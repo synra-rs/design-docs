@@ -30,96 +30,186 @@
 ## 1. 当前目录形态（设计期）
 
 ```
-D:/Projects/synra-rust/            # ← 设计期的容器（三者未来各自独立成仓库）
-├─ design-docs/                    # ★ 本文档集；未来独立发一个仓库
-├─ synra-rust-core/                # 内核仓库骨架（目前只有 README.md，尚未 git init）
-└─ synra-rust-app/                 # 应用仓库骨架（目前只有 README.md，尚未 git init）
+D:/Projects/synra-rust/          # ← 设计期的临时容器（各仓库最终各自独立）
+├─ design-docs/                   # ★ 本仓库（synra-rs/design-docs，已推送）
+├─ synra-rust-core/               # 内核骨架（只有 README.md）
+└─ synra-rust-app/                # 应用骨架（只有 README.md）
 ```
 
-**未来的目标形态**（对齐本机生态里 `peon-burrow` / `peon-hall` 的做法）：
+> 目录名带 `synra-rust-` 前缀是**设计期遗留**，与仓库名（`synra-core` / `synra-app`）不同。
+> 位置按业主指示**不动**；GitHub 上的仓库名才是权威。
+
+**目标形态**（五个独立仓库，对齐本机生态里 `peon-burrow` / `peon-hall` 的做法）：
 
 ```
 D:/Projects/
-├─ synra-rust-core/                # 独立仓库 1：Rust workspace（内核 + CLI + 工具）
-├─ synra-rust-app/                 # 独立仓库 2：Tauri 应用（桌面 + 移动 + 前端）
-└─ synra-design-docs/              # 独立仓库 3（或并入 core 的 design-docs/）
+├─ synra-core/     →  github.com/synra-rs/synra-core      内核（Cargo workspace）
+├─ synra-app/      →  github.com/synra-rs/synra-app       Tauri 应用（桌面 + 移动）
+├─ synra-js/   →  github.com/synra-rs/synra-js   插件 UI 的类型库（TS 包 monorepo）
+├─ design-docs/    →  github.com/synra-rs/design-docs    ★ 本仓库：设计文档（内部）
+└─ docs/           →  github.com/synra-rs/docs            官网 + 用户文档 + schema（对外）
 ```
+
+### 1.1 `design-docs` 与 `docs` 是**两个不同的仓库**
+
+这是最容易混的一点，务必分清：
+
+| | **`design-docs`**（本仓库） | **`docs`**（另一个仓库） |
+| --- | --- | --- |
+| 读者 | **实现者**（我们自己） | **用户 / 插件作者** |
+| 内容 | 目标架构、协议契约、ADR、风险、路线图 | 官网首页、使用指南、命令参考、插件作者手册 |
+| 语气 | "为什么这样设计、有哪些取舍、哪里还没定" | "怎么装、怎么用、这个参数是什么" |
+| 是否发布到站点 | ❌ **不上站点**（[27 §3](./27-website.md) 会说明理由） | ✅ 就是站点本身 |
+| 权威性 | 设计决策的唯一权威 | 面向用户的事实，与实现保持一致 |
+| 技术栈 | 纯 Markdown | VitePress + Netlify |
+| 域名 | — | `synra-app.dev` |
+
+**两者都必须存在，不能合并**：
+设计文档里有大量"还没定 / 我们决定不做 / 这个限制的代价是什么"的内容，
+对用户发布是有害的（把内部权衡当承诺）；而用户文档里的"怎么用"对实现者也不够。
+
+> **交叉引用约定**：设计文档引用用户文档时写
+> `synra-rs/docs` 仓库的 `guide/xxx.md`（纯文本 + 链接），反之亦然。
 
 ---
 
 ## 2. 已拍板的关键决策（速查）
 
-| # | 决策                                                       | 落点 |
-| - | ---------------------------------------------------------- | ---- |
-| 1 | **拆两个仓库**：`synra-rust-core` + `synra-rust-app`          | §3、[ADR-016](./20-adr.md) |
-| 2 | **插件只做双轨**（headless Wasm + UI WebView），不做"纯 UI 插件" | [09 §2](./09-plugin-system.md)、[13 §1](./13-plugin-authoring.md)、[ADR-002](./20-adr.md) |
-| 3 | **不做集群 / 选主**，保持对等直连                              | [ADR-011](./20-adr.md)、[19 §7](./19-roadmap.md) |
-| 4 | **前端用标准 Vite + pnpm + Vitest**                          | [ADR-012](./20-adr.md) |
-| 5 | **当前无 macOS 环境**：M0 只做 Android 的 spike，iOS 推迟      | [19 §0.1](./19-roadmap.md)、[R-14](./22-risks.md) |
-| 6 | **协议是全新设计**，不兼容任何历史实现                          | [04 §9](./04-wire-protocol.md) |
-| 7 | **核心要稳 / 封装要精致 / 性能内建于设计**（三条贯穿性要求落成可检查规则） | [26](./26-core-stability-and-perf.md) |
+| #  | 决策                                                         | 落点 |
+| -- | ------------------------------------------------------------ | ---- |
+| 1  | **拆五个仓库**：core / app / client / design-docs / docs         | §3、[ADR-016](./20-adr.md) |
+| 2  | **插件只做双轨**（headless Wasm + UI WebView），不做"纯 UI 插件"   | [09 §2](./09-plugin-system.md)、[13 §1](./13-plugin-authoring.md)、[ADR-002](./20-adr.md) |
+| 3  | **不做集群 / 选主**，保持对等直连                                | [ADR-011](./20-adr.md)、[19 §7](./19-roadmap.md) |
+| 4  | **前端用标准 Vite + pnpm + Vitest**                            | [ADR-012](./20-adr.md) |
+| 5  | **当前无 macOS 环境**：M0 只做 Android 的 spike，iOS 推迟         | [19 §0.1](./19-roadmap.md)、[R-14](./22-risks.md) |
+| 6  | **协议是全新设计**，不兼容任何历史实现                            | [04 §9](./04-wire-protocol.md) |
+| 7  | **核心要稳 / 封装要精致 / 性能内建于设计**                        | [26](./26-core-stability-and-perf.md) |
+| 8  | **官网 = 用户文档 = schema 托管**，同一个仓库（`docs`），VitePress + Netlify | [27](./27-website.md) |
+| 9  | **域名 `synra-app.dev`**；包标识符 **`dev.synra-app.app`**        | [22 Q-11](./22-risks.md) |
 
 ---
 
-## 3. 仓库拓扑（已决策：拆两个仓库）
+## 3. 仓库拓扑（五个仓库）
 
-沿用本机生态的做法（`peon-burrow` ↔ `peon-hall`）：**内核与宿主是两个独立 git 仓库，并排放在同一个父目录下**。
+沿用本机生态的做法（`peon-burrow` ↔ `peon-hall`）：**各仓库独立，并排放在同一个父目录下**。
+
+### 3.1 `synra-core` — 内核
 
 ```
-synra-rust-core/                   # 内核 + CLI + 工具（Cargo workspace）
-├─ Cargo.toml                       #   resolver = "3", edition 2024, MSRV 见 §8
-├─ STABILITY.md                     #   稳定性分级（哪些 crate 遵守 SemVer）
-├─ design-docs/                     #   本文档集中归 core 的部分
-├─ crates/                          #   11 个内核 crate
-│  ├─ synra-protocol/               #     线协议（无 IO）
-│  ├─ synra-capability/             #     capability DSL（纯函数）
-│  ├─ synra-net/                    #     发现 + 传输
-│  ├─ synra-store/                  #     SQLite + 文件沙箱 + 密钥
-│  ├─ synra-observe/                #     tracing / metrics / 诊断包
-│  ├─ synra-plugin-api/             #     插件契约（纯类型 + WIT 绑定）
-│  ├─ synra-plugin-host/            #     ★ Wasm 沙箱 + 能力闸门
-│  ├─ synra-plugin-ui/              #     UI 插件 artifact 管理
-│  ├─ synra-platform/               #     Platform trait + 各平台实现
-│  ├─ synra-core/                   #     ★ 领域内核 + 编排
-│  └─ synra-testkit/                #     测试夹具（publish = false）
-├─ apps/{synra-cli,synra-daemon}/    #   薄宿主（也是"内核不依赖 UI"的验收工具）
+synra-core/
+├─ Cargo.toml                      #   resolver = "3", edition 2024, MSRV 见 §8
+├─ STABILITY.md                    #   ★ 稳定性分级（[26 §2](./26-core-stability-and-perf.md)）
+├─ api/*.txt                       #   ★ cargo public-api 快照
+├─ crates/
+│  ├─ synra-protocol/              #     线协议（无 IO：不依赖 tokio/rusqlite/wasmtime）
+│  ├─ synra-capability/            #     capability DSL（纯函数、零分配匹配）
+│  ├─ synra-net/                   #     发现 + 传输
+│  ├─ synra-store/                 #     SQLite + 文件沙箱 + 密钥
+│  ├─ synra-observe/               #     tracing / metrics / 诊断包
+│  ├─ synra-plugin-api/            #     插件契约（纯类型 + WIT 绑定）
+│  ├─ synra-plugin-host/           #     ★ Wasm 沙箱 + 能力闸门
+│  ├─ synra-plugin-ui/             #     UI 插件 artifact 管理
+│  ├─ synra-platform/              #     Platform trait + 各平台实现
+│  ├─ synra-core/                  #     ★ 领域内核 + 编排
+│  └─ synra-testkit/               #     测试夹具（publish = false）
+├─ apps/{synra-cli,synra-daemon}/   #   薄宿主（"内核不依赖 UI"的验收工具）
 ├─ tools/{synra-plugin-cli,wit-codegen}/
-├─ wit/synra-plugin.wit             #   ★ 插件接口定义（单一真相源）
-└─ spike/                           #   M0 的技术验证（[19 §0.1](./19-roadmap.md)）
-
-synra-rust-app/                    # Tauri 应用（桌面 + 移动 + 前端）
-├─ package.json / vite.config.ts     #   标准 Vite + pnpm（[ADR-012](./20-adr.md)）
-├─ design-docs/                      #   本文档集中归 app 的部分
-├─ src/                              #   前端：宿主 UI + 插件 UI 运行时
-└─ src-tauri/                        #   ~40 个 command + Platform 实现 + UI 插件承载
+├─ wit/synra-plugin.wit            #   ★ 插件接口定义（单一真相源）
+├─ fixtures/wire/ · benches/ · fuzz/
+└─ spike/                          #   M0 的技术验证（[19 §0.1](./19-roadmap.md)）
 ```
 
-### 3.1 为什么拆
+**本仓库不含设计文档** —— 设计文档在 [`docs` 仓库](https://github.com/synra-rs/docs)。
+
+### 3.2 `synra-app` — Tauri 应用
+
+```
+synra-app/
+├─ package.json / vite.config.ts    #   标准 Vite + pnpm（[ADR-012](./20-adr.md)）
+├─ src/                             #   宿主 UI
+│  ├─ pages/{home,plugins,devices,settings}/
+│  ├─ components/ · stores/ · ipc/
+│  └─ generated/                    #   ★ 生成物，CI 有 types-check
+└─ src-tauri/                       #   ~40 个 command + Platform 实现 + UI 插件承载
+   ├─ tauri.conf.json               #   identifier = dev.synra-app.app
+   └─ src/inject/                   #   ★ 注入 window.synra（必须 satisfies SynraClient）
+```
+
+### 3.3 `synra-js` — 插件 UI 的类型库
+
+```
+synra-js/packages/
+├─ synra/          # 类型汇总入口（作者一般不装，靠传递依赖解析）
+├─ client/         # @synra/client —— .d.ts only（零运行时）
+├─ protocol/       # @synra/protocol —— 线协议类型（Rust 生成）
+└─ testkit/        # @synra/testkit —— 插件作者的 mock 运行时
+```
+
+详见 [23](./23-client-library.md) 与 [25](./25-js-monorepo.md)。
+
+### 3.4 `design-docs` — 设计文档（本仓库）
+
+```
+design-docs/
+├─ README.md · 01-charter.md · … · 27-website.md   # 27 篇（见 §4 分流表）
+└─ 无构建：纯 Markdown，不上站点（理由见 §1.1）
+```
+
+### 3.5 `docs` — 官网 + 用户文档 + schema
+
+```
+docs/
+├─ .vitepress/                # VitePress 配置与主题
+├─ guide/ · reference/        # 英文内容（面向用户 / 插件作者）
+├─ zh/                        # 简中（与英文结构镜像，CI 强制）
+├─ public/
+│  ├─ schema/                 # ★ JSON Schema（https://synra-app.dev/schema/…）
+│  └─ CNAME                   #   synra-app.dev
+├─ netlify.toml               #   构建、重定向、缓存头
+└─ scripts/                   #   结构校验等
+```
+
+详见 [27 官网设计](./27-website.md)。
+
+### 3.6 为什么拆
 
 | 理由                    | 说明                                                                       |
 | ----------------------- | -------------------------------------------------------------------------- |
 | **内核可独立发布与消费** | `synra-protocol` / `synra-capability` / `synra-plugin-api` 有独立价值         |
-| **发布节奏解耦**         | 内核发 crates.io，应用发安装包（Tauri bundler），互不阻塞                       |
-| **CI 更轻**             | 内核 CI 不需要 Node/WebView/NDK；应用 CI 不需要跑 wasmtime 的 feature 矩阵      |
+| **发布节奏解耦**         | 内核发 crates.io，应用发安装包，类型库发 npm，站点发 Netlify —— 互不阻塞         |
+| **CI 更轻**             | 内核 CI 不需要 Node/WebView/NDK；站点 CI 不需要 Rust 工具链                    |
 | **物理强制内核边界**     | 应用仓库的代码**不可能**被内核 crate 依赖（反之亦然）——比"文档铁律"硬              |
 | **移动端生成物体积**     | `gen/android` + `gen/apple` 不进内核仓库                                     |
+| **设计文档不能对用户发布** | 里面有"还没定 / 决定不做 / 这个限制的代价"，发出去会被当成承诺（§1.1、[27 §3](./27-website.md)） |
+| **schema 与用户文档同源** | schema 与描述它的页面必须一起改，放两个仓库必然漂移（[27 §2](./27-website.md)）    |
 
-### 3.2 跨仓库的接口（唯三接触点）
+### 3.7 跨仓库的接口
 
 | # | 接触点                              | 形态                                                       |
 | - | ----------------------------------- | ---------------------------------------------------------- |
 | 1 | Rust API（`synra-core`）             | 版本依赖；`Kernel` 的公开方法                                |
-| 2 | TypeScript 类型                      | core 侧用 `ts-rs` 生成 → 发 npm 包（或 app 侧 build script 生成） |
-| 3 | 插件 UI 的类型库（`@synra/client`）  | **`.d.ts` only（零运行时）**；描述注入给插件 WebView 的全局 `synra`（[23](./23-client-library.md)） |
+| 2 | TypeScript 类型                      | core 的 `ts-rs` 生成 → `synra-js` 的 `@synra/protocol`   |
+| 3 | 插件 UI 的形状契约（`@synra/client`）  | **`.d.ts` only**；app 的注入脚本按它实现（[23](./23-client-library.md)） |
+| 4 | 插件契约（WIT）                      | `wit/synra-plugin.wit` → 插件 SDK 与宿主实现                  |
+| 5 | **JSON Schema（公开 URL）**           | `docs` 仓库的 `public/schema/**` → `https://synra-app.dev/schema/…`，被插件 manifest 的 `$schema` 引用 |
 
-**除此之外没有第四个**。应用不得直接依赖 `synra-net` / `synra-store` / `synra-plugin-host` 的内部类型。
+**没有第六个。** 应用不得直接依赖 `synra-net` / `synra-store` / `synra-plugin-host` 的内部类型。
 
-**跨仓库引用约定**：写「仓库名 + 路径」的**纯文本**，并给本地相对链接（GitHub 上跨仓库链接会失效）。
+**跨仓库引用约定**：写「仓库名 + 路径」的**纯文本**，并给 GitHub 链接（本地相对路径在跨仓库时不存在）。
 
-| 从                                 | 到 core                   | 到 app                    |
-| ---------------------------------- | ------------------------- | ------------------------- |
-| `synra-rust-core/design-docs/*.md`  | 同仓库 → `./`             | `../../synra-rust-app/…`  |
-| `synra-rust-app/design-docs/*.md`   | `../../synra-rust-core/…` | 同仓库 → `./`             |
+| 从                       | 指向                    | 写法 |
+| ------------------------ | ----------------------- | ---- |
+| 任一仓库                  | `synra-core`             | ``synra-rs/synra-core`` 的 `crates/synra-protocol/` |
+| 任一仓库                  | `synra-app`              | ``synra-rs/synra-app`` 的 `src-tauri/src/inject/` |
+| 任一仓库                  | `synra-js`           | ``synra-rs/synra-js`` 的 `packages/client/` |
+| 任一仓库                  | `design-docs`（本仓库）   | 本地相对链接（`./` 或 `../`） |
+| 设计文档 → 用户文档        | `docs`                   | ``synra-rs/docs`` 的 `guide/installation.md` |
+| 用户文档 → 设计文档        | `design-docs`            | ❌ **不要链**（用户不该读内部设计，[27 §3](./27-website.md)） |
+
+> **本地相对链接只在同一仓库内有效。** 设计文档之间用 `./` 相对链接；
+> 跨到 `synra-core` / `synra-app` / `synra-js` / `docs` 时一律用 GitHub URL 或纯文本仓名。
+
+
 
 ---
 
@@ -127,38 +217,39 @@ synra-rust-app/                    # Tauri 应用（桌面 + 移动 + 前端）
 
 | #   | 文档                                          | 归属     | 内容                                                       |
 | --- | --------------------------------------------- | -------- | ---------------------------------------------------------- |
-| 01  | [设计纲要](./01-charter.md)                    | core     | 目标 / 非目标、设计原则、成功判据、术语                      |
-| 02  | [领域模型与用户旅程](./02-domain-and-flows.md)   | core     | 领域对象、三条主流程、业务规则清单                            |
-| 03  | [架构基线](./03-architecture-baseline.md)       | core     | 三环模型、状态归属、分层与依赖方向                            |
-| 04  | [线协议](./04-wire-protocol.md)                 | core     | 帧 / 信封 / 事件 / 会话 / 传输 / 发现 / 演进                  |
-| 05  | [系统架构](./05-system-architecture.md)         | core     | 进程与线程模型、Tauri 边界、部署形态、关键决策                 |
-| 06  | [Workspace 与 Crate 规划](./06-workspace-layout.md) | core | core 仓库的目录、依赖图、feature、lint、CI 守卫               |
-| 07  | [领域内核](./07-core-kernel.md)                 | core     | 聚合根、类型状态机、监督、意图路由、错误模型                   |
-| 08  | [IPC 契约与前端集成](./08-ipc-and-frontend.md)   | **app**  | Tauri command/event、生成式类型、前端 stores、UI 插件 IPC      |
-| 09  | [插件系统](./09-plugin-system.md)               | core     | 双轨运行时、信任模型、UI 插件承载的抽象边界                    |
-| 10  | [能力模型与沙箱强制](./10-capability-and-sandbox.md) | core | capability DSL、三层闸门、配额、逃逸面收敛                   |
-| 11  | [设计原则：必须避免什么](./11-design-principles.md) | core | 从真实工程事故中提炼的硬性约束                            |
-| 12  | [Wasm 宿主](./12-wasm-host.md)                  | core     | 组件模型、wasmtime 配置、中断、实例池、故障隔离                |
-| **13** | ★ [**插件写法**](./13-plugin-authoring.md)   | core     | **作者写什么代码 / manifest / 构建产物 / 运行期谁调谁** + 待讨论缺口 |
-| 14  | [插件生命周期](./14-plugin-lifecycle.md)         | core     | 安装 → 校验 → 激活 → 降级 → 卸载的状态机                     |
-| 15  | [插件 SDK 与作者契约](./15-plugin-sdk.md)        | core     | Rust SDK、WIT 世界、CLI、打包与签名规范                       |
-| 16  | [插件分发](./16-plugin-distribution.md)          | core     | Registry、签名与信任链、跨设备同步、冲突解决                    |
-| 17  | [存储与配置](./17-storage-and-config.md)         | core     | SQLite schema、文件沙箱、密钥、GC                             |
-| 18  | [可观测性与诊断](./18-observability.md)          | core     | tracing、指标、跨设备 trace、诊断包、崩溃处理                   |
-| 19  | [实施路线图](./19-roadmap.md)                    | core     | M0–M6 + M0 的技术验证 spike，每步标仓库归属                    |
-| 20  | [架构决策记录（ADR）](./20-adr.md)               | core     | ADR 全集                                                     |
-| 21  | [测试与验证策略](./21-testing-strategy.md)       | core     | 分层测试、恶意插件对抗、性能基准（app 侧另列）                   |
-| 22  | [风险与开放问题](./22-risks.md)                  | core     | 风险登记、决策台账、技术天花板                                  |
-| **23** | ★ [**类型库 `@synra/client`**](./23-client-library.md)  | **js** | **`.d.ts` only（零运行时）**；`types: ["@synra/client"]` 一行拿到全局 `synra` 与 `window.synra` |
-| 24  | [文档编写约定与维护](./24-migration-map.md)      | core     | 约定、评审机制、文档如何随设计演进                               |
-| **25** | ★ [**JS 包 monorepo**](./25-js-monorepo.md)             | **js**   | `synra` / `@synra/client` / `@synra/protocol` / `@synra/testkit` 的仓库形态、发布、版本、CI 守卫 |
-| **26** | ★ [**核心稳定性、封装与性能**](./26-core-stability-and-perf.md) | core | 三条贯穿性要求的**可检查规则**：稳定层义务、封装四律、热路径零分配、数据结构选型 |
+| 01  | [设计纲要](./01-charter.md)                    | `synra-core` | 目标 / 非目标、设计原则、成功判据、术语                      |
+| 02  | [领域模型与用户旅程](./02-domain-and-flows.md)   | `synra-core` | 领域对象、三条主流程、业务规则清单                            |
+| 03  | [架构基线](./03-architecture-baseline.md)       | `synra-core` | 三环模型、状态归属、分层与依赖方向                            |
+| 04  | [线协议](./04-wire-protocol.md)                 | `synra-core` | 帧 / 信封 / 事件 / 会话 / 传输 / 发现 / 演进                  |
+| 05  | [系统架构](./05-system-architecture.md)         | `synra-core` | 进程与线程模型、Tauri 边界、部署形态、关键决策                 |
+| 06  | [Workspace 与 Crate 规划](./06-workspace-layout.md) | `synra-core` | core 仓库的目录、依赖图、feature、lint、CI 守卫               |
+| 07  | [领域内核](./07-core-kernel.md)                 | `synra-core` | 聚合根、类型状态机、监督、意图路由、错误模型                   |
+| 08  | [IPC 契约与前端集成](./08-ipc-and-frontend.md)   | `synra-app` | Tauri command/event、生成式类型、前端 stores、UI 插件 IPC      |
+| 09  | [插件系统](./09-plugin-system.md)               | `synra-core` | 双轨运行时、信任模型、UI 插件承载的抽象边界                    |
+| 10  | [能力模型与沙箱强制](./10-capability-and-sandbox.md) | `synra-core` | capability DSL、三层闸门、配额、逃逸面收敛                   |
+| 11  | [设计原则：必须避免什么](./11-design-principles.md) | `synra-core` | 从真实工程事故中提炼的硬性约束                            |
+| 12  | [Wasm 宿主](./12-wasm-host.md)                  | `synra-core` | 组件模型、wasmtime 配置、中断、实例池、故障隔离                |
+| **13** | ★ [**插件写法**](./13-plugin-authoring.md)   | `synra-app` | **作者写什么代码 / manifest / 构建产物 / 运行期谁调谁** + 待讨论缺口 |
+| 14  | [插件生命周期](./14-plugin-lifecycle.md)         | `synra-core` | 安装 → 校验 → 激活 → 降级 → 卸载的状态机                     |
+| 15  | [插件 SDK 与作者契约](./15-plugin-sdk.md)        | `synra-core` | Rust SDK、WIT 世界、CLI、打包与签名规范                       |
+| 16  | [插件分发](./16-plugin-distribution.md)          | `synra-core` | Registry、签名与信任链、跨设备同步、冲突解决                    |
+| 17  | [存储与配置](./17-storage-and-config.md)         | `synra-core` | SQLite schema、文件沙箱、密钥、GC                             |
+| 18  | [可观测性与诊断](./18-observability.md)          | `synra-core` | tracing、指标、跨设备 trace、诊断包、崩溃处理                   |
+| 19  | [实施路线图](./19-roadmap.md)                    | `synra-core` | M0–M6 + M0 的技术验证 spike，每步标仓库归属                    |
+| 20  | [架构决策记录（ADR）](./20-adr.md)               | `synra-core` | ADR 全集                                                     |
+| 21  | [测试与验证策略](./21-testing-strategy.md)       | `synra-core` | 分层测试、恶意插件对抗、性能基准（app 侧另列）                   |
+| 22  | [风险与开放问题](./22-risks.md)                  | `synra-core` | 风险登记、决策台账、技术天花板                                  |
+| **23** | ★ [**类型库 `@synra/client`**](./23-client-library.md)  | `synra-js` | **`.d.ts` only（零运行时）**；`types: ["@synra/client"]` 一行拿到全局 `synra` 与 `window.synra` |
+| 24  | [文档编写约定与维护](./24-migration-map.md)      | `synra-core` | 约定、评审机制、文档如何随设计演进                               |
+| **25** | ★ [**JS 包 monorepo**](./25-js-monorepo.md)             | `synra-js` | `synra` / `@synra/client` / `@synra/protocol` / `@synra/testkit` 的仓库形态、发布、版本、CI 守卫 |
+| **26** | ★ [**核心稳定性、封装与性能**](./26-core-stability-and-perf.md) | `synra-core` | 三条贯穿性要求的**可检查规则**：稳定层义务、封装四律、热路径零分配、数据结构选型 |
+| **27** | ★ [**官网与文档站**](./27-website.md)                | `docs` | 站点结构、双语策略、Netlify 部署、**schema 托管与冻结**、写作规范 |
 
-> 编号到 26；**23 与 25 是 JS 仓库的文档**（类型库与包 monorepo），其余在 core（[08](./08-ipc-and-frontend.md) 与 [13 §5](./13-plugin-authoring.md) 归 app）。
+> **归属列用的是真实仓库名**（`synra-core` / `synra-app` / `synra-js` / `docs`）。本仓库（`design-docs`）本身是设计文档的家，不再单列一列。
 
 ### 4.1 需要**拆成两份**的内容
 
-| 位置                                        | core 部分                              | app 部分                                    |
+| 位置                                        | `synra-core` 部分                        | `synra-app` 部分                              |
 | ------------------------------------------- | -------------------------------------- | ------------------------------------------- |
 | [09 §5 UI 插件的承载](./09-plugin-system.md) | `trait UiHost` 抽象 + 令牌签发/校验      | WebView/iframe 创建、CSP、`on_navigation`     |
 | [08](./08-ipc-and-frontend.md)               | 只需知道"内核通过命令暴露面"             | **整篇**（command 清单、类型生成、stores）     |
@@ -167,27 +258,29 @@ synra-rust-app/                    # Tauri 应用（桌面 + 移动 + 前端）
 
 ### 4.2 路线图的仓库归属
 
-| 里程碑 | 主要仓库 | 另一仓库的并行工作                                                  |
-| ------ | -------- | ------------------------------------------------------------------- |
-| M0     | **两个** | core：workspace/CI/**技术验证 spike**；app：前端骨架（假内核）+ Tauri 壳层 |
-| M1     | core     | app：用假内核渲染四页                                                 |
-| M2     | core     | app：设备页接线                                                      |
-| M3     | core     | app：插件页、授权、审计 UI                                            |
-| M4     | **app**  | core：平台能力补齐、插件 UI artifact 服务                              |
-| M5     | **app**  | core：移动端 wasm 后端验证                                            |
-| M6     | 两个     | —                                                                   |
+| 里程碑 | 主仓库        | 并行工作                                                        |
+| ------ | ------------- | --------------------------------------------------------------- |
+| M0     | **三个**      | `synra-core`：workspace/CI/**技术验证 spike**；`synra-app`：Tauri 壳层 + 假内核四页；`synra-js`：包骨架与类型生成管线 |
+| M1     | `synra-core`  | `synra-app`：用假内核渲染四页；`synra-js`：`@synra/protocol` 生成物首次发布 |
+| M2     | `synra-core`  | `synra-app`：设备页接线                                             |
+| M3     | `synra-core`  | `synra-app`：插件页、授权、审计 UI；`synra-js`：`@synra/client` 定稿   |
+| M4     | `synra-app`   | `synra-core`：平台能力补齐、插件 UI artifact 服务；`docs`：站点骨架与 P0 页面 |
+| M5     | `synra-app`   | `synra-core`：移动端 wasm 后端验证                                   |
+| M6     | `synra-core`  | `synra-app`：发布准备；`docs`：schema 冻结与全站内容；`synra-js`：v1 发布 |
 
 ### 4.3 测试的仓库归属
 
-| 测试类型                     | 仓库 | 说明                                  |
-| ---------------------------- | ---- | ------------------------------------- |
-| 协议编解码 / 一致性            | core | [21 §2–3](./21-testing-strategy.md)    |
-| 内核集成（`KernelPair`）       | core | [21 §4](./21-testing-strategy.md)      |
-| 恶意插件对抗（headless）        | core | [21 §5.1](./21-testing-strategy.md)    |
-| 敏感数据                      | core | [21 §6](./21-testing-strategy.md)      |
-| UI 插件对抗（CSP/跨 origin）   | app  | [21 §5.2](./21-testing-strategy.md)    |
-| 前端行为回归                   | app  | [21 §7](./21-testing-strategy.md)      |
-| 桌面 E2E（`tauri-driver`）     | app  | [21 §10](./21-testing-strategy.md)     |
+| 测试类型                          | 仓库          | 说明                                  |
+| --------------------------------- | ------------- | ------------------------------------- |
+| 协议编解码 / 一致性                 | `synra-core`  | [21 §2–3](./21-testing-strategy.md)    |
+| 内核集成（`KernelPair`）            | `synra-core`  | [21 §4](./21-testing-strategy.md)      |
+| 恶意插件对抗（headless）             | `synra-core`  | [21 §5.1](./21-testing-strategy.md)    |
+| 敏感数据                           | `synra-core`  | [21 §6](./21-testing-strategy.md)      |
+| UI 插件对抗（CSP / 跨 origin）       | `synra-app`   | [21 §5.2](./21-testing-strategy.md)    |
+| 前端行为回归                        | `synra-app`   | [21 §7](./21-testing-strategy.md)      |
+| 桌面 E2E（`tauri-driver`）          | `synra-app`   | [21 §10](./21-testing-strategy.md)     |
+| **类型库形状一致性 / 零运行时**        | `synra-js`    | [25 §6](./25-js-monorepo.md)（8 条守卫） |
+| **站点：双语言结构 / 死链 / schema**   | `docs`        | [27 §7](./27-website.md)（10 条守卫）   |
 
 ---
 

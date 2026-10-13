@@ -1,18 +1,18 @@
 # 08 · IPC 契约与前端集成
 
-> 📍 **归属：`synra-rust-app` 仓库**（[README §2 分流表](./README.md)）。本文是**唯一一篇整篇进 app 仓库的文档**。
+> 📍 **归属：`synra-app` 仓库**（[README §2 分流表](./README.md)）。本文是**唯一一篇整篇进 app 仓库的文档**。
 >
 > 本文定义 Tauri 侧（第 2 环）与前端（第 3 环）之间的契约，以及前端如何从"业务宿主"退化为"渲染层"。
 > 对应 [06 三环模型](./05-system-architecture.md) 的第 2↔3 环边界。
 >
 > ⚠️ **迁移到 app 仓库时**：文中所有 `./NN-*.md` 的相对链接要改成跨仓库形式——
-> core 的文档在 `../../synra-rust-core/design-docs/`（[README §2.1](./README.md) 的路径基准表）。
+> core 的文档在 `../../synra-core/design-docs/`（[README §2.1](./README.md) 的路径基准表）。
 
 ---
 
 ## 0. 与 core 的边界（先说清楚）
 
-| 属于 core（`synra-rust-core`）          | 属于本文（`synra-rust-app`）                     |
+| 属于 core（`synra-core`）          | 属于本文（`synra-app`）                     |
 | --------------------------------------- | ------------------------------------------------ |
 | `KernelEvent` 枚举（事件的事实来源）      | 事件 → Tauri `emit` 的桥、前端的 `switch` 分发     |
 | `SynraError` + 稳定错误码（错误的事实来源） | `IpcError` + `SuggestedAction`（面向 UI 的映射）   |

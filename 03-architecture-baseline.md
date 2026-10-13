@@ -10,7 +10,7 @@
 
 ```
 ╔═══════════════════════════════════════════════════════════════════════════════╗
-║  第 3 环 · 表示层（Presentation）  ——  synra-rust-app 仓库                     ║
+║  第 3 环 · 表示层（Presentation）  ——  synra-app 仓库                     ║
 ║                                                                               ║
 ║   Tauri WebView                                                               ║
 ║     ├─ 宿主 UI：Home / Plugins / Devices / Settings                            ║
@@ -20,7 +20,7 @@
 ╚═══════════════════════════════════╦═══════════════════════════════════════════╝
                                     ║  IPC（强类型，可审计）
 ╔═══════════════════════════════════▼═══════════════════════════════════════════╗
-║  第 2 环 · 宿主壳（Host Shell）  ——  synra-rust-app 仓库                       ║
+║  第 2 环 · 宿主壳（Host Shell）  ——  synra-app 仓库                       ║
 ║                                                                               ║
 ║   Tauri 应用                                                                   ║
 ║     ├─ 窗口 / 菜单 / 托盘 / 通知 / 深链 / 文件关联                              ║
@@ -31,7 +31,7 @@
 ╚═══════════════════════════════════╦═══════════════════════════════════════════╝
                                     ║  直接函数调用（同进程）
 ╔═══════════════════════════════════▼═══════════════════════════════════════════╗
-║  第 1 环 · 内核（Kernel）  ——  synra-rust-core 仓库                            ║
+║  第 1 环 · 内核（Kernel）  ——  synra-core 仓库                            ║
 ║                                                                               ║
 ║   synra-core        领域模型、聚合根、状态机、编排                              ║
 ║   synra-protocol    线协议（帧、信封、事件、会话）—— 无 IO                       ║
@@ -240,8 +240,8 @@ DeviceCard = f(Discovery, Trust, Transport, Identity)
 | 新的 capability 域               | `synra-capability`（先改 [10](./10-capability-and-sandbox.md)） |
 | 新的平台能力                     | `trait Platform` + 各实现（先改本文 §3）              |
 | 新的领域状态                     | 一个聚合根里（先改本文 §4）                          |
-| 新的 Tauri command               | `synra-rust-app/src-tauri/commands`（先改 [08](./08-ipc-and-frontend.md)） |
-| 新的前端 store                   | `synra-rust-app/src/stores`（必须是只读镜像或纯 UI 状态） |
+| 新的 Tauri command               | `synra-app/src-tauri/commands`（先改 [08](./08-ipc-and-frontend.md)） |
+| 新的前端 store                   | `synra-app/src/stores`（必须是只读镜像或纯 UI 状态） |
 | 新的插件能力（host function）      | `synra-plugin-host/host_funcs`（必须过闸门，[10 §3.1](./10-capability-and-sandbox.md)） |
 | 新的长驻后台任务                  | `Supervisor` 里的一个 `TaskSpec`（[07 §5](./07-core-kernel.md)） |
 | 新的持久化表                     | `synra-store` 的迁移（先改 [17](./17-storage-and-config.md)） |

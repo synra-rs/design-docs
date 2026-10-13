@@ -110,7 +110,7 @@ synra-plugin-chat/
 ```jsonc
 // synra.json
 {
-  "$schema": "https://synra.dev/schema/manifest/v1.json",
+  "$schema": "https://synra-app.dev/schema/manifest/v1.json",
 
   "id": "@synra-plugin/chat",
   "version": "1.0.0",
@@ -624,7 +624,7 @@ dist/signature.json
 ### 5.1 它跑在哪
 
 ```
-synra-rust-app 的主 WebView（宿主 UI）
+synra-app 的主 WebView（宿主 UI）
   ┌─────────────────────────────────────────────────────────────────┐
   │  src/  （宿主自己的 Vue 应用）                                    │
   │    pages/{home,plugins,devices,settings}                          │
@@ -796,7 +796,7 @@ dist/ui.zip          （zip 内路径 < 256 字符，拒绝符号链接，禁止
 
 ```
                         ┌───────────────────────────────────────────────┐
-                        │  synra-rust-core（内核进程）                    │
+                        │  synra-core（内核进程）                    │
                         │                                               │
    ┌──────────────┐     │  ┌─────────────────┐   ┌───────────────────┐  │
    │ synra-net    │◀────┼──│ synra-core      │──▶│ synra-plugin-host │  │
@@ -826,7 +826,7 @@ dist/ui.zip          （zip 内路径 < 256 字符，拒绝符号链接，禁止
                                               ▲
                                               │ ⑨ SelfInvokeAction
                         ┌─────────────────────┴─────────────────────────┐
-                        │  synra-rust-app（Tauri）                       │
+                        │  synra-app（Tauri）                       │
                         │  ┌──────────────────────┐  ┌────────────────┐ │
                         │  │ commands/（~40 个）   │  │ plugin_ui.rs    │ │
                         │  │  plugin_ui_rpc ★令牌  │─▶│  创建 WebView   │ │
@@ -1176,4 +1176,4 @@ N 个这样的插件会持续消耗 CPU。
 | 签名 / registry / 跨设备同步          | [16](./16-plugin-distribution.md)                              |
 | **UI 侧的类型库 `@synra/client`** ★   | [23](./23-client-library.md)                                   |
 | UI 插件的 IPC、CSP 与令牌             | [08 §7](./08-ipc-and-frontend.md)                              |
-| 契约（WIT world）的完整定义            | `synra-rust-core/wit/synra-plugin.wit`（M2 产出）                |
+| 契约（WIT world）的完整定义            | `synra-core/wit/synra-plugin.wit`（M2 产出）                |

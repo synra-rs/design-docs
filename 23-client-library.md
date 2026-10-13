@@ -1,10 +1,10 @@
 # 23 · 客户端库 `@synra/client`
 
-> 本文定义插件 UI 侧的**类型库** `@synra/client`：它属于 **`synra-client` JS monorepo**（[25](./25-js-monorepo.md)），
+> 本文定义插件 UI 侧的**类型库** `@synra/client`：它属于 **`synra-js` JS monorepo**（[25](./25-js-monorepo.md)），
 > 是一个 **`.d.ts` only 包**——编译后**只有类型声明，没有任何 `.js`**。
 >
 > 前置：[25 JS 包 monorepo](./25-js-monorepo.md)（仓库与包的划分）、[13 §5 UI 部分](./13-plugin-authoring.md)（`window.synra` 的运行时形状）、[08 §7](./08-ipc-and-frontend.md)（UI 插件的 IPC 与令牌）。
-> 读者：插件作者 + `synra-rust-app` 的实现者。
+> 读者：插件作者 + `synra-app` 的实现者。
 
 ---
 
@@ -52,10 +52,10 @@ synra.log.info('mounted')
 ### 1.2 这个包属于一个多包仓库
 
 `@synra/client` 不是孤立的包，它和 `synra` / `@synra/protocol` / `@synra/testkit` 一起构成
-**`synra-client` monorepo**（详见 [25](./25-js-monorepo.md)）：
+**`synra-js` monorepo**（详见 [25](./25-js-monorepo.md)）：
 
 ```
-synra-client/packages/
+synra-js/packages/
 ├─ synra/               # 类型汇总入口（作者一般不装，靠传递依赖解析）
 ├─ client/              # ★ 本文：@synra/client
 ├─ protocol/            # 线协议类型（Rust 生成）
@@ -233,7 +233,7 @@ const off: Unsubscribe = synra.device.onChange(d => { /* d 自动是 DeviceTarge
 ### 3.4 五层类型来源
 
 ```
-synra-rust-core/crates/synra-protocol    （Rust 类型 = 数据层的唯一真相源）
+synra-core/crates/synra-protocol    （Rust 类型 = 数据层的唯一真相源）
         │  ts-rs 生成 → commit 到 JS 仓库
         ▼
 @synra/protocol                           （数据类型）
@@ -242,7 +242,7 @@ synra-rust-core/crates/synra-protocol    （Rust 类型 = 数据层的唯一真�
 @synra/client                             （注入契约 + declare global）
         │  tsconfig types / import type
         ▼
-synra-rust-app 的注入脚本                  （★ 按同一类型实现，保证两侧字段一致）
+synra-app 的注入脚本                  （★ 按同一类型实现，保证两侧字段一致）
         │
         ▼
 插件作者的 ui/src/**                        （业务代码，零 import 也能写）
@@ -503,7 +503,7 @@ export type NetworkErrorCode =
 
 ```ts
 // ★ 宿主的注入脚本必须用同一个类型来实现 fetch
-//   synra-rust-app 的注入脚本：
+//   synra-app 的注入脚本：
 import type { SynraFetchInit, SynraResponse } from '@synra/client'
 
 async function fetchImpl(input: string, init?: SynraFetchInit): Promise<SynraResponse> {
@@ -725,7 +725,7 @@ async function openOnLaptop(url: string) {
 
 ## 10. 实现清单
 
-`@synra/client`（`synra-client` 仓库）：
+`@synra/client`（`synra-js` 仓库）：
 
 - [ ] `surface.ts`：`SynraClient` 与 10 个 namespace 的接口
 - [ ] `global.d.ts`：`declare global { const synra; interface Window { synra? }; type Unsubscribe }`
@@ -737,7 +737,7 @@ async function openOnLaptop(url: string) {
 - [ ] **CI 守卫**：`dist/` 下不存在 `.js` / `.mjs` / `.cjs`
 - [ ] 形状断言测试（`tsd` 或 `expect-type`）：`SynraResponse` 字段与宿主实现逐一对齐
 
-`synra-rust-app` 侧（保证两侧字段一致）：
+`synra-app` 侧（保证两侧字段一致）：
 
 - [ ] 注入脚本 `import type { SynraClient } from '@synra/client'`，
       并用 `satisfies SynraClient`（或显式标注）实现——**漏字段/多字段在编译期就报错**

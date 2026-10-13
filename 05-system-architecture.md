@@ -4,8 +4,8 @@
 > 后续所有设计文档都必须与本文一致。
 >
 > 📍 **仓库归属**（[README §1](./README.md)、[ADR-016](./20-adr.md)）：
-> 第 1 环（内核）在 **`synra-rust-core`**；第 2 环的 Tauri 外壳与第 3 环（前端）在 **`synra-rust-app`**。
-> 本文 §2.1「桌面端」与 §5「UI 插件」的具体落点在 app 仓库（见 synra-rust-app 的 `design-docs/10-ipc-and-frontend.md`）。
+> 第 1 环（内核）在 **`synra-core`**；第 2 环的 Tauri 外壳与第 3 环（前端）在 **`synra-app`**。
+> 本文 §2.1「桌面端」与 §5「UI 插件」的具体落点在 app 仓库（见 synra-app 的 `design-docs/10-ipc-and-frontend.md`）。
 
 ---
 
@@ -25,7 +25,7 @@
 ╔═══════════════════════════════════▼═══════════════════════════════════════════╗
 ║                          第 2 环 · 宿主壳（Host Shell）                        ║
 ║                                                                               ║
-║   Tauri 应用（synra-rust-app 仓库：src-tauri + src）                          ║
+║   Tauri 应用（synra-app 仓库：src-tauri + src）                          ║
 ║     ├─ 窗口 / 菜单 / 托盘 / 通知 / 深链 / 文件关联                              ║
 ║     ├─ Tauri command 与 event 的注册（薄适配层，不含业务）                       ║
 ║     ├─ 平台能力实现（Platform trait 的 Tauri 实现）                             ║

@@ -550,10 +550,10 @@ Rust 版中，工具链职责主要落在 `cargo` + `just`；前端只是"渲染
 1. 前端从"业务宿主"退化为"渲染层"，其构建复杂度大幅下降；
 2. Tauri 官方模板用标准 Vite，兼容性风险低；
 3. 避免"两套包管理器/运行时"（Rust 用 cargo，前端用 pnpm）；
-4. 拆仓库后 `synra-rust-app` 是**独立仓库**，前端工具链不该与 core 的 `cargo`/`just` 耦合。
+4. 拆仓库后 `synra-app` 是**独立仓库**，前端工具链不该与 core 的 `cargo`/`just` 耦合。
 
 ### 后果
-- **正面**：前端依赖树更小；`synra-rust-app` 可用 Tauri 官方模板起步，减少定制。
+- **正面**：前端依赖树更小；`synra-app` 可用 Tauri 官方模板起步，减少定制。
 - **负面**：CI 需要分别配 `cargo` 与 `pnpm` 两套缓存（core 仓库只有 cargo；app 仓库两套都要）；
   失去 `vp` 的 Vite Task 编排 → app 仓库改用 `package.json` scripts。
 
@@ -742,7 +742,7 @@ MSRV 的唯一声明处是 `Cargo.toml` 的 `[workspace.package] rust-version`�
 
 ---
 
-## ADR-016 · 拆两个仓库：`synra-rust-core`（内核）+ `synra-rust-app`（Tauri）
+## ADR-016 · 拆两个仓库：`synra-core`（内核）+ `synra-app`（Tauri）
 
 **状态**：接受（2026-07，**业主确认**）
 
@@ -760,7 +760,7 @@ MSRV 的唯一声明处是 `Cargo.toml` 的 `[workspace.package] rust-version`�
 
 | 选项                                          | 优点                                                          | 缺点                                                          |
 | --------------------------------------------- | ------------------------------------------------------------- | ------------------------------------------------------------- |
-| **A. 拆两个仓库**（`synra-rust-core` + `synra-rust-app`） | 内核可独立发布/消费；发布节奏解耦；CI 更轻；**物理强制内核边界**；对齐生态 | 跨仓库引用失效；类型共享与版本绑定需要机制；两个 CI/tag；本地两个 clone |
+| **A. 拆两个仓库**（`synra-core` + `synra-app`） | 内核可独立发布/消费；发布节奏解耦；CI 更轻；**物理强制内核边界**；对齐生态 | 跨仓库引用失效；类型共享与版本绑定需要机制；两个 CI/tag；本地两个 clone |
 | B. 单一 workspace（`crates/` + `apps/`）        | 引用方便；一次 `cargo check` 全绿；版本天然一致                  | 内核无法独立演进；`cargo install` 会带上 Tauri 依赖图；移动端生成物污染仓库；发布时要靠 `publish=false` 手工隔离 |
 | C. 单仓库但用 Cargo 的 `exclude` 分区            | 折中                                                          | 分区是**约定**不是边界；跨区依赖照样能写；CI 还是要跑全量           |
 
@@ -771,8 +771,8 @@ MSRV 的唯一声明处是 `Cargo.toml` 的 `[workspace.package] rust-version`�
 ```
 D:/Projects/
 ├─ （本文档集未来独立成仓库）      # 设计文档
-├─ synra-rust-core/      # ★ 新仓库 1：Rust workspace（11 crate + CLI + daemon + 工具）
-└─ synra-rust-app/       # ★ 新仓库 2：Tauri（桌面 + 移动）+ 前端
+├─ synra-core/      # ★ 新仓库 1：Rust workspace（11 crate + CLI + daemon + 工具）
+└─ synra-app/       # ★ 新仓库 2：Tauri（桌面 + 移动）+ 前端
 ```
 
 **跨仓库的唯二接触点**（[README §1.3](./README.md)）：
@@ -824,4 +824,4 @@ D:/Projects/
 | 013 | 插件运行时用 Wasm 组件模型，不用 cdylib 插件系统                    | 接受 |
 | 014 | 不写 `rust-toolchain.toml`，MSRV 只写在 `Cargo.toml`               | 接受 |
 | 015 | 复用生态工具：`harbor` 发布、`cargo-bumpp` 版本                     | 接受 |
-| 016 | 拆两个仓库：`synra-rust-core` + `synra-rust-app`                   | 接受 |
+| 016 | 拆两个仓库：`synra-core` + `synra-app`                   | 接受 |

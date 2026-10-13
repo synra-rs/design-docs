@@ -1,4 +1,4 @@
-# 25 · JS 包 monorepo（`synra-client`）
+# 25 · JS 包 monorepo（`synra-js`）
 
 > 本文定义**面向插件的一部分 JavaScript/TypeScript 包**的仓库形态：
 > 谁在哪个包、怎么发布、`synra` 为什么"一般不用安装"、以及生成类型与形状一致性如何保证。
@@ -22,9 +22,9 @@
 
 ```
 D:/Projects/
-├─ synra-rust-core/        # 内核（Cargo workspace）
-├─ synra-rust-app/         # Tauri 应用（桌面 + 移动 + 宿主 UI）
-└─ synra-client/           # ★ 本文：TS 包 monorepo（插件作者用的东西）
+├─ synra-core/        # 内核（Cargo workspace）
+├─ synra-app/         # Tauri 应用（桌面 + 移动 + 宿主 UI）
+└─ synra-js/           # ★ 本文：TS 包 monorepo（插件作者用的东西）
 ```
 
 > 这与 [ADR-016](./20-adr.md) 不冲突：那里论证的是"**内核**与**宿主**必须分开"；
@@ -35,7 +35,7 @@ D:/Projects/
 ## 2. 包含哪些包
 
 ```
-synra-client/
+synra-js/
 ├─ package.json                 # 私有根包（不发布）
 ├─ pnpm-workspace.yaml          # packages/*
 ├─ pnpm-lock.yaml
@@ -65,13 +65,13 @@ CI 对前三个有"不允许产出 `.js`"的守卫（§6）。
 ### 2.2 `@synra/protocol`：生成物，不手写
 
 ```
-synra-rust-core/crates/synra-protocol/**   （Rust 类型 = 唯一真相源）
+synra-core/crates/synra-protocol/**   （Rust 类型 = 唯一真相源）
         │  cargo test -p synra-protocol --features ts-export   （ts-rs 导出）
         ▼
 生成到 core 仓库的 target/ts-export/*.ts
         │  pnpm --filter @synra/protocol sync   （scripts/gen-protocol-types.ts 复制并加头注释）
         ▼
-synra-client/packages/protocol/src/generated/*.ts   （★ commit 进仓库）
+synra-js/packages/protocol/src/generated/*.ts   （★ commit 进仓库）
 ```
 
 **为什么 commit 生成物而不是发布时生成**：
@@ -92,7 +92,7 @@ synra-client/packages/protocol/src/generated/*.ts   （★ commit 进仓库）
 /**
  * ⚠️ 自动生成，请勿手动修改。
  *
- * 来源：synra-rust-core/crates/synra-protocol
+ * 来源：synra-core/crates/synra-protocol
  * 生成：cargo test -p synra-protocol --features ts-export
  * 同步：pnpm --filter @synra/protocol sync
  */
@@ -209,7 +209,7 @@ export type { DeviceId, TransferId, DeviceTarget } from '@synra/protocol'
 ```jsonc
 // 根 package.json
 {
-  "name": "synra-client",
+  "name": "synra-js",
   "private": true,
   "packageManager": "pnpm@11.x",
   "scripts": {
@@ -241,12 +241,12 @@ export type { DeviceId, TransferId, DeviceTarget } from '@synra/protocol'
 ## 5. 与两个 Rust 仓库的关系
 
 ```
-synra-rust-core ──────────► synra-client ──────────► 插件作者
+synra-core ──────────► synra-js ──────────► 插件作者
    （协议真相源）              （生成 + 手写契约）         （tsconfig / devDeps）
         │                          ▲
         │                          │ 注入脚本按同一类型实现
         ▼                          │
-synra-rust-app ────────────────────┘
+synra-app ────────────────────┘
    （宿主：注入 window.synra）
 ```
 
@@ -263,7 +263,7 @@ synra-rust-app ────────────────────┘
 
 ## 6. CI 守卫
 
-`synra-client` 仓库的 CI（Node 侧）：
+`synra-js` 仓库的 CI（Node 侧）：
 
 | # | 守卫                                                  | 怎么实现                                                |
 | - | ----------------------------------------------------- | ------------------------------------------------------- |
@@ -276,7 +276,7 @@ synra-rust-app ────────────────────┘
 | 7 | `types: ["@synra/client"]` 可用                         | 一个 fixture 工程，`tsc --noEmit` 必须通过，且断言 `synra.device.send` / `synra.device.pick` 的类型 |
 | 8 | 文档里的类型片段能编译                                    | 把 [23](./23-client-library.md) 里的代码块抽出来做类型检查（防文档漂移） |
 
-`synra-rust-app` 仓库的对应守卫：
+`synra-app` 仓库的对应守卫：
 
 | # | 守卫                                                       |
 | - | ---------------------------------------------------------- |
@@ -594,7 +594,7 @@ export default defineBuildConfig({
 
 | 场景                                  | 做法                                                                 |
 | ------------------------------------- | -------------------------------------------------------------------- |
-| `synra-client` 内部改包                | `pnpm -r stub` → 各包 `dist` 指向 `src`，无需重建                        |
+| `synra-js` 内部改包                | `pnpm -r stub` → 各包 `dist` 指向 `src`，无需重建                        |
 | app 仓库要用未发布的改动                  | app 的 `pnpm-workspace.yaml` 用 `overrides` + `link:` 指向本地目录（见本机 `pnpm-local-overrides` 的做法） |
 | 验证"作者装上去能不能用"                 | CI 的 fixture 工程（§6 守卫 7）从**打包产物**（`pnpm pack`）安装，而不是链源码 |
 

@@ -45,7 +45,7 @@
 | 平台    | 数据目录                                          | 依据                                    |
 | ------- | ------------------------------------------------- | --------------------------------------- |
 | Windows | `%APPDATA%\synra\`（Roaming）或 `%LOCALAPPDATA%`   | Roaming 用于配置，Local 用于缓存         |
-| macOS   | `~/Library/Application Support/dev.synra.app/`     | 标准位置                                 |
+| macOS   | `~/Library/Application Support/dev.synra-app.app/`     | 标准位置                                 |
 | Linux   | `$XDG_DATA_HOME/synra/`（默认 `~/.local/share/synra/`） | XDG Base Directory                 |
 | Android | `Context.filesDir` / `Context.noBackupFilesDir`    | Tauri 提供                               |
 | iOS     | `Application Support/`（`Library/Application Support/`） | 备份 + 不备份两处分工             |

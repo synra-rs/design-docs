@@ -33,7 +33,7 @@
 
 ```jsonc
 {
-  "$schema": "https://synra.dev/schema/manifest/v1.json",
+  "$schema": "https://synra-app.dev/schema/manifest/v1.json",
 
   // ── 身份 ──
   "id": "@synra-plugin/chat",        // 必填。规则见 §2.3
@@ -46,7 +46,7 @@
   "publisher": {
     "id": "synra-official",          // 必填（用于信任与签名）
     "name": "Synra Official",        // 可选
-    "url": "https://synra.dev"       // 可选
+    "url": "https://synra-app.dev"       // 可选
   },
   "license": "MIT",
   "repository": "https://github.com/synra/plugin-chat",

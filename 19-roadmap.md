@@ -52,10 +52,10 @@ M6  生态与优化             ──▶ 更新、观测、性能、可选集�
 
 > **判据**：spike 只写**最小代码**（独立小 crate，**不进 workspace**），
 > 目的是**证伪**而不是"做出能用的东西"。每个 spike 的产出是一段结论 + 一段可复现的命令。
-> 结果写进 `synra-rust-core/spike/RESULTS.md`，并回填 [22 §4](./22-risks.md)。
+> 结果写进 `synra-core/spike/RESULTS.md`，并回填 [22 §4](./22-risks.md)。
 
 ```
-synra-rust-core/spike/            # 不进 workspace，用完可删（或归档）
+synra-core/spike/            # 不进 workspace，用完可删（或归档）
 ├─ RESULTS.md                     # ★ 每行：假设 / 结论 / 证伪命令
 ├─ 01-tauri-android-tokio/
 ├─ 02-tauri-android-wasm/
@@ -318,7 +318,7 @@ cargo nextest run --workspace --test security
 
 | 交付物                                        | 对应文档                            |
 | --------------------------------------------- | ----------------------------------- |
-| `synra-rust-app`（Tauri 2 + Vue）            | [05 §2.1](./05-system-architecture.md)、[10](./08-ipc-and-frontend.md) |
+| `synra-app`（Tauri 2 + Vue）            | [05 §2.1](./05-system-architecture.md)、[10](./08-ipc-and-frontend.md) |
 | ~40 个 Tauri command                           | [08 §2.2](./08-ipc-and-frontend.md)  |
 | `ts-rs` + `tauri-specta` 类型生成 + CI `types-check` | [08 §3](./08-ipc-and-frontend.md) |
 | 前端：`src/`（app 仓库） 四页 + stores + event bridge   | [08 §5](./08-ipc-and-frontend.md)    |
@@ -374,7 +374,7 @@ Android 与 iOS 可用，且**插件代码一份到处跑**（headless Wasm 在�
 
 | 交付物                                    | 对应文档                            |
 | ----------------------------------------- | ----------------------------------- |
-| `synra-rust-app`（Tauri 2 mobile）       | [05 §2.2](./05-system-architecture.md) |
+| `synra-app`（Tauri 2 mobile）       | [05 §2.2](./05-system-architecture.md) |
 | Rust 内核编译为 `.so` / `.a`（Android / iOS） | ADR-005                              |
 | **AOT/解释器 Wasm 后端**（iOS 无 JIT）       | [12 §2](./12-wasm-host.md)            |
 | `AndroidPlatform` / `IosPlatform`            | [07 §3.1](./07-core-kernel.md) |
@@ -493,8 +493,8 @@ M0 ──▶ M1 ──▶ M2 ──▶ M3
 
 | 产物                      | 路径                              | 形态                    |
 | ------------------------- | --------------------------------- | ----------------------- |
-| 桌面应用                  | `synra-rust-app`               | `.msi` / `.dmg` / `.AppImage` |
-| 移动应用                  | `synra-rust-app`                | `.apk` / `.aab` / `.ipa` |
+| 桌面应用                  | `synra-app`               | `.msi` / `.dmg` / `.AppImage` |
+| 移动应用                  | `synra-app`                | `.apk` / `.aab` / `.ipa` |
 | CLI                       | `apps/synra-cli`                   | 单二进制                 |
 | 守护进程（可选）            | `apps/synra-daemon`                | 单二进制                 |
 | 插件开发工具               | `tools/synra-plugin-cli`           | 单二进制                 |
@@ -502,4 +502,4 @@ M0 ──▶ M1 ──▶ M2 ──▶ M3
 | WIT 定义                  | `wit/synra-plugin.wit`             | 接口定义                 |
 | TS 类型（给插件作者）       | `@synra/client`（[23](./23-client-library.md)）        | `.d.ts` only，零运行时    |
 | 插件模板                  | `synra-plugin new`                 | 三种模板                 |
-| 文档                      | `docs/` + `design-docs/`（本文档集）      | Markdown                |
+| 文档                      | `design-docs/` + `design-docs/`（本文档集）      | Markdown                |

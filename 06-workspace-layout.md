@@ -1,17 +1,17 @@
 # 06 · Workspace 与 Crate 规划
 
-> 本文定义 **`synra-rust-core` 仓库**（[README §1](./README.md)）的物理结构：有哪些 crate、谁依赖谁、哪些 feature gate 控制编译期形态。
-> 目标：**内核可单独编译、单独测试、单独部署**；宿主（`synra-rust-app`）是它的一个消费者，且**不在本仓库里**。
+> 本文定义 **`synra-core` 仓库**（[README §1](./README.md)）的物理结构：有哪些 crate、谁依赖谁、哪些 feature gate 控制编译期形态。
+> 目标：**内核可单独编译、单独测试、单独部署**；宿主（`synra-app`）是它的一个消费者，且**不在本仓库里**。
 >
 > ⚠️ **拆仓库的影响**：`src-tauri` 与 `gen/`（即 Tauri 桌面/移动）**不在本仓库**（见 [README §1](./README.md)）。
 > 本仓库的 `apps/` 下只有 `synra-cli` 与 `synra-daemon`——它们只是内核的**薄宿主**，与内核同仓库有明确理由（见 §4.2）。
 
 ---
 
-## 1. 顶层目录结构（`synra-rust-core`）
+## 1. 顶层目录结构（`synra-core`）
 
 ```text
-synra-rust-core/                   # ← Cargo workspace 根 = git 仓库根
+synra-core/                   # ← Cargo workspace 根 = git 仓库根
 ├─ Cargo.toml                      # workspace 根
 ├─ Cargo.lock
 ├─ README.md / LICENSE (MIT)
@@ -46,7 +46,7 @@ synra-rust-core/                   # ← Cargo workspace 根 = git 仓库根
    └─ fixtures/                    # 协议编解码 fixture（[21 §3](./21-testing-strategy.md)）
 ```
 
-> **`ui/` 不在这里**。前端（宿主 UI + 插件 UI 运行时）在 `synra-rust-app` 仓库。
+> **`ui/` 不在这里**。前端（宿主 UI + 插件 UI 运行时）在 `synra-app` 仓库。
 > core 只**生成** TypeScript 类型（`ts-rs`）与 UI 插件的运行时**形状描述**，不包含 Vue 代码。
 
 ---
@@ -97,13 +97,13 @@ synra-rust-core/                   # ← Cargo workspace 根 = git 仓库根
         └──────────────────── 本仓库边界 ────────────────────┘
 
                  ╔═══════════════ 另一个仓库 ═══════════════╗
-                 ║  synra-rust-app                          ║
+                 ║  synra-app                          ║
                  ║   src-tauri/  ── 依赖 synra-core（版本依赖）║
                  ║   src/        ── 消费生成的 TS 类型        ║
                  ╚══════════════════════════════════════════╝
 ```
 
-> **依赖方向的关键**：`synra-rust-app` 依赖 `synra-core`，**反之永远不成立**。
+> **依赖方向的关键**：`synra-app` 依赖 `synra-core`，**反之永远不成立**。
 > 这是拆仓库（[ADR-016](./20-adr.md)）的最大收益——它由**物理隔离**保证，而不是靠评审纪律。
 
 ### 2.1 依赖方向铁律
@@ -299,7 +299,7 @@ src/
 
 ### 4.1 ⚠️ `synra-desktop` / `synra-mobile` **不在本仓库**
 
-它们属于 **`synra-rust-app`**（[README §1](./README.md)、[ADR-016](./20-adr.md)）。
+它们属于 **`synra-app`**（[README §1](./README.md)、[ADR-016](./20-adr.md)）。
 本仓库只提供内核，并通过 [README §1.3](./README.md) 的两个接触点（Rust API + 生成的 TS 类型）被它消费。
 
 > **为什么 CLI / daemon 在 core，而 desktop / mobile 不在**：
@@ -311,7 +311,7 @@ src/
 >
 > **判据**：宿主是否**只依赖内核的公开 API**且**没有平台特定的重型依赖**？CLI/daemon 是；Tauri 应用不是。
 
-`synra-rust-app` 的目录结构见 [README §1](./README.md) 与 synra-rust-app 仓库的 `design-docs/08-ipc-and-frontend.md`。
+`synra-app` 的目录结构见 [README §1](./README.md) 与 synra-app 仓库的 `design-docs/08-ipc-and-frontend.md`。
 
 ### 4.2 `apps/synra-cli`（本仓库）
 
@@ -694,7 +694,7 @@ publish-plan:; cargo harbor plan
 publish:     ; cargo harbor publish
 ```
 
-> **`justfile` 只服务本仓库（core）**。前端、桌面、移动的构建命令在 `synra-rust-app` 仓库的
+> **`justfile` 只服务本仓库（core）**。前端、桌面、移动的构建命令在 `synra-app` 仓库的
 > `package.json` scripts（+ 必要时一个薄 `justfile`）里，见该仓库的 `design-docs/08-ipc-and-frontend.md`。
 > `mobile-check` / `sqlite-check` / `wasm-check` 保留在 core，因为它们验证的是**内核能否交叉编译**，
 > 而不是"应用能否打包"。
@@ -716,7 +716,7 @@ publish:     ; cargo harbor publish
 | `packages/capacitor-*`                          | **删除**，能力并入 `crates/synra-net` + `synra-platform`    |
 | `packages/bridge-schema` / `vite-plugin-synra-electron` | **删除**（不再需要跨语言桥 schema）                |
 | `scripts/**`                                    | `xtask/**` + `justfile`                                    |
-| **↓ 以下进 `synra-rust-app` 仓库（不在本仓库）↓** |                                                          |
+| **↓ 以下进 `synra-app` 仓库（不在本仓库）↓** |                                                          |
 | `apps/frontend/src/pages|components|stores/**`  | `src/`（保留，改数据源）                                     |
 | `apps/frontend/src/**`（其余）                   | `src/**`                                                   |
 | `apps/electron/**`                              | `src-tauri/**`                                             |
@@ -757,7 +757,7 @@ publish:     ; cargo harbor publish
 | # | 生态做法                                  | 我们的做法                                  | 为什么                                                        |
 | - | ----------------------------------------- | ------------------------------------------- | ------------------------------------------------------------- |
 | 1 | 插件系统用 cdylib + `dlopen`（`crate-plugin-kit` / `pmpx`） | Wasm 组件模型                      | 插件来自不可信第三方 + 跨设备同步 + 移动端 iOS 不允许 dlopen → [ADR-013](./20-adr.md) |
-| 2 | **core 与 GUI 拆两个仓库**（`peon-burrow` / `peon-hall`） | **同样拆**（`synra-rust-core` / `synra-rust-app`） | ★ **已从最初的"单仓库"方案改为对齐生态** → [ADR-016](./20-adr.md)、[README §1](./README.md) |
+| 2 | **core 与 GUI 拆两个仓库**（`peon-burrow` / `peon-hall`） | **同样拆**（`synra-core` / `synra-app`） | ★ **已从最初的"单仓库"方案改为对齐生态** → [ADR-016](./20-adr.md)、[README §1](./README.md) |
 | 3 | 有的项目用 `edition 2021`（`crate-plugin-kit` / `bmux`） | **edition 2024**                | 我们是新项目；`peon-burrow` 已是 2024（`resolver = "3"`）        |
 | 4 | 有的项目发到 crates.io 是核心目标            | 发布是**副产品**（主目标是应用）              | 但 `synra-protocol` / `synra-capability` / `synra-plugin-api` 确实有独立价值 → 仍发（§7.1.2） |
 | 5 | `peon-burrow` 的 CLI 与 core **在同仓库** | 我们**一样**（`apps/synra-cli` + `synra-daemon` 在 core） | CLI/daemon 只是内核的薄宿主，且是"内核不依赖 UI"的验收工具 → §4.1 |

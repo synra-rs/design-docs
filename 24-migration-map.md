@@ -139,7 +139,7 @@ design-docs/
 | "必须避免什么"                  | [11](./11-design-principles.md)                                 |
 | 未定项、风险                    | [22](./22-risks.md)                                             |
 
-**注意**：`synra-rust-app` 仓库的文档只保留 [08](./08-ipc-and-frontend.md)（以及 [09 §5](./09-plugin-system.md)、
+**注意**：`synra-app` 仓库的文档只保留 [08](./08-ipc-and-frontend.md)（以及 [09 §5](./09-plugin-system.md)、
 [21 §5.2](./21-testing-strategy.md)、[21 §10](./21-testing-strategy.md) 中归 app 的部分，见 [README §4.1](./README.md)）。
 其余文档归 core，app 侧用**跨仓库引用**指向它们（[README §3.2](./README.md) 的路径基准表）。
 
@@ -149,7 +149,7 @@ design-docs/
 
 | 日期       | 版本        | 变更                                                                                                     |
 | ---------- | ----------- | -------------------------------------------------------------------------------------------------------- |
-| 2026-07-22 | `v0.3-draft` | 拆两个仓库（[ADR-016](./20-adr.md)）；目录改名 `design-docs`；新增 [13 插件写法](./13-plugin-authoring.md) 与 M0 技术验证 spike（[19 §0.1](./19-roadmap.md)） |
+| 2026-07-22 | `v0.3-draft` | 拆两个仓库（[ADR-016](./20-adr.md)）；目录改名 `docs`；新增 [13 插件写法](./13-plugin-authoring.md) 与 M0 技术验证 spike（[19 §0.1](./19-roadmap.md)） |
 | 2026-07-22 | `v0.2-draft` | 按本机 Rust 生态对齐（`harbor` / `cargo-bumpp` / 严格 clippy / 不写 `rust-toolchain.toml`）                |
 | 2026-07-22 | `v0.1-draft` | 初版                                                                                                     |
 
@@ -184,7 +184,7 @@ just docs-check
 | -------------------- | ----------------------------------------------------------- |
 | 同文档内             | `§7.2`                                                       |
 | 同仓库另一篇          | `[04 §7](./04-wire-protocol.md)`                             |
-| 另一新仓库            | ``见 synra-rust-app 仓库的 `design-docs/08-ipc-and-frontend.md`（本地：[08](../../synra-rust-app/design-docs/08-ipc-and-frontend.md)）`` |
+| 另一新仓库            | ``见 synra-app 仓库的 `design-docs/08-ipc-and-frontend.md`（本地：[08](../../synra-app/design-docs/08-ipc-and-frontend.md)）`` |
 | 外部资料（规范 / 库） | 正常 Markdown 链接                                            |
 
 ---

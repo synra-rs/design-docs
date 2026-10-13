@@ -251,7 +251,7 @@
 | ---- | ----------------------------------- | ------------------------------------------------------------ | ---- |
 | Q-01 | 是否支持"全 UI 插件"作为迁移过渡？     | **不支持过渡，只做双轨**（headless Wasm + UI WebView）          | [ADR-002](./20-adr.md)、[04 §2](./09-plugin-system.md) |
 | Q-02 | 前端工具链用 Vite+ 还是标准 Vite？     | **标准 Vite + pnpm + Vitest**                                  | [ADR-012](./20-adr.md) |
-| Q-03 | 单仓库还是拆两个仓库？                | **拆**：`synra-rust-core` + `synra-rust-app`                   | [ADR-016](./20-adr.md)、[README §1](./README.md) |
+| Q-03 | 单仓库还是拆两个仓库？                | **拆**：`synra-core` + `synra-app`                   | [ADR-016](./20-adr.md)、[README §1](./README.md) |
 | Q-04 | 集群 / 选主做不做？                   | **不做**，保持对等直连（留 crate 与 feature 占位）               | [ADR-011](./20-adr.md)、[19 §7](./19-roadmap.md) |
 | Q-05 | 移动端首发平台 / iOS 验证环境          | **无 macOS**：M0 只做 Android 的 spike；iOS 推迟，**M4 前必须搞到环境** | [19 §0.1](./19-roadmap.md)、[R-14] |
 
@@ -322,13 +322,27 @@ iOS 是否进 M5 由 M4 结束时的评估决定（[R-14]）。
 
 ### Q-11 · 应用仓库的包名与标识
 
-**背景**：`synra-rust-app` 的 `tauri.conf.json` 需要 `identifier`（如 `dev.synra.app`）、
-`productName`、各平台的 bundle id。
+**状态**：✅ **已定**（2026-07）
 
-**建议**：用 `dev.synra.app`（与 crates.io / GitHub 组织名一致）。**需业主确认**——这个标识一旦发布就不可更改。
+| 项                       | 值                                                  | 说明 |
+| ------------------------ | --------------------------------------------------- | ---- |
+| `identifier`              | **`dev.synra-app.app`**                              | 反向域名，与 `synra-app.dev` 血缘一致 |
+| `productName`             | `Synra`                                              | 用户看到的名字 |
+| macOS bundle id           | 同 `identifier`                                       | — |
+| Android `applicationId`   | `dev.synra_app.app`                                   | Android 不允许连字符，下划线替代 |
+| iOS bundle id             | `dev.synra-app.app`                                   | — |
 
----
+**为什么是 `dev.synra-app.app` 而不是字面反转的 `app.synra-app.dev`**：
 
+反向域名标识符的惯例是 **`tld.组织.应用`** 的结构语义，而不是把域名逐段倒过来。
+主流做法（Rust 生态的 `cargo-bumpp`、`hurl` 等项目）用的是 `dev.<org>.<app>`。
+字面反转会得到 `app.synra-app.dev`，读起来像"app.synra-app.dev 这个域名"，反而不清楚。
+
+⚠️ **一旦发布到应用商店就不可更改**（Android `applicationId` 尤其严格）。
+所以这个值是**发布前必须复核**的一项（[19 路线图 M4 退出条件](19-roadmap.md)）。
+
+> **历史**：曾用 `dev.synra.app`。域名定为 `synra-app.dev` 后同步改为 `dev.synra-app.app`，
+> 以免同一个产品出现两套命名血缘。
 ## 4. 需要在实现前验证的技术假设
 
 这些假设**如果错了，会影响架构**。已在 [19 §0.1](./19-roadmap.md) 排成 **M0 的 8 个 spike**（约 8–10 人日），
