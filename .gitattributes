@@ -1,0 +1,17 @@
+# 行尾与编码：文档集必须跨平台一致，避免"只有行尾变了"的巨型 diff
+* text=auto eol=lf
+
+# Markdown 明确按文本处理
+*.md text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+
+# 图片按二进制（将来可能有架构图）
+*.png binary
+*.jpg binary
+*.webp binary
+*.svg text eol=lf
+
+# GitHub 上把文档标记为文档
+*.md linguist-documentation
