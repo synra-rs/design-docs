@@ -2,7 +2,7 @@
 
 > 本文定义仓库 **`synra-rs/docs`**：官网首页 + 用户文档 + 插件作者文档 + **JSON Schema 托管**。
 >
-> 域名 **`synra-app.dev`**，部署 **Netlify**，技术栈 **VitePress**（参考实现：本机的 `pmpx-docs`）。
+> 域名 **`synra-app.dev`**，部署 **GitHub Pages**（§5），技术栈 **VitePress**（参考实现：本机的 `pmpx-docs`）。
 >
 > 前置：[README §1.1](./README.md)（与 `design-docs` 的区别）、[15 §2](./15-plugin-sdk.md)（manifest 规范，schema 的来源）。
 > 本文同时是**做这个站点的规格书**和**往站点里写内容的规范**。
@@ -115,7 +115,7 @@ docs/                                    # 仓库根 = VitePress 源目录
 │  └─ CNAME                              #   synra-app.dev
 ├─ scripts/
 │  └─ check-structure.mjs                # ★ 双语言结构一致性校验（§6）
-├─ netlify.toml                          # 构建 + 重定向 + 缓存头（§5）
+├─ deploy.yml                          # 构建 + 重定向 + 缓存头（§5）
 └─ package.json · tsconfig.json · tsconfig.node.json
 ```
 
@@ -144,90 +144,182 @@ docs/                                    # 仓库根 = VitePress 源目录
 
 ---
 
-## 5. 部署（Netlify）
+## 5. 部署（GitHub Pages）
 
-### 5.1 配置
+### 5.1 为什么是 Pages 而不是 Netlify
 
-```toml
-# netlify.toml
-[build]
-  command = "pnpm build"
-  publish = "dist"
+| 维度             | **GitHub Pages** ✅                                    | Netlify                                  |
+| ---------------- | ----------------------------------------------------- | ---------------------------------------- |
+| 成本             | 公开仓库免费，含带宽                                     | 免费额度内免费，超出计费                    |
+| 与代码同处        | 同一个组织、同一套权限；`CNAME` 与 `$schema` 同源          | 多一个外部服务的账号与配置                   |
+| 部署             | Actions 一步到位                                       | 需要连接仓库或 CLI                          |
+| **自定义响应头**   | ❌ **不支持**                                          | ✅ `deploy.yml` 的 `[[headers]]`          |
+| **服务端重定向**   | ❌ 只能靠 HTML meta / 目录占位                           | ✅ `[[redirects]]`                          |
+| 构建环境          | 自己配 Actions（Node 版本、缓存都要写）                    | 内置                                       |
 
-[build.environment]
-  NODE_VERSION = "22"
+**结论**：站点是纯静态内容，Pages 的能力足够；**代价是没有自定义响应头**——
+这一条对 schema 有实际影响，见 §5.4。
 
-# ── ★ schema 的缓存策略：长缓存 + 不可变，因为 URL 里有版本号（v1）──
-[[headers]]
-  for = "/schema/*"
-  [headers.values]
-    Cache-Control = "public, max-age=31536000, immutable"
-    Access-Control-Allow-Origin = "*"        # ★ 工具与 IDE 需要跨域拉取
-    Content-Type = "application/schema+json; charset=utf-8"
+### 5.2 配置
 
-# ── 静态资源长缓存（VitePress 带 hash）──
-[[headers]]
-  for = "/assets/*"
-  [headers.values]
-    Cache-Control = "public, max-age=31536000, immutable"
+**没有 `deploy.yml`**。Pages 的配置分布在两处：
 
-# ── HTML 不缓存（部署后立刻可见）──
-[[headers]]
-  for = "/*.html"
-  [headers.values]
-    Cache-Control = "public, max-age=0, must-revalidate"
+**① 仓库设置**（手动，一次性）：
 
-# ── 安全头 ──
-[[headers]]
-  for = "/*"
-  [headers.values]
-    X-Content-Type-Options = "nosniff"
-    Referrer-Policy = "strict-origin-when-cross-origin"
-    X-Frame-Options = "DENY"
-    Permissions-Policy = "geolocation=(), microphone=(), camera=()"
+| 项                | 值                                          |
+| ----------------- | ------------------------------------------- |
+| Settings → Pages  | Source = **GitHub Actions**（不是分支）        |
+| Custom domain     | `synra-app.dev`                              |
+| Enforce HTTPS     | ✅ 开                                        |
 
-# ── ★ 让 schema 的短路径也稳定：/schema/manifest/v1 → …/v1.json ──
-[[redirects]]
-  from = "/schema/manifest/v1"
-  to = "/schema/manifest/v1.json"
-  status = 200
+**② `.github/workflows/deploy.yml`**：
 
-# ── 旧路径兜底（将来若调整结构）──
-[[redirects]]
-  from = "/docs/*"
-  to = "/:splat"
-  status = 301
+```yaml
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false      # 绝不取消正在进行的部署：半个站点比旧站点更糟
+
+jobs:
+  build:
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4        # version: 11
+      - uses: actions/setup-node@v4       # node-version: 22, cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm check                   # ★ 三条内容守卫（§7）
+      - run: pnpm build
+      - run: touch dist/.nojekyll         # ★ 见下
+      - uses: actions/upload-pages-artifact@v3
+        if: github.event_name != 'pull_request'
+        with: { path: dist }
+
+  deploy:
+    needs: build
+    if: github.event_name != 'pull_request'
+    permissions: { pages: write, id-token: write }
+    environment: github-pages
+    steps:
+      - uses: actions/deploy-pages@v4
 ```
 
-### 5.2 域名与 HTTPS
+**几个不得已但有理由的选择**：
 
-| 项              | 值                                                  |
-| --------------- | --------------------------------------------------- |
-| 主域名           | `synra-app.dev`                                       |
-| `www` 子域       | 301 → 主域（Netlify 的 primary domain 设置）            |
-| `CNAME` 文件     | `public/CNAME` 内容为 `synra-app.dev`（防止 Netlify 每次重新分配子域） |
-| 证书             | Netlify 自动（Let's Encrypt）                          |
-| `_redirects` 冲突 | 只用 `netlify.toml`（两处都有时优先级不同，容易搞混）        |
+| 选择                                  | 为什么                                                              |
+| ------------------------------------- | ------------------------------------------------------------------- |
+| **从 Actions 部署，不用"从分支部署"**     | 构建需要 Node 步骤；从分支部署意味着把 `dist/` 提交进仓库 —— 生成的 HTML 进 review diff 和 git 历史 |
+| **PR 只跑检查不部署**                    | 坏链接与双语结构漂移应该在 PR 上失败，而不是让线上站点坏掉                 |
+| **`touch dist/.nojekyll`**              | Pages 默认跑 Jekyll，它会忽略下划线开头的文件/目录。VitePress 产出 `assets/`，今天不冲突，但空文件能免掉这一整类问题 |
+| **`cancel-in-progress: false`**         | 见上：绝不取消正在进行的部署                                            |
+| **`pnpm check` 在 `build` 之前**         | schema 结构变了、页面泄漏了设计文档链接 —— 应该在构建前就拦下，而不是部署后才发现 |
 
-### 5.3 schema URL 是**公开契约**
+### 5.3 域名与 HTTPS
 
-`https://synra-app.dev/schema/manifest/v1.json` 被**每个插件的 manifest** 引用（[15 §2](./15-plugin-sdk.md)）。
-所以它：
+| 项          | 值                                                              |
+| ----------- | --------------------------------------------------------------- |
+| 主域名       | `synra-app.dev`                                                  |
+| `public/CNAME` | 内容为 `synra-app.dev`。**必须提交**，否则每次部署都会被重新分配子域 |
+| `www` 子域   | DNS 里 CNAME 到 `synra-rs.github.io`，再用 **Pages 的 primary domain 设置**把根域设为主域 |
+| 证书         | Pages 自动申请（Let's Encrypt），配好域名后开启 Enforce HTTPS        |
+| DNS          | 根域用 4 条 A 记录指向 GitHub Pages 的 IP；`www` 用 CNAME。**不要用 CNAME 指向根域**（多数 DNS 不允许 apex CNAME） |
 
-| 规则                                       | 理由 |
-| ------------------------------------------ | ---- |
-| **URL 里带版本号**（`v1`），且**永不改内容**   | 已经发布的 manifest 会指向它；改了等于改历史 |
-| `v2` 是**新文件**，不是 `v1` 的修改            | 旧插件继续用 `v1` 校验                      |
-| 长缓存 + `immutable`                        | URL 不可变，缓存可以无限久                    |
-| 允许跨域（`Access-Control-Allow-Origin: *`）  | 编辑器插件要在浏览器里拉取                    |
-| `index.json` 列出可用版本                     | 工具能自动发现最新版                         |
-| **`v1.json` 一旦发布就不删**                   | 删掉会让所有旧插件的 `$schema` 变成 404        |
+### 5.4 ⚠️ 没有自定义响应头，schema 的取用方式要跟着变
 
-> ⚠️ **这是一个需要进 CI 的约束**：如果某次改动让 `public/schema/manifest/v1.json` 的内容变了，
-> 那就是**破坏性变更**。CI 要拦：对已发布版本只允许改 `description`（文案），不允许改结构。
-> 用一份 `schema/.frozen/v1.sha256` 记录结构部分的哈希（§7 守卫 5）。
+这是换到 Pages 后**唯一的实质损失**。原来在 Netlify 上，`/schema/*` 可以带：
 
----
+```
+Cache-Control: public, max-age=31536000, immutable
+Access-Control-Allow-Origin: *
+Content-Type: application/schema+json
+```
+
+Pages **一个都设不了**。逐个看影响：
+
+| 想要的          | Pages 上的实际情况                                            | 应对 |
+| --------------- | ----------------------------------------------------------- | ---- |
+| `Content-Type`   | `.json` 会被识别为 `application/json` —— 对 JSON Schema 完全够用 | 无需应对 |
+| `Cache-Control`  | Pages 对静态资源有合理默认（带 hash 的长缓存）；schema 没有 hash，靠**URL 里带版本号**（`v1`）也够 | 无需应对：URL 不可变，缓存多久都不会返回错的东西 |
+| **CORS**         | ❌ **不返回 `Access-Control-Allow-Origin`** —— 浏览器里 `fetch()` 会被拦；命令行与编辑器（Node 侧）不受影响 | ★ 见下 |
+
+**CORS 的实际影响范围**（决定了要不要处理）：
+
+| 消费者                        | 受 CORS 影响？ | 说明 |
+| ----------------------------- | ------------- | ---- |
+| 插件作者的编辑器（VS Code 等）  | ❌ 不受影响    | 扩展在 Node 侧发请求，不走浏览器 CORS |
+| `synra-plugin verify` 等 CLI   | ❌ 不受影响    | 同上 |
+| 浏览器里的在线 JSON Schema 编辑器 | ✅ 受影响     | 用户手动贴 URL 时会被拦 |
+
+**三个选项**：
+
+| # | 做法                                                | 评价 |
+| - | --------------------------------------------------- | ---- |
+| A | **接受限制**：文档里说明"浏览器内联校验请用本仓库的 `$schema` 或本地文件" | 最简单；受影响的是一个小众场景 |
+| B | **在同一仓库里加 Cloudflare Worker / Netlify 只服务 `/schema/*`** | 为了一个响应头引入第二个部署目标，不值得 |
+| C | **把 schema 也发到 npm**（`@synra/manifest-schema`），让工具从 `node_modules` 读 | 不能解决"贴 URL"场景，但让 CLI 完全不依赖网络 |
+
+**倾向 A + C**：A 让站点保持单一部署；C 让 CLI 能离线工作（[25](./25-js-monorepo.md) 的 `synra-js` 正好可以多一个包）。
+🔴 **最终选哪个待定**（§11）。
+
+### 5.5 schema 的 URL 是公开契约（与部署方式无关）
+
+`https://synra-app.dev/schema/manifest/v1.json` 被**每个插件的 manifest** 引用（[15 §2](./15-plugin-sdk.md)）：
+
+| 规则                                          | 理由 |
+| --------------------------------------------- | ---- |
+| **URL 里带版本号**（`v1`），且**永不改内容**       | 已发布的 manifest 会指向它；改了等于改历史 |
+| `v2` 是**新文件**，不是 `v1` 的修改                | 旧插件继续用 `v1` 校验 |
+| **`v1.json` 一旦发布就不删**                     | 删掉会让所有旧插件的 `$schema` 变成 404 |
+| 结构部分用哈希钉住（§7 守卫 5）                     | 见下 |
+| `index.json` 列出可用版本                        | 工具能自动发现最新版 |
+
+**冻结摘要的位置**：`types/frozen/<schema>__<file>.sha256`，**不在 `public/` 下**。
+
+> ⚠️ **踩过的坑**：最初把它放在 `public/schema/.frozen/`，想让"摘要与被描述的 schema 挨着"。
+> 但 VitePress 会在 **Vite 的 bundle 阶段之外**复制 `public/`，所以任何 Vite 插件钩子
+> （`generateBundle` / `writeBundle`）都看不到那些文件，无法过滤。
+> 唯一的做法是构建后删 —— 那意味着本地 `dist/` 与线上不一致。
+> **把它移出 `public/` 是更好的解法**：`public/` 严格等于"会被发布的东西"，不需要任何清理逻辑。
+
+> ⚠️ **CI 必须拦**：如果某次改动让 `public/schema/manifest/v1.json` 的结构变了，那就是**破坏性变更**。
+> 对已发布版本只允许改 `description` / `title`（文案），不允许改结构 ——
+> 用结构摘要（忽略文案键）来判定，`pnpm check:schema --update` 显式更新摘要，更新必须进 review diff。
+
+### 5.6 脚本统一用 TypeScript
+
+`scripts/**` 全部是 `.ts`，用 **`esno`** 运行（与本机 `synra-monorepo` 的约定一致）：
+
+```jsonc
+{
+  "scripts": {
+    "check": "pnpm check:structure && pnpm check:schema && pnpm check:public",
+    "check:structure": "esno scripts/check-structure.ts",
+    "check:schema": "esno scripts/check-schema.ts",
+    "check:public": "esno scripts/check-public-content.ts",
+    "translate": "esno scripts/scaffold-translation.ts"
+  },
+  "devDependencies": {
+    "esno": "^4.8.0",
+    "jiti": "^2.7.0"        // ★ ESLint 10 加载 eslint.config.ts 需要它
+  }
+}
+```
+
+**两个必须知道的点**：
+
+| 点                                          | 说明 |
+| ------------------------------------------- | ---- |
+| **`jiti` 是必需的**                            | ESLint 10 读 `eslint.config.ts` 时依赖它；不装会报 *"The 'jiti' library is required for loading TypeScript configuration files"*。它不在 `eslint` 的依赖里。 |
+| **`.ts` 脚本也必须过 lint**                     | 它们是代码，不是配置。`@antfu/eslint-config` 抓到了几个真实问题：正则的多项式回溯（`\s*` 与 `.*` 重叠）、脚本里用全局 `process` 而非 `import process from 'node:process'`、一个混进 `.vue` 文件的控制字符（`0x08`）。 |
 
 ## 6. 双语策略
 
@@ -376,40 +468,71 @@ docs/public/schema/manifest/v1.json    （手写的 JSON Schema，带 descriptio
 
 ## 10. 实现清单
 
-仓库骨架：
+> 本仓库已建好骨架并推送（`synra-rs/docs`，首个提交 `93cca1d`）。清单反映**实际状态**。
 
-- [ ] `package.json`（`vitepress` / `vue` / `vue-tsc` / `markdown-it-task-lists` / `@antfu/eslint-config`）
-- [ ] `.vitepress/config.mts`（title / description / `cleanUrls` / `lastUpdated` / `outDir` / `srcExclude`）
-- [ ] `locales.root` + `locales.zh`，两套 nav / sidebar
-- [ ] `transformHead`：canonical + `hreflang` alternates（`en` / `zh-CN` / `x-default`）
-- [ ] `sitemap.hostname = https://synra-app.dev`
-- [ ] `.vitepress/writing-style.md`（§8）
-- [ ] `tsconfig.json`（`strict` / `verbatimModuleSyntax` / `noUnusedLocals`）
-- [ ] `public/{CNAME,favicon.svg,brand-mark.svg,robots.txt}`
-- [ ] `netlify.toml`（§5.1）
-- [ ] `.gitignore`（`node_modules/` `dist/` `.vitepress/cache/` `.vitepress/.temp/`）
-- [ ] `scripts/check-structure.mjs`（§6）
+仓库骨架（✅ 已完成）：
 
-内容（按 §4.2 的优先级）：
+- [x] `package.json`（`vitepress` / `vue` / `vue-tsc` / `markdown-it-task-lists` / `@antfu/eslint-config` / `esno` / `jiti`）
+- [x] `.vitepress/config.mts`（title / description / `cleanUrls` / `lastUpdated` / `outDir` / `srcExclude`）
+- [x] `locales.root` + `locales.zh`，两套 nav / sidebar
+- [x] `transformHead`：canonical + `hreflang` alternates（`en` / `zh-CN` / `x-default`）
+- [x] `sitemap.hostname = https://synra-app.dev`
+- [x] `tsconfig.json`（`strict` / `verbatimModuleSyntax` / `noUnusedLocals` / `types: ["node"]`）
+- [x] `.vitepress/types/shims.d.ts`（`markdown-it-task-lists` 与 `*.css` 的环境声明）
+- [x] `eslint.config.ts`（`@antfu/eslint-config`；`scripts/**` 是代码，必须过 lint）
+- [x] `public/{CNAME, schema/**}`
+- [x] `.github/workflows/deploy.yml`（§5.2）
+- [x] `.gitignore`（`node_modules/` `dist/` `.vitepress/cache/` `.vitepress/.temp/`）
+- [x] `scripts/*.ts`（3 个守卫 + 1 个翻译脚手架，用 `esno` 跑）
+- [x] `types/frozen/manifest__v1.json.sha256`（★ 在 `public/` **之外**，§5.5）
+- [x] `.vitepress/writing-style.md`（§8 的规则落成文件，不发布）
 
-- [ ] P0：首页 ×2、`guide/installation`、`guide/quick-start`、`plugins/manifest`、`plugins/getting-started`
+- [ ] `public/{favicon.svg, brand-mark.svg, og-image.png, robots.txt}` —— 目前**缺**，站点没有图标
+- [ ] `.vitepress/theme/shared/components/Home.vue` 的文案与首页设计在 §9 定稿后复核
+
+内容：
+
+- [x] 首页 ×2（`index.md` + `zh/index.md`，自定义 Layout 来自 `.vitepress/theme/`）
+- [x] P0 英文：`guide/introduction`、`guide/installation`、`guide/quick-start`、`plugins/manifest`
+- [ ] **P0 中文翻译**（4 页已生成结构镜像 stub，带 `translated: false`；`pnpm translate` 可重生成）
+- [ ] P0 其余英文：`plugins/getting-started`
 - [ ] P1：`reference/capabilities`、`reference/events`、`plugins/authoring`、`plugins/ui`
 - [ ] P2：`guide/devices-and-pairing`、`guide/transfers`、`reference/errors`、`guide/troubleshooting`
 - [ ] P3：`plugins/testing`、`plugins/publishing`、`reference/paths`、`reference/platform-matrix`
 
+> **P1–P3 的英文页目前是 stub**（`guides/devices-and-pairing` 等 16 页，双语都是 stub）。
+> 它们已经上线且能访问，内容是"本页正在撰写中" + 现在可用的替代途径。
+> 这是有意的：**空页比坏链接好，占位比 404 好**，而且 `check-structure` 已经在守结构。
+
 schema：
 
-- [ ] `public/schema/manifest/v1.json`（与 [15 §2](./15-plugin-sdk.md) 的字段表逐项对应）
+- [x] `public/schema/manifest/v1.json`（与 [15 §2](./15-plugin-sdk.md) 的字段表逐项对应）
+- [x] `public/schema/index.json` + `index.schema.json`
+- [x] 冻结摘要（`types/frozen/`）
 - [ ] `public/schema/plugin-events/v1.json`
-- [ ] `public/schema/index.json`
-- [ ] `public/schema/.frozen/v1.sha256`
+- [ ] 与 `synra-core` 的 Rust 类型做字段集合比对（§7 守卫 4，跨仓库 job）
 
 CI：
 
-- [ ] 10 条守卫（§7），至少 1–3、6、7 在 M6 前必须有
-- [ ] `netlify.toml` 与 Netlify 站点设置一致的复核（build command / publish dir / 域名）
+- [x] 守卫 1（双语结构）、2（死链，VitePress 内建）、3（schema 合法 + `$ref` 可解析 + `$id` 与路径一致）、5（结构未变）、6（无未定表述）、7（无设计文档链接）
+- [ ] 守卫 4（schema ↔ Rust 类型一致）—— 需要 `synra-core` 先有 manifest 类型
+- [ ] 守卫 8（frontmatter 有效）、9（命令冒烟）、10（Lighthouse）
+- [x] Pages 站点设置（Source = GitHub Actions、custom domain、Enforce HTTPS）
+- [ ] **Netlify → Pages 的实际切换**（DNS 记录、域名验证）—— 首次部署后做
 
 ---
+
+## 11. 待确认（🔴）
+
+| # | 问题                                                          | 倾向 |
+| - | ------------------------------------------------------------- | ---- |
+| 1 | **schema 的 CORS**：Pages 不返回 `Access-Control-Allow-Origin`，浏览器内联校验会失败 | 🟡 **接受限制 + 把 schema 也发到 npm**（`@synra/manifest-schema`）。受影响场景只是"在浏览器里贴 URL 校验"，而 CLI 与编辑器扩展都不走 CORS（§5.4） |
+| 2 | **中文翻译的推进节奏**：先发英文、中文逐步补，还是两边同时？            | 🟡 英文优先；中文用 `translated: false` 的 stub 占住结构，`pnpm check` 每次报告还剩几页（§6、[§7 守卫 6](#71-守卫-6-为什么重要)） |
+| 3 | 首页那段两设备动画的实现（`pmpx-docs` 是 Vue 组件 + 打字机）            | 🟡 已按此实现（`TwoDeviceDemo.vue`）：一条时间线推进两个面板，因为要讲的是**转移**，两个面板各自播放会让读者分不清因果 |
+| 4 | API 参考（capabilities / events / errors）手写还是从 Rust 生成       | 🔴 未定。手写能加文案但会漂移；生成可保证一致但文案弱。**倾向：字段表手写 + CI 比对**（同 §7.2 的 schema 做法），**错误码表生成**（它没有文案需求，只有 code → 建议动作的映射） |
+| 5 | 是否要展示插件目录（marketplace 浏览页）                          | 🔴 未定。需要 registry 有查询 API；倾向 M6+ 再说 |
+| 6 | `docs` 仓库与已发布版本的对应关系                                | 🟡 站点内容跟随**已发布版本**，`main` 代表"下一个版本"。发版时打 tag，站点从 tag 构建 |
+| 7 | `synra-plugin new` 生成的插件模板是否要自带一个最小站点/README 片段   | 🔴 未定。模板里放文档链接（指向 `synra-app.dev`）是需要的，但放整篇文档会让模板变重 |
 
 ## 11. 待确认（🔴）
 
