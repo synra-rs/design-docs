@@ -764,6 +764,28 @@ publish:     ; cargo harbor publish
 > **在此之前只有它自己的测试在用它** —— 因为 shell 从来没有 `Host`，也就没有地方挂它。
 > 现在 `DesktopHost` 把它接上了，`platform:open-url` 在一台有桌面的机器上第一次真的能打开浏览器。
 
+> ### ★★ 同一个错误发生了第二次，所以规则写在这里，而不是留给记性
+>
+> 上面那次是**第一次**：core 改了 `PluginSet::new` 的签名，app 的二进制停止编译，
+> 而检查跑的是 `--lib`。记下这条规则之后，它**又发生了一次** ——
+> `orchestrate::cancel` 多了一个 `local_device` 参数（第 51 轮），
+> 而第 51、52、53 轮的验证**只跑了 core 的工作区**，所以 `synra-app` 静默地坏了三轮。
+>
+> 两次的形状完全一样，而两次的原因不是"不知道要检查"，是**检查被漏掉了**。所以：
+>
+> > **改 `synra-rust-core` 的任何 `pub` 签名之后，`synra-rust-app` 的 `cargo build` 是必需的一步，
+> > 不是可选的。** 它没有被任何守卫强制，因为两个仓库是分开的 —— 这一点正是它会被漏掉的原因。
+>
+> ```
+> # 一次改动的完整验证，两个工作区都要跑
+> core:  cd synra-rust-core && cargo test --workspace && cargo clippy --workspace --all-targets
+> app:   cd synra-rust-app/src-tauri && cargo build && cargo test --no-default-features
+> ```
+>
+> ★ 而且**不能只看 core 的输出**：`synra-core` 作为路径依赖被 app 编译时，
+> 用的是 app 那侧的 feature 统一结果，所以 core 里干净的东西在 app 的构建里可能会有新的 warning
+> —— 第 54 轮那次就冒出一个 `unnecessary qualification`，只在 app 的构建里出现过。
+
 ---
 
 
