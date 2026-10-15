@@ -539,7 +539,7 @@ impl GcTask {
 >
 > | 表 | 状态 | 后果 |
 > | --- | --- | --- |
-> | `intents` | **已修**：`save_intent`/`load_intents`/`forget_finished_intents` | 之前意图只在内存 `Board` 里，**重启就丢** |
+> | `intents` | **已修**，见下面 | 之前意图只在内存 `Board` 里，**重启就丢** |
 > | `plugin_audit` | 仍空：审计写在内存环里 | 需要先决定它该不该落盘 |
 > | `transfer_sessions` | 仍空：传输不写库 | 本节的“`expires_at` 过期即删”目前无对象 |
 >
@@ -549,6 +549,25 @@ impl GcTask {
 >
 > ★ 而 **`devices_seen` 的保留（500 条）也还没写**：它是唯一真有数据的表，
 > 但这一轮没顾上，记在这里。
+>
+> ### ★ `intents` 到位了（第 62–64 轮）
+>
+> 1. **存**：`save_intent` / `load_intents` / `forget_finished_intents` / `intent_for_request`。
+> 2. **而原来的表格子装不下一个意图** —— 迁移 9 重建了它：
+>    `document` 存内核自己序列化的整个意图，旁边的列是**不解析每一行**就能回答的两个查询：
+>    保留清理（按 `state`）和幂等查找（按 `origin` + `request`）。
+>    旧表的列是在类型存在**之前**设计的，装不下 trace、`Choice`、候选列表、
+>    拒绝理由、派发的 `request_id` —— 用它存出来的意图会**忘记谁来回答**，
+>    而那比不存更糟，因为它看上去像存成功了。
+> 3. **`intents_by_request` 是 UNIQUE**：`Board::raise` 在**内存里**拒绝重复请求，
+>    而持久化的意义正是重启不能丢掉这件事。边计的 id 是**新生成**的，
+>    所以主键拦不住重复 —— 这个索引把它从板子记得的规则变成数据库强制的。
+> 4. **读回**：`Intent` 及其嵌套类型现在有 serde，`Board::restore` / `all` 把它放回去；
+>    `restore` **不是** `raise` —— 后者会另取 id 和 trace，于是重发的请求会跑第二次。
+>
+> ★ **而还差最后一步：守护进程还没有调它们。** `Runtime` 启动时没有 `load_intents`，
+> 每次变化后也没有 `save_intent` —— 所以**现在重启依然会丢**。库这一侧已经齐了，
+> 接线在下一轮；记在这里是为了不把库写完了当成功能完成了。
 >
 > ★ **凭什么说 `intents` 之前是死的**：内存 `Board` 是 `HashMap<IntentId, Intent>`，
 > 而全仓没有 `load_intents`、也没有任何 `INTO intents` —— 所以进程一退，意图全部消失。
