@@ -795,8 +795,18 @@ publish:     ; cargo harbor publish
 > ```
 > # 一次改动的完整验证，两个工作区都要跑
 > core:  cd synra-rust-core && cargo test --workspace && cargo clippy --workspace --all-targets
-> app:   cd synra-rust-app/src-tauri && cargo build && cargo test --no-default-features
+> app:   cd synra-rust-app/src-tauri && cargo build && cargo test --no-default-features \
+>        && cargo clippy --no-default-features --all-targets
 > ```
+>
+> ★ **而 `clippy` 那一行是第 60 轮才加上的**，因为它之前不在这里，也不在我跑的东西里 ——
+> app 的 clippy **从第 54 轮就是红的**（3 个 `deny` 级别的错误），而四轮里
+> `cargo build` 和 `cargo test` 一直是绿的。这和上面那两次是**同一个错误的第三次**：
+> 不是不知道要检查，是检查没在清单里。
+>
+> ★ 而且同一把尺子下，**core 的 clippy 也不是“干净”**：它有 5 类 `warn`（`missing_const_for_fn`、
+> `needless_borrow` 等）。之前几轮的“clippy 干净”是用 `^error` 过滤出来的结论 ——
+> **过滤器不是证据**，尤其当它只看一种级别的时候。
 >
 > ★ 而且**不能只看 core 的输出**：`synra-core` 作为路径依赖被 app 编译时，
 > 用的是 app 那侧的 feature 统一结果，所以 core 里干净的东西在 app 的构建里可能会有新的 warning
