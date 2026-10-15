@@ -609,6 +609,19 @@ Content-Security-Policy:
 >   而原来那个函数**一个属性都没有**。编译器只是很小声地说了一句 warning，
 >   而 `cargo test` 输出里看不出少了一条 —— 直到这次重构让它变成了错误。
 - [ ] ~40 个 Tauri command（见 §2.2）—— **18/39**。
+      > ★ **一个归零的进度条：`devices_scan_start` 从来没有扫描过。**
+      > 它写一个 `ScanState { elapsed_ms: 0, found: 0 }` 就返回，而全仓**没有任何代码更新它**，
+      > 所以界面画的是一条永远不会动的进度条。旧注释自己反对这件事：
+      > “giving it a running state with a deadline would show a progress bar that cannot progress — which is
+      > worse than an honest finished one” —— 而它对**每一次非 cached 扫描**都在这么做。
+      > * ★ **为什么 shell 扫不了**：`synra_core::DiscoveryService` 在库里（`worker.rs`，
+      >   `bind_on`/`run_recording`），但它要**宣告一个端口**，而 shell 不在任何端口上服务。
+      >   发现属于**接受连接的进程**，也就是 daemon；它已经在扫了（`serve.rs:346` 的线程活到进程结束），
+      >   并把听到的写进**同一张 `devices_seen`**—— 所以列表是新的。
+      > * ★ **缺的是“立即扫一次”**：daemon 有 `on_demand` 截止时间，但 `synra-control` 的 `Request`
+      >   **没有对应的请求**，所以这条路完全不存在。现在非 cached 扫描会**拒绝并说明原因**
+      >   （`Unsupported`，reason 里同时点名两半）；cached 扫描仍然可用，因为它真的只读已知。
+      > * 待办：给控制协议加 `Request::Scan { timeout_ms }`，daemon 据此设 `on_demand`，shell 再转发。
       > ★ **18/39：`plugins_audit` 也注册了。** 它原来的理由是“the audit ring has no production
       > writer yet”—— 写下时是真的：`AuditRing` 有界、有测试、可查询，而**没有人往里写**。
       > 现在写入者存在（`PluginSet` 为每个实例装 session，调用后把它记下的排进 ring），
