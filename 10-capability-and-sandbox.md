@@ -743,6 +743,23 @@ pub struct AuditEntry {
       文档要的令牌桶在 `synra-plugin-host/src/quota/`：`RateKind`(`limits.rs:13`)、
       `TokenBucket::try_consume`(`ledger.rs:79`)、`Budget::consume`(`budget.rs:237`)，
       `quota/proptests.rs:18` 有 proptest。性质完全成立，只是名字和 crate 换了 —— **是两套独立机制**。
+       > ★ **而 `Quota` 的十二个字段里，只有“速率”那五个真的被强制。** 逐条核对：
+       > 被强制的：`host_calls_per_sec` / `host_calls_burst`（以及其余四个 kind，
+       > 经 `Quota::rate_for`(`limits.rs:130`) → `Budget::consume`(`budget.rs:237`)，
+       > `host_calls.rs:374-390` 的 `rate_kind()` 负责分类）。
+       > **没被强制的**：`max_memory_bytes`、`max_instances`、`max_storage_bytes`、`max_open_transfers`、
+       > `call_fuel`、`call_timeout_ms`、`network_concurrent`。
+       > * ★ 根因是 `CallBudget::from_quota`(`engine/types.rs:233`) **在生产里从来没有调用方**——
+       >   只有 `scripted.rs:691` 的 `enforcement` 和一个测试用。它的注释写着
+       >   "Every field is taken from the quota rather than chosen here, so the number a user sees in a settings
+       >   screen is the number the sandbox enforces"，**而那句话当时只有三分之一是真的**。
+       > * 已修的是 `call_fuel` / `call_timeout_ms` / `max_memory_bytes`：`share.execute` 现在用
+       >   `PluginSet::quota()` → `CallBudget::from_quota`，而不再是一个固定的 5 秒超时 + `fuel: None`。
+       >   ★ 那个 `fuel: None` 值得单独说：**它意味着执行一个动作时完全没有指令上限**，只有墙钟。
+       > * 仍然没强制的：`max_instances`（实例上限走的是 `PluginSpec.limit`，**不是** quota —— 两个来源）、
+       >   `max_storage_bytes` 与 `max_open_transfers`（这两个守的功能本身还没实现，所以“没强制”是对的）、
+       >   `network_concurrent`（无并发请求这回事）。
+       > * ★ **为什么之前看不出来**：速率**是**被强制的，而“一个能做事的 quota”看起来就像“一个能用的 quota”。
 - [x] `UiSessionRegistry`：签发/校验/撤销 —— **A，但"注入"那半是 B**。
       名字完全一致：`synra-plugin-ui/src/session/registry.rs:17`，`issue_with`(`:46`)、
       `validate`(`:140`，要求 nonce + plugin_id + version 三者一致)、`revoke`(`:113`)、
