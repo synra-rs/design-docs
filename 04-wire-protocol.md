@@ -83,14 +83,29 @@ uuid_newtype!(ScanId,     "scan");
 uuid_newtype!(SessionId,  "ses");
 
 /// 128-bit trace id（W3C trace context 兼容：32 位十六进制）
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(transparent)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TraceId(pub u128);
 
 impl TraceId {
     pub fn new() -> Self { Self(rand::random()) }
     pub fn to_hex(self) -> String { format!("{:032x}", self.0) }
 }
+
+// ★ 上面那两行原本是 `#[derive(Serialize, Deserialize)]` + `#[serde(transparent)]`，
+// 而它们与**自己上一行的注释相矛盾**：那句说的是"32 位十六进制"，
+// 而 `transparent` 把它序列化成一个**128 位的 JSON 数字**。三件事同时错了：
+//
+// 1. `serde_json::Value` 直接拒绝：`number out of range` —— 所以任何经过 `Value`
+//    的路径（比如 IPC 转换）都会在遇到 trace 时失败；
+// 2. JavaScript 的 `JSON.parse` **不报错，而是静默地四舍五入** ——
+//    一个"差不多对"的 trace id 比没有更糟：它把错的步骤串在一起，而看起来像是对的；
+// 3. `synra-js` 对外发布的是 `export type TraceId = string`（`wire.d.ts`）——
+//    **Rust 侧和 TypeScript 侧对同一字段的类型说法不一致**。
+//
+// 现在它自己实现 serde：序列化为 32 位十六进制字符串，反序列化时校验
+// 非空、≤ 32 位、全部是十六进制。这也才是 W3C trace context 的写法。
+impl Serialize for TraceId { /* serialize_str(self.to_hex()) */ }
+impl<'de> Deserialize<'de> for TraceId { /* from_str_radix(text, 16) */ }
 
 /// 插件标识：由 manifest 声明，全局唯一
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
