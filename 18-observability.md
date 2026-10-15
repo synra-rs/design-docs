@@ -616,11 +616,22 @@ pub fn install_panic_hook(paths: &Paths, version: &str) {
       另加 `the_debug_log_section_is_empty_rather_than_absent_when_there_is_no_log`，
       区分"这一节是空的"与"这一节不存在"—— 与审计那节同一个判断。
       ★ 审计那一节仍然是空列表，因为**仍然没有审计写入方** —— 两者情况不同，所以答案也不同。
-- [x] `run_probes` 系列（§6.3）+ 设置页诊断展示 —— **A/一半**：
-      `run_probes(targets, host)`(`doctor/mod.rs:54`) 含端口/数据目录可写/磁盘空间/插件完整性，
-      测试 `doctor/tests.rs:347`/`:375`。
-      ★ §6.3 列的 11 个探针只实现了 6 个左右；`probe_webview_version`/`probe_wasm_backend`/
-      `probe_keyring_available` 未见。设置页展示那半也没有。
+- [x] `run_probes` 系列（§6.3）—— **A，全部实现且已接线**。
+      ★ **更正一处我自己写错的注记。** 上一轮我在这里写了"§6.3 列的 11 个探针只实现了 6 个左右，
+      `probe_webview_version`/`probe_wasm_backend`/`probe_keyring_available` 未见"。
+      **那是错的**，而且是逐条核对就能发现的那种错：三个探针都在
+      `crates/synra-observe/src/doctor/host.rs`（`:55`/`:99`/`:85`），
+      而 `run_probes`(`doctor/mod.rs:54`) **12 次 `push` 覆盖了 §6.3 的每一个探针**
+      外加一个 `probe_udp_port_available`：
+      端口可用（TCP + UDP）/ 网卡 / 防火墙提示 / 数据目录可写 / 磁盘空间 / 时钟偏差 /
+      WebView 版本 / 密钥链可用 / wasm 后端可用 / 插件目录。
+      我是从一份子代理报告里转述的，没有自己打开 `run_probes` 看 ——
+      这正是我在别人代码里反复找的那类问题（**断言的是说法，不是那个说法所指的东西**），
+      写在文档里同样成立。教训记在这里而不是悄悄改掉。
+      剩下的确实缺的只有一半：**设置页的诊断展示**。app 的 `src/pages` 只有
+      Devices/Home/Plugins/Settings 四个，没有任何 doctor/探针的调用方。
+      探针本身不是没人用的 —— `synra doctor`（CLI，已注册）就是它们的调用方
+      （`DoctorReport::run` → `run_probes`），所以这半是"少一个界面"，不是"少一套实现"。
 - [x] `install_panic_hook` + `CrashReport` 落盘 —— **★ 本次补上了缺的那一半**。
       `CrashReport`(`crash.rs:54`)、`CrashStore::write`(`:254`) 原本就是真的，
       但 **`install_panic_hook` 不存在，全仓 0 处 `std::panic::set_hook`/`take_hook`** ——

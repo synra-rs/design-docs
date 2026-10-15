@@ -631,3 +631,12 @@ Wasm **验证与编译本身**是攻击面（一个精心构造的模块可以�
       内存炸弹无 guest 测试（`:354` 只断言 ceiling 已安装）；
       trap 恢复只有 `ScriptedBackend` 桩；并发隔离测的是线程池，不跑 wasm。
       本 crate 里唯一执行真 wasm 的两个测试都被 `#[ignore]`（`wasmtime_tests.rs:270, 306`）。
+      ★ **但是 `#[ignore]` 的理由值得照抄下来，它比"没做"更有用**：
+      两条的注解都是
+      "the hand-written fixture does not match the canonical ABI for a `string` parameter and result;
+      the lookup itself now works, and a fixture built by `bindgen!` from the WIT file is what would close this"。
+      也就是说**缺的是夹具而不是被测代码**：手写的 `.wat` 与 canonical ABI 对不上，
+      而 `bindgen!` 从 `wit/synra-plugin.wit` 生成的夹具才是出路。
+      ★ 这条路径**依赖环境**：`synra-plugin-sdk/tests/guest/world_fixture.rs` 自己写明
+      `wasm32-wasip2` 目标与 `wasm-tools` 都没有安装。
+      所以这一条要真正勾上，先要有那个目标 —— 属于"需要环境"的一类，本次不碰。
