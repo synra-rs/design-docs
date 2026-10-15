@@ -576,13 +576,28 @@ pub fn install_panic_hook(paths: &Paths, version: &str) {
       `CrashReport`(`crash.rs:54`) + `CrashStore::write`(`:254`) 是真的，
       ★ 但 **`install_panic_hook` 不存在，且全仓 0 处 `std::panic::set_hook`/`take_hook`** ——
       生产中**永远不会有崩溃报告落盘**。
-- [x] 启动时崩溃检测 + 安全模式 —— **A，但它要门控的行为没有**。
+- [x] 启动时崩溃检测 + 安全模式 —— **A，且本次把"它要门控的行为"接上了**。
       `StartupVerdict::SafeMode` + `startup_verdict`(`crash.rs:190`) + `SAFE_MODE_THRESHOLD`
       + 真实测试(`:474`/`:495`/`:525`)，并接进 `Kernel::startup_verdict`(`kernel.rs:358`)。
-      ★ `StartupVerdict::allows_plugins()`(`:160`) **只在测试里被调用**
+      ★ 原状：`StartupVerdict::allows_plugins()`(`:160`) **只在测试里被调用**
       （`crash.rs:443`/`:469`/`:490`、`kernel_tests.rs:365`）——
-      全仓**没有任何插件加载路径查询它**。安全模式解禁不了任何东西，因为它不做任何决定。
-      另外它也没有崩溃报告来源（见上一条）。
+      全仓没有任何插件加载路径查询它。后果具体而不抽象：一个在激活时崩溃的插件，
+      第三次之后仍会被第四次启动，而用户要关掉它所需要的设置页**始终打不开** ——
+      而这正是 `SafeMode` 自己的文档注释里写的"必须存在的那个出口"。
+      **本次接上**：`apps/synra-daemon/src/runtime/plugins.rs` 的 `load_installed` 现在收
+      `&StartupVerdict`（不是 `bool`，这样拒绝时能说出**是哪个位置**在反复崩），
+      `serve.rs` 在装载前用 `CrashStore::verdict(now)` 得到判定再传进去；
+      `LoadedSummary` 新增 `safe_mode: Option<String>`，**独立于 `refused`** ——
+      两者是不同的陈述：`refused` 说的是"这些插件失败了"，
+      `safe_mode` 说的是"守护进程在看过任何一个插件之前就决定了不启动它们"，
+      把后者塞进前者等于把责任推给一个**从未被检查过**的插件。
+      状态报告（`reports.rs`）也跟着暴露 `safeMode`，否则客户端看到的是
+      `loaded: false` + 空的 `notLoaded`，读起来就是"这台机器没装插件"—— 与事实相反，且会把人引去重装。
+      测试 `safe_mode_loads_nothing_and_says_why` 走**真实路径**（写三份崩溃报告 → 问 store 要判定 →
+      装载），而不是手工构造 `SafeMode` 枚举 —— 后者只能证明"我编的那个值返回 false"。
+      负控制：把判定那行改成 `if false`，测试立刻红（"safe mode loaded something"）。
+      ★ 仍未做的：**`install_panic_hook` 不存在，所以生产里根本不会产生崩溃报告**（见上一条）。
+      也就是说这条链路现在是通的，但入口没有水 —— 安全模式要真的生效，先得有东西写那三份报告。
 - [x] DB `integrity_check` + 损坏恢复路径 —— **检查有，恢复没有**：
       `SynraDb::health`(`sqlite/mod.rs:174`) + `interpret_integrity` + 测试(`db/tests.rs:249-279`)；
       ★ `health.rs:42` 只提示"restore from a backup"，**无任何恢复代码**。
