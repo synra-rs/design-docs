@@ -407,7 +407,17 @@ impl Supervisor {
 >   于是**信封在能被送出去的一行之前就被丢了**。现在 shim 返回类型化的 `Decided`，
 >   由 host 先用它能用的东西，再渲染给线路。
 >
->      ★ **剩下的三件**：收信后本地跑插件、回 `INTENT_RESULT`、按 `request_id` 做幂等。
+>      ★ **四件全部完成（已提交）。** `orchestrate::accept_remote` 是收信端：
+>      读出 `Invoke`、以 `IntentSource::Direct` 上牌（正因为它点名了插件与动作，`raise` 会直接进 `Dispatching`，不需匹配）、
+>      跑插件、`conclude`、回 `INTENT_RESULT`（`reply_to` 是请求的 id，供对方关联）。
+> * ★ **幂等没有在这里实现，而是用了已有的**：`Board::raise` 在**创建任何东西之前**
+>   就按 `(origin, request)` 查重，重发会拿到第一次的 intent、`created == false`，于是动作不会跑第二次。
+>   一个自带缓存的 handler 会是**第二个**“我见过这个请求吗”的答案。
+> * ★ **证据**：**55 suites / 2781 passed**（+3），clippy、5 guard、matrix 均绿。
+>   `the_same_request_twice_runs_once_and_answers_twice` 断言 `board.len() == 1`；
+>   阴性对照（把 request id 从 `raise` 拿掉）会以 **`left: 2, right: 1`** 失败 —— 正是幂等失效的样子。
+>   `a_request_from_another_device_runs_here_and_answers_with_the_outcome` 同时断言动作**真的跑了**（回答是 `"opened"`），
+>   因为一个不跑东西就回 `ok` 的 handler 从发送方看完全一样。
 >      幂等的**两半已经在 board 里**：`confirm` 重用而不新铸 request id，`recall(origin, request)`
 >      按来源查一个到达的请求。所以收信端只差把这两个接上 listener 的 `Decision`。
 >
