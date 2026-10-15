@@ -621,7 +621,14 @@ Content-Security-Policy:
       > * ★ **缺的是“立即扫一次”**：daemon 有 `on_demand` 截止时间，但 `synra-control` 的 `Request`
       >   **没有对应的请求**，所以这条路完全不存在。现在非 cached 扫描会**拒绝并说明原因**
       >   （`Unsupported`，reason 里同时点名两半）；cached 扫描仍然可用，因为它真的只读已知。
-      > * 待办：给控制协议加 `Request::Scan { timeout_ms }`，daemon 据此设 `on_demand`，shell 再转发。
+      > * ★ **待办，而且第一版写错了。** 我先写的是“给控制协议加 `Request::Scan`，
+      >   daemon 据此设 `on_demand`，shell 转发”—— **shell 根本不会说控制协议**：
+      >   `src-tauri` 的 `Cargo.toml` 里没有 `synra-control`，全仓 0 处 `Request::`（只有 `diag.rs:266` 一句注释提到它）。
+      >   控制协议是 **CLI 对 daemon** 的，不是 shell 对 daemon 的。
+      > * ★ **真正的原因在 [05 §2.1](./05-system-architecture.md)**：设计里桌面端的签名是
+      >   `Kernel（Arc<Kernel>）` **同进程**，`DiscoveryService` 和 `TransportRegistry` 都在里面。
+      >   shell 现在两者都没有；它手里的 `Host` 能 `listen_on`（`host/kernel.rs:160`）但从没调过。
+      >   所以 scan 不是差一个请求，是差半个内核。
       > ★ **18/39：`plugins_audit` 也注册了。** 它原来的理由是“the audit ring has no production
       > writer yet”—— 写下时是真的：`AuditRing` 有界、有测试、可查询，而**没有人往里写**。
       > 现在写入者存在（`PluginSet` 为每个实例装 session，调用后把它记下的排进 ring），

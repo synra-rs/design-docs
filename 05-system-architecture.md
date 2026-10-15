@@ -88,6 +88,36 @@
 - **可选：内核独立进程**。若需要"UI 关闭后继续服务"，把内核跑在一个 `synra-daemon` 子进程里，Tauri 侧通过本地 socket（unix domain / named pipe）与之通信。见 [07](./06-workspace-layout.md) §5.2 的 `kernel-remote` feature。
 - **渲染进程**：Tauri 默认使用系统 WebView（Windows: WebView2 / macOS: WKWebView / Linux: WebKitGTK）。多个 WebView 实例可用于 UI 插件隔离（见 §5）。
 
+> ### ★ 本节第一句是设计，而仓库里现在没有一处按它做
+>
+> 记在这里，因为这张图里的 `Kernel（Arc<Kernel>）` 对应的是 `synra_core::Kernel`（`crates/synra-core/src/kernel.rs`，
+> 701 行）：它有 `Supervisor`、有事件总线（`subscribe`/`next_event`）、有审计环、有 `startup_verdict`。
+> **而没有任何生产代码构造它**——构造点只有 `kernel_tests.rs`（`Kernel::in_memory`/`open`，`:13`/`:42`/`:45`/…）。
+>
+> ★ **注意它没有 listener。** 监听在 `Host` 上（`crates/synra-core/src/host/kernel.rs`，223 行）：
+> `listener: Option<TcpListener>`（`:25`），`Host::listen_on`（`:160`）里 `TcpListener::bind`（`:161`）。
+> 两个同名文件不是一件事，第一版笔记把它们混为一谈了。
+>
+> 更要紧的是**图里那两层服务没有注册者**。`Kernel::register_task(TaskSpec)` 认识 `"discovery.udp"` 与
+> `"transport.accept"` 这两个名字，而这两个字符串**只出现在 `kernel_tests.rs`**（`:103`、`:107`、`:116`、`:117`）。
+>
+> 于是现在有三份各占一半的实现，**没有一份是图里那个**：
+>
+> | | store / identity / host | 发现 | 接受连接 | 插件 + 意图 |
+> |---|---|---|---|---|
+> | `synra_core::Kernel` | ✅ | ❌ | ❌（但 `Host::listen_on` 在库里） | ❌ |
+> | daemon 的 `Runtime` | ✅ | ✅ | ✅ `transport.rs`，765 行，**在二进制里** | ✅ |
+> | app 的 `AppState` | ✅（与上面各重复一份） | ❌ | ❌（`Host` 在手却从不 `listen_on`） | ✅ |
+>
+> ★ **这一条解释了此前二十来轮里散落的一整族缺口**，它们不是彼此独立的 bug：
+> shell 扫不了描（没有发现任务）、`DesktopHost::device_send` 拒绝一切（从不监听，也就没有连接可发）、
+> `Kernel::record_action` 没有调用者（没有 Kernel）、`AppState` 与 daemon 各持一份 store/identity/host。
+>
+> ★ 而 `synra-daemon` 在文档里是**可选的**那个（见上面第三条要点与之对应的 `kernel-remote` feature），
+> 现在却是唯一跑起来的网络实现。可行的下一步是先让 daemon 的 `transport.rs` 搬进库（`serve` 在 `:70`，
+> `bind` 在 `:364`），两个宿主都注册 `transport.accept` —— 和把编排从 `runtime/intent.rs` 搬进库是同一件事，
+> 那次已经做完了。
+
 ### 2.2 移动端（Android / iOS）
 
 ```
