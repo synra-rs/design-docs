@@ -608,7 +608,17 @@ Content-Security-Policy:
 >   一次插入把新测试放在了 `#[test]` 与它的函数之间，于是属性重复、
 >   而原来那个函数**一个属性都没有**。编译器只是很小声地说了一句 warning，
 >   而 `cargo test` 输出里看不出少了一条 —— 直到这次重构让它变成了错误。
-- [ ] ~40 个 Tauri command（见 §2.2）—— **13/39**。
+- [ ] ~40 个 Tauri command（见 §2.2）—— **17/39**。
+      > ★ **现在是 17/39：四个 intent 命令已注册**（`commands/intent.rs`，
+      > `main.rs` 的 `generate_handler!`）。它们之前卡在的不是接线，而是**编排住在二进制里**：
+      > 现在在 `synra_core::dispatch::orchestrate`，两个孿主各自只写一层映射。
+      > ★ **而且这次还发现库返回的是无类型 JSON，这对第二个孿主是不够的**：
+      > 界面的 `IntentCandidate` **必须有一个设备**，而内核的候选人**可能对“在哪里跑”没有意见**（那正是“在哪里”这个问题的来源）。
+      > 所以 `snapshot` 现在返回类型化的 `IntentView` / `CandidateView`，而 `to_json()` 只是**其中一种**渲染。
+      > ★ **两处契约不匹配被记下而不是抹平**：
+      > 界面的 `Share` **没有 MIME**（shell 发 `text/plain`）；界面的 `IntentPrompt` 要求一个消息键和选项列表，
+      > 而内核是用**状态**来问问题的 —— shell 没有把状态翻译成一句自己写的问题，
+      > 而是直接传了 `None`（见 `intent_snapshot` 的注释）。
       > ★ 与之无关但同样是"看得见、跑不了"的一处：**CLI 的 `plugin` 子命令里，四个里只有一个能做任何事。**
       > `plugin_request`（`synra-cli/src/session.rs`）对除 `list` 外的每个 action 都返回 `None`，
       > 而 `question_for` 返回 `None` 会让 CLI 打出**"this command needs a running kernel, and none is reachable"**
