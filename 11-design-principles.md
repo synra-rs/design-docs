@@ -143,8 +143,23 @@ pub struct SessionTimeouts {
 并且**发起方在本端超时后必须清除自己的"等待中"状态**——不能只依赖对端回应。
 
 **检查**：
-- [ ] 每个 `Pending*` / `Awaiting*` 状态都有超时来源
-- [ ] 测试：对端完全不回应时，本端在超时后回到确定状态
+- [x] 每个 `Pending*` / `Awaiting*` 状态都有超时来源 —— 全仓这类状态只有一个：
+      `pairing/desk.rs` 的 `PendingPairing`，它带 `deadline_ms`，由 `pairing_window_ms` 推出，
+      `sweep_expired(now_ms)` 负责清退。
+      等待侧的 `session/send/awaiting.rs` 不持有状态，它收一个 `deadline: Instant` 参数，
+      每个循环都拿 `Instant::now() >= deadline` 判一次。
+- [ ] ★ `SessionTimeouts` 是**悬空的**（这条文档没写，但它是上面两条的前提）
+      `synra-protocol/src/session.rs` 的模块注释写着"每个会话都有超时，它们都在一个地方：
+      `SessionTimeouts`"。全仓 `grep SessionTimeouts` **11 处命中，全部在 `session.rs` 内部**：
+      定义、`Default`、`validate()`，以及 L934-960 的自测。
+      也就是说这个"唯一权威的超时配置"**没有任何生产代码读取**。
+      实际发生的事是另一套：会话层把 `deadline` 当参数由调用方传入。
+      ★ 这和 A2 的 `ack_policy` 是**同一个形状** —— 一个被测试得很好的策略类型，
+      加上"只有一个实现"这种容易绿的检查，看起来完备，实际上没有接线。
+      两次撞见同一类问题，所以值得单独记：**"只有一个实现"不等于"有人在用"**。
+- [x] 测试：对端完全不回应时，本端在超时后回到确定状态 ——
+      `pairing/desk.rs:474` `a_waiter_whose_window_closed_is_told_the_request_expired`：
+      配对窗口关掉后，等待方收到的是"请求已过期"，不是挂住。
 
 ---
 
@@ -245,8 +260,14 @@ pub struct SessionTimeouts {
 | 归档解包           | 超出条目/大小/深度/路径限制一律拒绝；symlink 条目直接拒绝       |
 
 **检查**：
-- [ ] 每个白名单的"空"状态有测试（断言拒绝而不是允许）
-- [ ] 路径比较是**组件级**（`/data` 不匹配 `/database`）
+- [x] 每个白名单的"空"状态有测试（断言拒绝而不是允许）—— `capability/set/tests.rs` 里
+      空集合的用例断言的是**拒绝**；`config/tests.rs:174`、`tests.rs:429` 也明确写着
+      "一个白名单会让新设置进不来"。
+- [x] 路径比较是**组件级**（`/data` 不匹配 `/database`）—— `synra-store/src/paths.rs:237`
+      `is_within` 按 `Path::components()` 逐段比较，注释直接点名这个坑；
+      用例在同文件 L366/L399-403/L515/L531/L537。
+      另一条独立证据：`synra-capability` 的 `tests.rs:268` 断言
+      `fs:read:/database` **不**被 `fs:read:/data*` 覆盖。
 
 ---
 
@@ -261,9 +282,22 @@ pub struct SessionTimeouts {
 - URL 类型 → 去掉 query 与 fragment。
 
 **检查**：
-- [ ] 测试：给日志宏传一个含 `hunter2` 的 payload，断言输出里**不含** `hunter2`
-- [ ] 测试：诊断包里不含密钥
-- [ ] 审计记录**不含 payload 内容**（只有"调用了哪个能力"）
+- [x] 测试：给日志宏传一个含 `hunter2` 的 payload，断言输出里**不含** `hunter2` ——
+      `synra-observe/src/redact.rs:314-315` 就是这条，用例字面量是
+      `("secret", "hunter2")` 与 `("password", "hunter2")`。
+- [x] 测试：诊断包里不含密钥 —— `synra-ipc` 的 `tests.rs:470`
+      `a_diagnostic_export_defaults_to_the_least_intrusive_bundle` 断言
+      `DiagExportOptions::default()` 是最不侵入的一档。
+      ★ 提醒一句这条的**边界**：它断言的是默认档位，不是"任何档位都不含密钥"。
+      高侵入档位是否含密钥，这条检查没有覆盖。
+- [x] 审计记录**不含 payload 内容**（只有"调用了哪个能力"）——
+      `synra-observe/src/audit.rs:437` `a_record_has_no_place_to_put_a_payload`。
+      这个保证是**构造性**的：`AuditEntry` 的字段只有
+      `at_ms` / `plugin` / `capability` / `outcome` / `elapsed_ms`，
+      没有任何一个能装下内容，所以不是一个可能被忘记的约定。
+      `AuditEntryDto` 同样只有 `at_ms` / `capability` / `allowed` / `reason` /
+      `elapsed_ms` / `trace_id`。另有 `audit.rs:758`
+      `a_rendered_record_is_a_destination_not_a_body` 守着渲染层。
 
 ---
 
