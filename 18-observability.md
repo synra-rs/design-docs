@@ -572,10 +572,23 @@ pub fn install_panic_hook(paths: &Paths, version: &str) {
       测试 `doctor/tests.rs:347`/`:375`。
       ★ §6.3 列的 11 个探针只实现了 6 个左右；`probe_webview_version`/`probe_wasm_backend`/
       `probe_keyring_available` 未见。设置页展示那半也没有。
-- [ ] `install_panic_hook` + `CrashReport` 落盘 —— **类型有，生产者没有**。
-      `CrashReport`(`crash.rs:54`) + `CrashStore::write`(`:254`) 是真的，
-      ★ 但 **`install_panic_hook` 不存在，且全仓 0 处 `std::panic::set_hook`/`take_hook`** ——
-      生产中**永远不会有崩溃报告落盘**。
+- [x] `install_panic_hook` + `CrashReport` 落盘 —— **★ 本次补上了缺的那一半**。
+      `CrashReport`(`crash.rs:54`)、`CrashStore::write`(`:254`) 原本就是真的，
+      但 **`install_panic_hook` 不存在，全仓 0 处 `std::panic::set_hook`/`take_hook`** ——
+      于是整条链路是**通的、但干的**：报告类型、存储、按位置计数、阈值、以及查询它的装载路径全都在，
+      而**永远没有人写过一份报告**。后果具体：安全模式触发不了（它数的那份文件不存在），
+      一个在激活时崩溃的插件每次都只会崩，用户拿不到任何可读的记录。
+      **本次实现**：`synra_observe::crash::install_panic_hook(store, version)`，
+      在 `serve.rs` 里**先于任何会崩的东西**安装（在插件宿主构建之前 —— 装在之后就不记录构建它时的失败），
+      version 用 `env!("CARGO_PKG_VERSION")` 即守护进程自己的版本而不是 observe 层的。
+      ★ 它**串联**而不是替换上一个 hook：替换掉就会让装了这个 hook 的构建在终端里**静默 panic**，
+      那比它要记录的故障更糟。先写报告、再跑原 hook，所以写失败也还有普通消息。
+      ★ 测试放在 `crates/synra-observe/tests/panic_hook.rs`（独立二进制），
+      因为 `set_hook` 是**进程级**的 —— 放进 `src/` 的测试会改掉同一二进制里所有其它测试报告失败的方式。
+      ★ 而且那里**只有一个 `#[test]`**：两次安装会互相替换，两个测试各装一次就是一个
+      "大多数运行能过、机器一忙就失败"的竞态 —— 正是这个仓库一直在找并点名的那类东西。
+      测试跑 5 次确认稳定；负控制（把写报告那行去掉）确认会红（"the hook wrote 0 reports"）。
+      至此崩溃管线是端到端通的：panic → hook → 落盘 → 按位置计数 → `verdict` → 安全模式 → 不装载插件。
 - [x] 启动时崩溃检测 + 安全模式 —— **A，且本次把"它要门控的行为"接上了**。
       `StartupVerdict::SafeMode` + `startup_verdict`(`crash.rs:190`) + `SAFE_MODE_THRESHOLD`
       + 真实测试(`:474`/`:495`/`:525`)，并接进 `Kernel::startup_verdict`(`kernel.rs:358`)。
@@ -596,8 +609,8 @@ pub fn install_panic_hook(paths: &Paths, version: &str) {
       测试 `safe_mode_loads_nothing_and_says_why` 走**真实路径**（写三份崩溃报告 → 问 store 要判定 →
       装载），而不是手工构造 `SafeMode` 枚举 —— 后者只能证明"我编的那个值返回 false"。
       负控制：把判定那行改成 `if false`，测试立刻红（"safe mode loaded something"）。
-      ★ 仍未做的：**`install_panic_hook` 不存在，所以生产里根本不会产生崩溃报告**（见上一条）。
-      也就是说这条链路现在是通的，但入口没有水 —— 安全模式要真的生效，先得有东西写那三份报告。
+      至此这条链路是通的**且有水**：`install_panic_hook` 本次已实现（见上一条），
+      panic → 落盘 → 计数 → `verdict` → 不装载插件，整条都有测试。
 - [x] DB `integrity_check` + 损坏恢复路径 —— **检查有，恢复没有**：
       `SynraDb::health`(`sqlite/mod.rs:174`) + `interpret_integrity` + 测试(`db/tests.rs:249-279`)；
       ★ `health.rs:42` 只提示"restore from a backup"，**无任何恢复代码**。
