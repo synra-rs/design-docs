@@ -806,7 +806,23 @@ publish:     ; cargo harbor publish
 >
 > ★ 而且同一把尺子下，**core 的 clippy 也不是“干净”**：它有 5 类 `warn`（`missing_const_for_fn`、
 > `needless_borrow` 等）。之前几轮的“clippy 干净”是用 `^error` 过滤出来的结论 ——
-> **过滤器不是证据**，尤其当它只看一种级别的时候。
+> **过滤器不是证据**，尤其当它只看一种级别的时候。第 61 轮已把它们清到
+> **0 条**（`--message-format=json` 数出来的，不是看出来的）。
+>
+> ### ★ 而比那些警告更重要的：一整个文件被某些命令静默地跳过
+>
+> `synra-plugin-host` 的 `default = []`，而 `engine/linker.rs` 在 `#[cfg(feature = "wasm-runtime")]` 里。所以：
+>
+> ```
+> cargo test -p synra-plugin-host                  # ✗ 不编译 linker.rs，不跑它的任何测试
+> cargo test -p synra-plugin-host --features wasm-text   # ✓ 318 个测试，包括 linker
+> cargo test --workspace                          # ✓ 特征被实现包统一（daemon 要求了它），所以也跑
+> ```
+>
+> ★ 这是怎么发现的：把 9 个“只循环一个元素”的 `for` 改成绑定时，
+> 第一版多留了一个 `}`。`cargo build -p synra-plugin-host` **成功了** ——
+> 因为它根本没编译那个文件；而 `cargo clippy --workspace --all-targets` 报了错。
+> **一条“构建通过”的命令，如果它没碰你改的文件，就不是证据。**
 >
 > ★ 而且**不能只看 core 的输出**：`synra-core` 作为路径依赖被 app 编译时，
 > 用的是 app 那侧的 feature 统一结果，所以 core 里干净的东西在 app 的构建里可能会有新的 warning
