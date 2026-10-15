@@ -576,15 +576,67 @@ Content-Security-Policy:
 
 ## 9. 实现清单
 
-- [ ] `IpcError` + `ErrorCode` + `SuggestedAction` + `From<core::Error>`
-- [ ] ~40 个 Tauri command（见 §2.2）
-- [ ] `ts-rs` 派生 + `tauri-specta` 绑定生成 + CI `types-check`
-- [ ] `KernelEventEnvelope`（带 `seq`）+ Tauri emit 桥
-- [ ] 前端 `event-bridge.ts`（含未知事件 → 全量刷新、`seq` 断裂 → 全量刷新）
-- [ ] `PluginUiOp` 枚举 + 方法白名单 + `plugin_ui_rpc`
-- [ ] UI 插件自定义协议 handler（`synra-plugin://`）+ CSP（`connect-src 'none'`）
-- [ ] 插件 WebView 初始化脚本（token 闭包注入）
-- [ ] 导航范围限制（`on_navigation`）
-- [ ] 前端 stores：`ui` / `devices` / `pairing` / `plugins` / `intent` / `transfers` / `config` / `diagnostics`
-- [ ] WebView 引擎兼容矩阵（WebView2 / WKWebView / WebKitGTK / Android / iOS）+ 探测
-- [ ] 前端迁移四阶段（§8），每阶段可独立运行
+> ★ 这一节在实现之前写就，长期整节未勾选。逐条核对源码后：**这一节目前没有一条可以勾。**
+> 三样东西是真的（`IpcError` 三件套、`KernelEventEnvelope` 带 `seq`、`EventDispatcher` 的 gap/unknown 逻辑），
+> 但三样都缺"接上去"的那一半；其余九条是从未开工。
+> 下面写清每一条的**真实状态**与真实名字。
+
+- [ ] `IpcError` + `ErrorCode` + `SuggestedAction` + `From<core::Error>` ——
+      **四分之三**。`IpcError` 在 `crates/synra-ipc/src/error.rs:125`，`:127` 转出 protocol 的 `ErrorCode`，
+      `:144` `SuggestedAction`，转换是 `:221` 的固有方法 `IpcError::from_synra_error(&SynraError)`。
+      ★ **`From<core::Error>` 不存在**：全仓 0 处 `impl From<..> for IpcError`，
+      且 `synra-ipc/Cargo.toml` 只依赖 protocol/capability/observe —— `synra_core::Error` 根本不在作用域里。
+- [ ] ~40 个 Tauri command（见 §2.2）—— **12/39**。
+      39 个名字确实存在，但只在 `crates/synra-ipc/src/command.rs` 的 `commands!` 表里；
+      `src-tauri/src/main.rs:153-166` 只注册了 12 个（identity 2、devices 4、plugins 3、config 2、diag 1）。
+      未实现的 27 个逐条列在 `synra-rust-app/src/ipc/registration.test.ts`
+      的 `NOT_YET_REGISTERED` 里，**每条都带原因**（区分"等接线"与"决定不做"）。
+      ★ 两处原本守不住这件事的检查，本次都处理了：
+      `command.rs` 里那条测试比的是"注册表 vs 同文件的手写列表"（两份同源拷贝互相比对），
+      它同名断言的那句话——"文档里有而这里没有 = 前端会调而 shell 没有"——它**看不见**；
+      `scripts/check-shapes.ts` 的 `checkCommandNames` 也只看同一张注册表。
+      新加的 `registration.test.ts` **直接读 `command.rs` 解析出 39 个名字**，
+      再与 `main.rs` 的 `generate_handler!` 两个方向比对，负控制确认会红。
+- [ ] `ts-rs` 派生 + `tauri-specta` 绑定生成 + CI `types-check` —— **未做，且选型换了**。
+      全仓 0 处 `ts-rs`/`tauri-specta`；真实机制是 `synra-ipc/src/ts_export.rs` **手写**生成两个 TS union
+      （只导出 `ErrorCode` 与 `SuggestedAction`），靠 `serde_json::to_value` 反推变体名。
+      所有 DTO 与命令绑定一个都没生成。CI 那半彻底没有：core 与 app 都没有 `.github/`，也没有 `justfile`。
+- [ ] `KernelEventEnvelope`（带 `seq`）+ Tauri emit 桥 —— **一半**。
+      `KernelEventEnvelope` + `SequenceTracker` 是真货（`crates/synra-ipc/src/event.rs:193`、`:243`）。
+      ★ **emit 桥不存在**：`synra-rust-app` 下所有 `.rs` 搜 `emit`/`Emitter`/`listen`
+      只命中 `build.rs` 的一句注释 —— envelope 没有生产者。
+- [ ] 前端 `event-bridge.ts`（未知事件 → 全量刷新、`seq` 断裂 → 全量刷新）——
+      **逻辑是真的，接不上**。真名 `EventDispatcher`（`src/ipc/dispatcher.ts:62`）：
+      未知事件 → `:137` `#refresh('unknown')`，`seq` 断裂 → `:122` `#refresh('gap')`，两个都有测试。
+      ★ 但生产代码 **0 处引用**它，19 个测试全都自己 `new`；`src/kernel.ts:25` 把界面接在
+      `new FakeKernel()` 上（该文件自己写着 "That is not written yet"）。
+- [ ] `PluginUiOp` 枚举 + 方法白名单 + `plugin_ui_rpc` —— **未做**。
+      `PluginUiOp` 全仓 0 处；`plugin_ui_rpc` 只作为注释出现在 `command.rs:39`。
+      `command.rs` 里 `Interface::{Host,Plugin}`、`:59` `allows()`、`:375` `plugin_allow_list()` 是真的且有测试，
+      **但 app 侧 0 处调用**。
+      ★ `injection.ts` 的 `BACKED` 布尔表不是这个方法白名单：它答的是"这个功能实现了没有"，
+      不是"这个调用允许不允许"。
+- [ ] UI 插件自定义协议 handler（`synra-plugin://`）+ CSP（`connect-src 'none'`）—— **未做**。
+      全仓 0 处 `synra-plugin://`、`register_uri_scheme`、`WebviewWindowBuilder`。
+      `plugin-ui/src/artifact/serving.rs` 只有 `check_path` 与 `content_type_for`，不产响应头。
+      ★ 唯一的 CSP 是 `src-tauri/tauri.conf.json:22` 的 app 级 CSP，那是**宿主主窗口**的，不是插件页的。
+- [ ] 插件 WebView 初始化脚本（token 闭包注入）—— **未做**：全仓 0 处 `initialization_script`，
+      0 处 `Object.freeze`。`InjectionContext` 里**根本没有 token/nonce 字段** ——
+      不是"没实现闭包"，是还没有可以闭包的东西。
+- [ ] 导航范围限制（`on_navigation`）—— **未做**，全仓 0 命中。
+- [ ] 前端 stores：`ui`/`devices`/`pairing`/`plugins`/`intent`/`transfers`/`config`/`diagnostics` —— **1/8**。
+      只有 `src/stores/devices.ts`，其余七个没有文件。
+      ★ 现存这一个确实是忠实的只读镜像：`:70` 整体替换快照、`:82/:94/:99` 只记录、
+      `:133` 的 `switch` 只认三个事件且 `default` 返回 `false`，不含业务规则。
+- [ ] WebView 引擎兼容矩阵（WebView2 / WKWebView / WebKitGTK / Android / iOS）+ 探测 —— **未做**。
+      `WebviewKind` 只存在于设计文档（[09](./09-ui-plugin-model.md)、本文 §384），代码 0 处。
+      ★ 比"没有"更糟的是：`src/ipc/injection.ts` 原先把 `platform`/`hostKind`/`appVersion`
+      当成**硬编码常量**暴露（`platform: () => 'windows'`），在 Linux/macOS/Android 上就是撒谎。
+      一个按 `platform()` 分支的插件在所有平台都会走 Windows 那条路，而且**不会报错** ——
+      一个看起来合理的错答案和正确答案在调用点无法区分。本次已改成从 `InjectionContext` 读取，
+      并加了会失败的测试（三个平台问出三个不同答案）。
+- [ ] 前端迁移四阶段（§8），每阶段可独立运行 —— **前提不成立**。
+      `synra-rust-app` 首个提交只含 `.gitattributes`/`.gitignore`/`README.md`；
+      `git log --all -- "*lan-discovery*"` 无输出。§8 要删的那些文件**在本仓库从未存在过** ——
+      这是从零构建，不是迁移，"每阶段可独立运行"没有指涉对象。
+      这一条应当改写成"从零构建的四个里程碑"，或者删掉。
