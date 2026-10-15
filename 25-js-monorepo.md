@@ -97,16 +97,31 @@ CI 对前三个有"不允许产出 `.js`"的守卫（§6）。
 > ★ 顺带更正 `SequenceTracker` 的注释：它写着"只持有最后一个序号，**不含运行时**"，
 > 而这句话出现在一个**类的定义**上方。所有者换了之后那句话才成立。
 
-### 2.2 `@synra/protocol`：生成物，不手写
+### 2.2 `@synra/protocol`：**手写镜像**，由脚本核对
+
+> ★ **本节的标题与那张图描述了一条不存在的生成路径。**
+> 图上写的 `cargo test -p synra-protocol --features ts-export`（ts-rs 导出）**跑不起来**：
+> `synra-protocol` 没有 `[features]` 段，也没有 `ts_export` 模块。
+> 而**这一点 `packages/protocol/src/generated/wire.ts` 的文件头自己就写着**
+> —— 那份文件头是对的，本节是错的。
+>
+> 实际机制：`src/generated/*.ts` 是**手写**的镜像，`pnpm --filter @synra/protocol sync`
+> 只加头注释（`scripts/gen-protocol-types.ts`），真正保证它没写错的是
+> `scripts/check-shapes.ts` 与 Rust 的逐项对照（§6 守卫 3/5）。
+>
+> 所以下面这张图应当读作**曾经设想过的**机制，而不是现行机制：
 
 ```
 synra-core/crates/synra-protocol/**   （Rust 类型 = 唯一真相源）
-        │  cargo test -p synra-protocol --features ts-export   （ts-rs 导出）
+        │  ~~cargo test -p synra-protocol --features ts-export~~（这条命令不存在）
         ▼
-生成到 core 仓库的 target/ts-export/*.ts
-        │  pnpm --filter @synra/protocol sync   （scripts/gen-protocol-types.ts 复制并加头注释）
+    ✗ 没有 target/ts-export/ 这个目录
+        │
         ▼
-synra-js/packages/protocol/src/generated/*.ts   （★ commit 进仓库）
+synra-js/packages/protocol/src/generated/*.ts   （★ 手写，commit 进仓库）
+        │  scripts/check-shapes.ts 与 Rust 逐项对照 + check-schema 的冻结摘要
+        ▼
+    CI 失败 = 内核改了协议而 TS 镜像没跟上
 ```
 
 **为什么 commit 生成物而不是发布时生成**：
@@ -287,7 +302,7 @@ synra-app ────────────────────┘
 
 | 方向                          | 机制                                                        |
 | ----------------------------- | ----------------------------------------------------------- |
-| core → client                 | `ts-rs` 生成 → `pnpm sync` → commit（§2.2）                    |
+| core → client                 | **手写镜像**（`packages/protocol/src/generated/*.ts`）+ `check-shapes.ts` 与 Rust 对照（§2.2） |
 | client → app                  | app 依赖 `@synra/client`（**dev** 依赖即可，类型在编译期用完）  |
 | app 不能写自己的 `SynraClient`   | CI 守卫：禁止 app 里出现 `interface SynraResponse` 之类的重复声明 |
 
@@ -302,14 +317,25 @@ synra-app ────────────────────┘
 
 | # | 守卫                                                  | 怎么实现                                                |
 | - | ----------------------------------------------------- | ------------------------------------------------------- |
-| 1 | **类型包零运行时**                                      | `dist/` 下出现 `.js`/`.mjs`/`.cjs` 即失败                  |
-| 2 | `synra` 与 `@synra/client` **没有值导出**                | 检查 `dist/*.d.ts` 里没有 `export declare const/function/class`（只允许 `export type` / `export interface`） |
-| 3 | **形状一致性**                                          | `scripts/check-shapes.ts`：断言 `SynraResponse` / `SynraError` 的字段集合与快照一致（字段增删必须显式更新快照，进 review diff） |
+| 1 | **类型包零运行时**                                      | `dist/` 下出现 `.js`/`.mjs` 即失败；另加 `package.json` 里不得有 `main`/`module`/`exports.import` |
+| 2 | `synra` 与 `@synra/client` **没有值导出**                | ★ **入口**（`dist/index.d.ts`）里不得出现不带 `type` 的 `export { ... }`。仓库开了 `verbatimModuleSyntax`，所以"类型还是值"由编译器强制区分 |
+| 3 | **形状一致性**                                          | `scripts/check-shapes.ts`：命名约定 / 错误码 / 帧类型 / 常量 / DTO 字段**逐项与 Rust 对照**（内核仓库不在旁边时跳过并说明） |
 | 4 | 生成物未被手改                                          | `pnpm sync && git diff --exit-code packages/protocol`      |
-| 5 | 生成物与 core 一致                                      | 从 core 仓库取当前导出，比对（跨仓库 job 或 nightly）           |
-| 6 | 三个包版本一致                                          | 读三个 `package.json` 的 `version` 比较                       |
-| 7 | `types: ["@synra/client"]` 可用                         | 一个 fixture 工程，`tsc --noEmit` 必须通过，且断言 `synra.device.send` / `synra.device.pick` 的类型 |
-| 8 | 文档里的类型片段能编译                                    | 把 [23](./23-client-library.md) 里的代码块抽出来做类型检查（防文档漂移） |
+| 5 | 生成物与 core 一致                                      | 同守卫 3 的那次对照（CI 会把 `synra-core` checkout 到 `synra-rust-core`） |
+| 6 | **四个**包版本一致                                       | 读四个 `package.json` 的 `version` 比较                       |
+| 7 | `types: ["@synra/client"]` 可用                         | `scripts/link-dist.ts` 铺出安装布局 + `tsc -p packages/client/type-tests/tsconfig.json` |
+| 8 | 文档里的类型片段能编译                                    | 把 [23](./23-client-library.md) 里的代码块抽出来做类型检查（防文档漂移）★ **未实现** |
+
+> ★ **本次核对修正了三处，它们都会让照做的人做错：**
+> * **守卫 2** 原本写的是"检查 `dist/*.d.ts` 里没有 `export declare const/function/class`"。
+>   按**整个 dist** 查会把"内部模块里有个值、入口只用 `export type` 带出类型"这种**无害**情况
+>   也判成失败，逼人去加白名单；而消费方根本到不了那个内部模块。
+>   实现改成只看入口。本轮正是这条守卫发现了 `@synra/protocol` 的 13 个值导出。
+> * **守卫 6** 原本写"三个包"，而可发布的是**四个**（`testkit` 也是）——
+>   一条只守三个包的守卫会漏掉第四个，而它的版本错开同样会让 `workspace:^` 改写成错的区间。
+> * **守卫 3** 原本写"与**快照**一致"。实际做法是与 **Rust 对照**，比快照强：
+>   快照只能发现"变了"，对照能发现"错了"。这一条也不是"没按文档做"，
+>   而是同一目的下更强的做法，所以按实际改了描述。
 
 `synra-app` 仓库的对应守卫：
 
@@ -322,26 +348,42 @@ synra-app ────────────────────┘
 
 ---
 
-## 7. 工具链与构建（unbuild）
+## 7. 工具链与构建（选型记录：**最终没有用 `unbuild`**）
+
+> ★ **本节原本通篇按 `unbuild` 来写，包括逐包的 `build.config.ts`。而实现选的是 `tsc -b`。**
+> 本次核对后把决策补在这里，并把后面的实测保留为**依据**而不是现行方案 ——
+> 那些数字正是决定不用它的原因，删掉就等于把结论和理由一起丢了。
+>
+> **实际用的**：四个包一律 `tsc -b`，纯类型包靠 `packages/*/tsconfig.json` 里的
+> `emitDeclarationOnly: true` 达到"不产出 `.js`"。没有任何 `build.config.ts`，
+> `unbuild` 也**从未进过 `pnpm-lock.yaml`**（所以不是"用过又删了"）。
+>
+> **为什么偏离本节的原选择**：因为本节 §7.2 的实测本身就给出了理由 ——
+> `unbuild` 对没有运行时值的包也会产出 `dist/index.mjs`（1 字节的空壳），
+> 于是必须再加一个 `build:done` 钩子把它删掉，然后再加一条 CI 守卫确认删掉了。
+> 那是三步，且每一步都能忘记跑。
+> `emitDeclarationOnly` 让它**从来不存在**：一步，且 `check-shapes.ts` 检查的是这一步确实生效
+> （§6 守卫 1）。**实测发现的问题是真的，只是解法比"产出后删除"更短。**
+>
+> 代价说清楚：`unbuild` 会把声明**打包成自包含的 `.d.ts`**（§7.3），而 `tsc` 产出的是多个
+> 互相 import 的文件 —— 也就是说**发布包里的 `.d.ts` 是散的**。
+> 这对 `types: ["@synra/client"]` 没有影响（TypeScript 会顺着 import 读），
+> 但如果将来改成"单文件 `.d.ts`"是需求，本节 §7.3 的实测就是重新评估的起点。
 
 ### 7.1 选型
 
 | 用途       | 选择                                                    | 依据 |
 | ---------- | ------------------------------------------------------- | ---- |
 | 包管理      | **pnpm workspaces**（`packages/*`）                      | [ADR-012](./20-adr.md)；与本机既有 monorepo 一致 |
-| 构建       | **`unbuild`**（`build.config.ts` + `unbuild --stub`）      | 与本机既有项目（`initx` / `triggerix` / `ext-kit` 等）同一套约定 |
-| 测试       | **Vitest**                                                | 同上 |
-| 形状断言    | `tsd` / `expect-type`                                     | §6 守卫 3 |
-| 版本与发布   | `bumpp -r` + 拓扑排序发布脚本                               | 本机既有 monorepo 的约定 |
-
-**为什么用 unbuild**：
-
-1. 它把**声明打包成自包含的 `.d.ts`** —— 对类型包尤其重要（§7.3）；
-2. `unbuild --stub` 让 monorepo 内部联调**不需要重新构建**（指向 `src` 直接跑）；
-3. 本机生态里已经有一致写法（`mergeDefaultBuildConfig` 共享配置），新仓库不必另发明一套。
+| 构建       | **`tsc -b` + `emitDeclarationOnly`**（~~`unbuild`~~，见本节开头的决策记录） | §7.2 的实测：`unbuild` 会为纯类型包产出空壳 `.js` |
+| 测试       | **Vitest**                                                | 与本机既有项目一致 |
+| 形状断言    | **`check-shapes.ts` 直接与 Rust 对照**（~~`tsd` / `expect-type`~~） | §6 守卫 3：对照比快照强，快照只能发现"变了" |
+| 版本与发布   | `bumpp -r`；**拓扑发布脚本尚缺**（§8 清单第 11 条）          | 本机既有 monorepo 的约定 |
 
 > **不用 Vite+ 的 `vp` 统一 CLI**：本仓库没有前端应用（只有类型包与一个测试替身），
 > 引入额外工具链没有收益（与 [ADR-012](./20-adr.md) 一致；ADR-012 约束的是 **app 仓库**）。
+>
+> 以下 §7.2–§7.6 是**当时的实测与设计**，保留为上面那个决策的证据。
 
 ### 7.2 ⚠️ 实测事实：`unbuild` 一定会产出 `.js`
 
