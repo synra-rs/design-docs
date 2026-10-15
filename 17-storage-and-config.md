@@ -599,7 +599,15 @@ plugins-manifest.json   # 已装插件清单（id + version + source），用于
 - [ ] 插件 secure storage（XChaCha20-Poly1305 + 每插件 DEK）—— **完全缺失**：
       全仓 0 处 `chacha`/`aead`/`DEK`；`plugin_secrets` 表不在任何迁移里。
 - [ ] `GcTask` + 清理策略 + GC 报告 —— **缺失**，全仓 0 命中 `GcTask`/`GcReport`。
-- [ ] 备份/恢复（VACUUM INTO + 导入导出）—— **缺失**：无 `VACUUM INTO`、无备份代码；
+      ★ **写入那一半本轮做了：`SynraDb::backup_to` + `synra db backup <path>`。**
+      用 `VACUUM INTO ?1`（**绑定参数**，不是拼字符串：路径来自用户，
+      引号会结束 SQL 字面量），而不是拷贝文件 ——
+      活数据库还有 WAL，只拷主文件得到的是一个**可能打不开**的库。
+      目标已存在时**拒绝而不覆盖**：调用方通常是在做危险操作**之前**备份的用户，
+      而工具无法知道那个文件是不是他想保留的那个。
+      测试断言的是**备份能被引擎打开并 migrate**，而不是"文件存在" ——
+      后者对一个没有写完的副本也成立。
+      **还没做的：恢复（导入）与导出。**
       `db/health.rs:42` 只**报告**损坏并提示"restore from a backup"，没有恢复路径。
 - [ ] 磁盘配额检查（安装前检查可用空间）—— **缺失**：`doctor/storage.rs:66` 的
       `probe_disk_space` 是**诊断探针**，不是安装前检查；`Quota::max_storage_bytes` 是单插件运行时配额。
