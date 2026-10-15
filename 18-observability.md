@@ -640,13 +640,35 @@ pub fn install_panic_hook(paths: &Paths, version: &str) {
 - [x] DB `integrity_check` + 损坏恢复路径 —— **检查有，恢复没有**：
       `SynraDb::health`(`sqlite/mod.rs:174`) + `interpret_integrity` + 测试(`db/tests.rs:249-279`)；
       ★ `health.rs:42` 只提示"restore from a backup"，**无任何恢复代码**。
-- [ ] `synra logs --follow --trace <id>`（CLI）—— **标志能解析，行为不存在**。
-      `--trace <id>` 在 `apps/synra-cli/src/channel.rs:108` 被翻译成 `verbose: true`，
-      **trace id 被丢弃**：`Request::Logs { lines, verbose }` 没有 trace 字段，
-      daemon 的 `logs_value`(`runtime/reports.rs:146`) 只按 level 过滤。
-      测试 `channel.rs:436` 只断言 `verbose` 翻转，注释却写"the filter is applied to what comes back" ——
-      **没有任何代码应用它**。
-      `--follow` 在 `args.rs:237` 定义，**全仓从未被读取**；
-      `args.rs:573`/`:586` 断言它**能解析** —— 参数解析不是清单项说的行为。
+- [x] `synra logs --trace <id>` —— **★ 本次把丢掉的 id 接了回来**。
+      原状：`channel.rs:108` 把 `--trace <id>` 翻译成 `verbose: true`，**id 被丢掉**；
+      `Request::Logs` 里根本没有 trace 字段；daemon 的 `logs_value` 只按 level 过滤。
+      而守这件事的测试 `a_trace_filter_asks_for_the_verbose_log` 只断言 `verbose` 翻转，
+      注释却写着 "the filter is applied to what comes back" —— **没有任何代码应用它**。
+      后果：用户想跟一条用户动作的日志，拿到的是整份日志，而且**没有任何提示说过滤被忽略了**；
+      一份安静的日志的快照和一份什么都没发生的实时日志，在屏幕上是一样的。
+      **本次**：`Request::Logs` 增加 `trace: Option<String>`，
+      `channel.rs` 透传而不是折叠，`logs_value` 增加一个**子串**过滤
+      （级别用 token 匹配是因为它是固定词表且有固定位置；trace id 是不透明字符串，
+      出现在 logger 决定渲染的地方，没有位置可锚定，token 匹配会一行都找不到）。
+      响应里回显 `trace`，这样调用方能区分"这条 trace 没有日志"和"过滤在传递路上丢了"——
+      正是丢掉 id 造成的那种混淆。
+      测试：`a_trace_filter_carries_the_id_and_asks_for_the_verbose_log`（CLI 侧，
+      断言 id 真的在请求里）与 `a_trace_filter_keeps_only_the_lines_that_mention_it`（daemon 侧，
+      四条日志里挑出两条、另一条 trace 不在里面、不存在的 id 得到空列表而不是全部）。
+      负控制：把过滤那行去掉 → 测试红，并且失败信息直接把四条日志打出来。
+      ★ 仍未做的：**日志行里现在还没有 trace id** —— 过滤是对的，但要有东西可过滤，
+      得先把 `TraceContext` 作为 span 字段挂上去（`TraceContext` 与 `RedactingWriter` 都在，缺的是插桩）。
+- [x] `synra logs --follow` —— **★ 本次改成明确拒绝，而不是假装**。
+      原状：`args.rs:237` 定义了这个标志，`args.rs:573`/`:586` 断言它**能解析**，
+      而**全仓从未读取它**。命令照常发一个普通 `logs` 请求、打印尾部、退出。
+      一个要求"跟随"的用户会一直以为自己看的是实时日志 —— 而这是**看不见的失败**，
+      因为安静日志的快照和一个什么都没发生的实时日志，输出完全一样。
+      **本次**：`dispatch` 里在连接之前拒绝，并说明原因是**功能未实现**而不是坏掉：
+      `Request` 是"一个连接一个请求"，要流式推送需要另一套协议 —— 这**不是接线缺口而是缺功能**，
+      而把这件事说清楚才是诚实的答案。替代方案（在这里循环、每秒重问一次）会是一个
+      **静默轮询**的 `--follow`，那是与这个标志所承诺的不同的东西。
+      测试 `following_the_log_is_refused_rather_than_answered_with_a_snapshot`
+      同时断言消息里有 `--follow` 与 `not implemented` —— 只断言 `Failed` 会把用户引去找一个没在跑的内核。
 - [x] `synra doctor`（CLI）—— **A**：`Command::Doctor`(`args.rs:80`) +
       `DoctorReport::run`(`doctor.rs:76`) 调 `run_probes`(`:83`) + `--failures-only`/`--bundle`。
