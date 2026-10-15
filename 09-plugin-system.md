@@ -275,18 +275,24 @@ interface share {
     can-handle: func(item-json: string) -> string;   // JSON: {"handled":false} | {"handled":true,"action":...,"presentation":...}
     /// 执行一个动作
     execute: func(action: string, args-json: string) -> outcome;
-    // ★ 这两行之间有一个契约漏洞：**`execute` 拿不到被分享的东西。**
+    // ★ **已修复：`can-handle` 的答案现在可以带 `args`。**
     //
-    // `can-handle` 拿到 `item-json`，而它的答案（本文上一行：`{"handled":true,"action":...,"presentation":...}`）
-    // **没有 `args`**；代码里的 `Proposal` 也确实没有这个字段，
-    // 所以 `into_candidate` 把 `args` 定为 `Value::Null`（`dispatch/matching.rs:92`）。
-    // 于是一个说"我能打开这个链接"的插件，被调用时只收到 `("open", "null")`——
-    // **它没有办法知道要打开哪个链接**。
+    // 契约没有改（`execute` 的签名不变），而是把传递补上了：
+    // `Proposal`（代码里 `can-handle` 的答案类型）新增了 `args: serde_json::Value`（`#[serde(default)]`，
+    // 所以不发这个字段的旧插件行为不变），`into_candidate` 把它原样传给 `PlannedAction.args`，
+    // 而 `execute` 把它作为 `args-json` 发出去。
     //
-    // ★ 这不是实现漏了一行，而是**契约少了一个传递**：修它要么给 `execute` 加上 item，
-    // 要么让 `can-handle` 的答案带 `args`（并且这个 args 要经过能力闸门）。
-    // 目前实现选择的是**不碰它**，并在 `runtime/intent.rs` 的测试里把它钉住：
-    // 那个配置只在 `args_json == "null"` 时生效，所以一旦有人修好，测试会失败并提醒他更新它。
+    // 为什么由**插件**而不是孿主填：只有插件知道自己的动作需要什么（打开链接要 URL，
+    // 加到阅读列表要 URL + 标题）；孿主代填就是在猜每个插件的接口。
+    //
+    // 为什么这不是绕过闸门：args 回到的是**写它的那个插件**，而闸门审的是能力不是参数；
+    // 插件无法通过对自己撒谎来提权，而它拷贝的那份 item 本来就是孿主给的。
+    //
+    // ★ **而且这个缺陷能藏一轮，是因为配置看不见自己的输入。**
+    // `Work` 的 `Display` 是 `interface.function`（`share.execute`），而 `ScriptedBackend` 用 `work.to_string()` 当索引键——
+    // 于是**每一次 `execute` 都落在同一个键上**，配置无法区分参数，也无法发现 `null`。
+    // 已改为 `key_for(work)`（`engine/scripted.rs`），把 payload 纳入键；现在参数对不上的调用会落到 fallback，而不是惄惄匹配。
+    // ★ 教训：**一个看不见自己输入的配置，是一个断言不了输入的测试。**
 }
 ```
 
