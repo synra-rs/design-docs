@@ -732,8 +732,21 @@ pub struct AuditEntry {
       ★ 而且有一个**方向相反的**性质：`is_within` 用 `Path::components()` 的 `PartialEq`，
       在 Windows 上**大小写敏感**、且把 `\\?\` 当不同 Prefix 组件，所以 `C:\Data` 与 `c:\data`
       会被判为不同。这是 fail-closed（安全），但与 §4.3 要求的"比较时大小写不敏感"正相反。
-- [ ] `NetworkGuard`：scheme 白名单 + host 规范化 + DNS 后 IP 校验 + 重定向逐步校验 + SSRF 拒绝表 ——
-      **完全缺失**。无 `NetworkGuard`、无 `IpPolicy`/`allow_link_local`/`allow_cidrs`。
+- [x] `NetworkGuard`：scheme 白名单 + host 规范化 + DNS 后 IP 校验 + 重定向逐步校鮌 + SSRF 拒绝表 ——
+      **已实现**（已提交）：`synra-core/src/network.rs`。四步按 `10 §4.4` 的顺序：
+      `check_url`（scheme + host）、`check_resolved`（IP 策略）、`next_hop`（逐步重校），
+      `IpPolicy` 六个字段与 `Cidr` 都在，默认全 `false`。
+      ★ **而第三步为什么是参数而不是调用**：这个 crate 不做 DNS，
+      而一个会解析域名的守卫是一个**离线就测不了**的守卫。
+      ★ **七个绕过都有对应的测试**，而两个最典型的做了阴性对照：
+      * `https://api.example.com@evil.example/` —— 取 `@` **之后**的部分；取之前的会把
+        授权给一台机器然后连另一台。对照失败。
+      * **每一个**解析出的地址都要过，不是第一个：对照失败。
+      * `169.254.169.254`（云元数据）、`::ffff:127.0.0.1`（换了家族的环回）、
+        `api.example.com.evil.example`、`/33` 的 CIDR、超限重定向 —— 各有一条。
+      * 证据：**55 suites / 2820 passed**（+22），clippy、7 guard（含兄弟 app 构建）均绿。
+      ★ **但它还没有生产调用方**：`network-fetch` 本身仍然拒绝（仓库里没有
+      HTTP 客户端）。所以这是**把守卫先建好**，而不是“拥有了护拦”。
       整个 workspace **没有任何 HTTP 客户端**（搜 `reqwest`/`hyper::`/`ureq`/`isahc` 只有 `Host::fetch`
       的 trait 声明与测试桩）。`ErrorCode::IpNotAllowed`/`RedirectBlocked` 有码无生产者。
 > ★ **而它当时没有生产调用方 —— 因为守护进程把整组 `platform:*` 一律拒绝了。**
