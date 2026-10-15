@@ -665,10 +665,14 @@ pub fn install_panic_hook(paths: &Paths, version: &str) {
       `frames_sent_total`/`links_open` 出现过，且只是 `metrics/tests.rs` 的测试夹具。
 - [ ] 设置页的"性能"面板（实时指标）—— **缺失**：`synra-rust-app/src/pages` 只有
       Devices/Home/Plugins/Settings。
-- [ ] 审计 UI（时间线 + 拒绝高亮 + 清空）—— **后端有，UI 没有，且后端无生产者**。
-      `AuditRing` + `PluginActivity::of`(`audit.rs:384`) 能出摘要，但 app 里没有任何 audit 组件；
-      更要紧的是 `Kernel::record_action`(`kernel.rs:676`) **只被 `kernel_tests.rs:380` 调用** ——
-      闸门与宿主**从不写审计条目**。`AuditRing` 是一个只有测试往里填数的空壳。
+- [ ] 审计 UI（时间线 + 拒绝高亮 + 清空）—— **UI 仍然没有；但"后端无生产者"这句只对一半了**。
+      ★ **仓库里有两个审计环，只有一个有生产者。**
+      * `PluginSet` 的环（`crates/synra-core/src/dispatch/plugins.rs:312`）**有**：每个实例被装上 session，
+        调用记录了能力与结果，`drain_audit` 把 session 记下的排进环，`audit_for`/`refusals_for` 读回来。
+        命令 `plugins_audit` 已经在 shell 里注册，读的就是这个环 —— 所以审计 UI 现在**有真数据可显示**。
+      * `Kernel` 的环（`kernel.rs:676`）**没有**：`record_action` 的唯一调用者是 `kernel_tests.rs:380`，
+        而 `synra_core::Kernel` 本身没有任何宿主构造它。这一半仍然是"只有测试往里填数的空壳"。
+      `AuditRing` + `PluginActivity::of`(`audit.rs:384`) 能出摘要，app 里仍然没有任何 audit 组件。
 - [x] `DiagnosticBundle` + 导出流程（内容清单确认）—— **A，而且本次让"debug 日志"这一节真的有内容了**。
       `diagnostics/records.rs:94` + `BundlePlan::build`(`plan.rs:190`) +
       `DiagExportOptions{include_audit, include_debug_logs, log_lines}` 三项默认 `false`
