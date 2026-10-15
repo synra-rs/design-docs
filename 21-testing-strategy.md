@@ -605,16 +605,63 @@ fn event_routing_does_not_allocate() {
 
 ## 12. 测试基础设施清单
 
-- [ ] `cargo nextest` 配置（超时、retries、test groups）
-- [ ] `synra-testkit`：`KernelPair` / `MockPlatform` / `MemoryTransport` / `MockClock` / 故障注入
-- [ ] `fixtures/wire/**`：协议 fixture（§3.1）
-- [ ] `benches/`：criterion + iai-callgrind 双轨
-- [ ] `fuzz/`：帧解码、信封解析、归档解包、路径解析、capability 解析
-- [ ] `crates/synra-plugin-host/tests/malicious/`：§5.1 的 29 个用例
-- [ ] UI 插件对抗测试（app 仓库）
-- [ ] 敏感数据测试（日志、诊断包、审计）
-- [ ] SQLite schema 迁移测试（本项目自己的 schema 版本演进）
-- [ ] 覆盖率门禁（CI）
-- [ ] 性能门禁（CI，iai-callgrind）
-- [ ] 手工 checklist（§10）
-- [ ] `just docs-check`（文档链接与锚点校验，[24 §7](./24-migration-map.md)）
+> ★ 这一节在实现之前写就，长期整节未勾选。逐条核对源码后，它是**两类东西混在一起**：
+> **已经做了的测试**（夹具、协议 fixture、敏感数据断言、迁移测试）与
+> **完全没建的 CI 基础设施**（nextest 配置、benches、fuzz、覆盖率门禁、性能门禁、justfile、`.github`）。
+> 前一类里几条只是**位置和文档写的不一样**；后一类是**一个都没有**，而且它们全都依赖同一个不存在的东西：CI。
+
+- [ ] `cargo nextest` 配置（超时、retries、test groups）—— **未做**：
+      `.config/nextest.toml` 与 `justfile` 都不存在。测试现在靠 `cargo test` 跑，
+      而 `SynraDb` 那条 `rusqlite` 的 `Connection` 是 `Send` 不是 `Sync`，
+      所以"超时 / retries"这类配置确实还没到需要的时候。
+- [x] `synra-testkit`：夹具 + 故障注入 —— **3/4，且这一条是清单里最完整的**。
+      `KernelPair`(`src/pair/`)、`MemoryTransport`/`MemoryTransportLink`(`src/transport.rs`)、
+      `MockClock`/`SystemClock`/`Deadline`(`src/clock.rs`) 都在，加一个计数分配器。
+      故障注入是真的：`KernelPair::inject(Side, Fault)`、`cut()`、`attempts()`、`dropped()`。
+      ★ **`MockPlatform` 全仓 0 命中** —— 这是四样里唯一没有的。
+      ★ 另外 `KernelPair` 有更深的缺口，不在这条清单里但更要紧：
+      **它在 `synra-testkit` 之外 0 处使用**，22 条测试跑的是它自己的 `FakeKernel`，
+      而且 `PeerLink` 持的是具体 `TcpStream`、`MemoryTransport` 搬的是已解码的 `Frame`，
+      两者类型上不兼容（详见 [04 §11](./04-wire-protocol.md)）。夹具测的是夹具自己。
+- [x] `fixtures/wire/**`：协议 fixture —— **A，只是不在这个目录**。
+      真实位置 `crates/synra-protocol/tests/wire_fixtures.rs`（261 行），
+      而且做法比"录一遍编码器的输出"更硬：**手写字节**、拆成具名片段、
+      三向断言（片段加起来等于文档布局 / 编码器产出这些字节 / 解码器还原同一帧）。
+      文件顶部的注释解释了为什么不能"录"：录只能证明代码等于它自己。
+- [ ] `benches/`：criterion + iai-callgrind 双轨 —— **未做**，目录不存在。
+      ★ 与之相关的是 [26 §4.1](./26-core-stability-and-perf.md) 的**每一个性能预算都只是散文**：
+      全仓无 `benches/`、无 `criterion`、无 `#[bench]`。唯一被测的是**分配次数**，不是时间。
+- [ ] `fuzz/`：帧解码、信封解析、归档解包、路径解析、capability 解析 —— **未做**，目录不存在。
+      现在只有 proptest 覆盖任意字节不 panic；property 测试与 fuzz 的输入族不同，前者通过不能当作后者的结论。
+- [ ] `crates/synra-plugin-host/tests/malicious/`：§5.1 的 29 个用例 —— **未做**，目录不存在。
+      这是三份文档里最长的测试清单项，目前一个都没有。
+      孤立的对抗测试是有的（归档穿越/symlink/体积、签名吊销、令牌伪造、装载期 import 覆盖），
+      但 §5.1 那句关键的"**内核仍可用 + 其它插件仍可用**"没有任何测试断言。
+- [ ] UI 插件对抗测试（app 仓库）—— **未做，而且前提不成立**：
+      `synra-rust-app/src` 13 个 TS 文件里，`plugin_ui*` 只出现在
+      `src/ipc/registration.test.ts` 的"未实现"清单里。
+      没有插件 origin、没有令牌注入、没有 `on_navigation`，所以**没有可攻击的表面**。
+      这一条要等 `plugin_ui_rpc` 那批命令先存在。
+- [x] 敏感数据测试（日志、诊断包、审计）—— **A，散在两处而不是一个套件里**。
+      日志：`synra-observe/src/logging/tests.rs` 的 `hunter2` 用例（8 处命中同一套策略）；
+      审计：`crates/synra-observe/src/audit.rs:437` `a_record_has_no_place_to_put_a_payload`
+      —— 而且这个保证是**构造性**的：`AuditEntry` 的字段没有一个能装内容；
+      诊断包：`synra-rust-app/src-tauri/src/commands/diag/tests.rs:38`
+      `the_exclusions_are_written_into_the_file`，加上本轮新加的
+      `the_debug_log_section_carries_the_lines_the_shell_wrote`。
+- [x] SQLite schema 迁移测试（本项目自己的 schema 版本演进）—— **A，而且相当扎实**。
+      `crates/synra-store/src/db/tests.rs` 覆盖：版本号从 1 连续（`the_migration_list_is_a_sequence_from_one`）、
+      空库识别（`schema_state_recognises_an_empty_database`）、
+      更新的库被拒而不是被迁（`a_newer_database_is_refused_rather_than_migrated`）、
+      空库跑完每一步（`applying_to_an_empty_database_runs_every_step`）、
+      失败语句点名是哪条迁移的哪句（`a_failed_statement_names_the_migration_and_the_statement`）、
+      已发布的迁移不被改写（`a_published_migration_is_never_edited`）、
+      以及列清单与迁移 schema 一致（`records.rs:766`）。
+      ★ 实际迁移数是 **7** 个（`migrations.rs` 的 `version: 1..=7`），不是 [17 §2.2](./17-storage-and-config.md) 写的 5 个。
+- [ ] 覆盖率门禁（CI）—— **未做**：无 `.github/`，无 `justfile`。
+- [ ] 性能门禁（CI，iai-callgrind）—— **未做**，同上，且连基准本身都没有。
+- [x] 手工 checklist（§10）—— **A**：§10「手工 / 探索性测试清单」在本文 L562 起，已经写在文档里。
+      这一条要的是"清单存在"，它存在。
+- [ ] `just docs-check`（文档链接与锚点校验）—— **未做**：无 `justfile`。
+      ★ 这一条现在比写它的时候更有用：本轮与上一轮我在这套文档里**改了大量行号与文件名引用**，
+      而没有任何东西校验它们。链接与锚点是会烂的，而烂掉的链接指向的是**看起来对、实际不存在**的位置。
