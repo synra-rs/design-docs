@@ -527,19 +527,72 @@ pub fn install_panic_hook(paths: &Paths, version: &str) {
 
 ## 9. 实现清单
 
-- [ ] `tracing` 初始化（JSON + 轮转 + 非阻塞 writer）
-- [ ] `RedactionLayer`（字段名命中 + 长度截断 + URL 去 query）+ 测试
-- [ ] `PluginAttributionLayer`（插件日志加 `plugin_id`）
-- [ ] `TraceContext` + `trace_id` 随信封传播（v2）+ v1 的 `trace_break` 标注
-- [ ] `Sampler`（错误/慢请求总是采样 + 用户强制开启）
-- [ ] `metrics` facade + `RingRecorder` + `CardinalityGuard`
-- [ ] §4.1 的指标清单全部接入
-- [ ] 设置页的"性能"面板（实时指标）
-- [ ] 审计 UI（时间线 + 拒绝高亮 + 清空）
-- [ ] `DiagnosticBundle` + 导出流程（内容清单确认）
-- [ ] `run_probes` 系列（§6.3）+ 设置页诊断展示
-- [ ] `install_panic_hook` + `CrashReport` 落盘
-- [ ] 启动时崩溃检测 + 安全模式
-- [ ] DB `integrity_check` + 损坏恢复路径
-- [ ] `synra logs --follow --trace <id>`（CLI）
-- [ ] `synra doctor`（CLI）
+> ★ 这一节在实现之前写就，长期整节未勾选。逐条核对源码后：**7 条真做了一半或全部，9 条从未开工。**
+> 最要紧的两条写在前面：**日志系统完全没有初始化**，**崩溃报告没有任何生产者** ——
+> 两者都是"类型齐了、接线没做"，而测试都是绿的。
+
+- [ ] `tracing` 初始化（JSON + 轮转 + 非阻塞 writer）—— **完全没有**。
+      全仓 0 处 `tracing_subscriber` / `tracing_appender` / `set_global_default`；
+      `LogConfig`、`init()`、`LogGuard` 都不存在。
+      ★ `synra-observe/Cargo.toml` **声明了 `tracing` 与 `tracing-subscriber` 两个依赖，没有任何源文件使用它们** ——
+      死依赖。文档 §2.1 的技术选型没有代码支撑。
+- [x] 字段名命中 + 长度截断 + URL 去 query + 测试 —— **A/C**：
+      `RedactionLayer` 不存在（**不是 `Layer<S>` 实现**）；真实机制是 `Redactor`(`redact.rs:154`)
+      + `RedactingWriter`(`logging/writer.rs:16`)，一个 `Write` 包装器。
+      三项性质都是真的且有测试：字段名黑名单(`:187`)、长度截断(`:222`)、URL 去 query(`:261`)
+      + proptest(`:542`/`:593`)。
+      ★ 但 `logging/tests.rs:18` 的 `a_payload_never_reaches_the_output` 注释说"the test the design document
+      asks for by name"，实际是手写 `format!("event=… payload=…")` 直接喂 `redact_line` ——
+      **没有 tracing 宏、没有 subscriber**（因为不存在），所以文档要求的 **JSON 格式完全没有测试**。
+- [ ] `PluginAttributionLayer`（插件日志加 `plugin_id`）—— **未做**，0 命中。
+- [x] `TraceContext` + `trace_id` 随信封传播 —— **A/一半**。
+      `TraceContext`(`trace/identity.rs:78`) + `Sampler` 有；`from_envelope`/`continue_from` 存在且有测试。
+      ★ **v1 的 `trace_break` 标注 0 命中**，断链标注不存在。
+- [x] `Sampler`（错误/慢请求总是采样 + 用户强制开启）—— **A**：
+      `trace/sampler.rs:14` + `should_record(context, failed, elapsed_ms)`(`:160`)，
+      含 always/nothing/everything 构造 + 单测与 proptest。
+- [x] `RingRecorder` + `CardinalityGuard` —— **A/C**：`metrics/recorder.rs:108` + `:18`，含测试与 proptest。
+      ★ 文档选定的 **`metrics` facade 从未使用**：`Cargo.toml` 声明了依赖，0 处
+      `metrics::counter!`/`gauge!`/`histogram!`。**自研 recorder 有，facade 没有。**
+- [ ] §4.1 的指标清单全部接入 —— **零接入**：没有任何生产代码记录指标；
+      `RingRecorder` 只出现在 `synra-observe` 自己的测试里。§4.1 的指标名中只有
+      `frames_sent_total`/`links_open` 出现过，且只是 `metrics/tests.rs` 的测试夹具。
+- [ ] 设置页的"性能"面板（实时指标）—— **缺失**：`synra-rust-app/src/pages` 只有
+      Devices/Home/Plugins/Settings。
+- [ ] 审计 UI（时间线 + 拒绝高亮 + 清空）—— **后端有，UI 没有，且后端无生产者**。
+      `AuditRing` + `PluginActivity::of`(`audit.rs:384`) 能出摘要，但 app 里没有任何 audit 组件；
+      更要紧的是 `Kernel::record_action`(`kernel.rs:676`) **只被 `kernel_tests.rs:380` 调用** ——
+      闸门与宿主**从不写审计条目**。`AuditRing` 是一个只有测试往里填数的空壳。
+- [x] `DiagnosticBundle` + 导出流程（内容清单确认）—— **A**：
+      `diagnostics/records.rs:94` + `BundlePlan::build`(`plan.rs:190`) +
+      `DiagExportOptions{include_audit, include_debug_logs, log_lines}` 三项默认 `false`
+      （`synra-ipc/src/dto/config.rs:74-82`）+ CLI `doctor --bundle`(`args.rs:264`)。
+- [x] `run_probes` 系列（§6.3）+ 设置页诊断展示 —— **A/一半**：
+      `run_probes(targets, host)`(`doctor/mod.rs:54`) 含端口/数据目录可写/磁盘空间/插件完整性，
+      测试 `doctor/tests.rs:347`/`:375`。
+      ★ §6.3 列的 11 个探针只实现了 6 个左右；`probe_webview_version`/`probe_wasm_backend`/
+      `probe_keyring_available` 未见。设置页展示那半也没有。
+- [ ] `install_panic_hook` + `CrashReport` 落盘 —— **类型有，生产者没有**。
+      `CrashReport`(`crash.rs:54`) + `CrashStore::write`(`:254`) 是真的，
+      ★ 但 **`install_panic_hook` 不存在，且全仓 0 处 `std::panic::set_hook`/`take_hook`** ——
+      生产中**永远不会有崩溃报告落盘**。
+- [x] 启动时崩溃检测 + 安全模式 —— **A，但它要门控的行为没有**。
+      `StartupVerdict::SafeMode` + `startup_verdict`(`crash.rs:190`) + `SAFE_MODE_THRESHOLD`
+      + 真实测试(`:474`/`:495`/`:525`)，并接进 `Kernel::startup_verdict`(`kernel.rs:358`)。
+      ★ `StartupVerdict::allows_plugins()`(`:160`) **只在测试里被调用**
+      （`crash.rs:443`/`:469`/`:490`、`kernel_tests.rs:365`）——
+      全仓**没有任何插件加载路径查询它**。安全模式解禁不了任何东西，因为它不做任何决定。
+      另外它也没有崩溃报告来源（见上一条）。
+- [x] DB `integrity_check` + 损坏恢复路径 —— **检查有，恢复没有**：
+      `SynraDb::health`(`sqlite/mod.rs:174`) + `interpret_integrity` + 测试(`db/tests.rs:249-279`)；
+      ★ `health.rs:42` 只提示"restore from a backup"，**无任何恢复代码**。
+- [ ] `synra logs --follow --trace <id>`（CLI）—— **标志能解析，行为不存在**。
+      `--trace <id>` 在 `apps/synra-cli/src/channel.rs:108` 被翻译成 `verbose: true`，
+      **trace id 被丢弃**：`Request::Logs { lines, verbose }` 没有 trace 字段，
+      daemon 的 `logs_value`(`runtime/reports.rs:146`) 只按 level 过滤。
+      测试 `channel.rs:436` 只断言 `verbose` 翻转，注释却写"the filter is applied to what comes back" ——
+      **没有任何代码应用它**。
+      `--follow` 在 `args.rs:237` 定义，**全仓从未被读取**；
+      `args.rs:573`/`:586` 断言它**能解析** —— 参数解析不是清单项说的行为。
+- [x] `synra doctor`（CLI）—— **A**：`Command::Doctor`(`args.rs:80`) +
+      `DoctorReport::run`(`doctor.rs:76`) 调 `run_probes`(`:83`) + `--failures-only`/`--bundle`。

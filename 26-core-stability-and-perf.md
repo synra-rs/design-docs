@@ -458,13 +458,73 @@ fn hot_paths_do_not_allocate() {
 
 ## 8. 实现清单
 
-- [ ] `STABILITY.md`：三层 + 每 crate 归属（[06 §7.2](./06-workspace-layout.md)）
-- [ ] `api/*.txt` 快照 + CI diff 守卫（§6.1）
-- [ ] `AllocCounter`（`synra-testkit`）+ 热路径零分配断言（§6.2）
-- [ ] grep 守卫脚本（§6.3）接进 `just check`
-- [ ] `synra-protocol`：`payload: Option<Box<RawValue>>` + `inbound_ref`（§5.1）
-- [ ] `synra-capability`：`CapabilitySet` 内部结构 + 顺序无关 proptest（§5.2）
-- [ ] 事件注册表（`EventId` + 路由表 + 有界缓存）（§5.3）
-- [ ] `FrameDecoder::push(Bytes)` / `next_frame()` / `recycle()`（§5.4）
-- [ ] 传输路径零拷贝的 grep 守卫（§5.5）
-- [ ] 依赖选型表落进 `Cargo.toml`，并在 PR 模板里加"为什么 std 不行"
+> ★ 这一节在实现之前写就，长期整节未勾选。逐条核对源码后：**5 条真做了，5 条缺失**。
+> ★ 另外要单独说明：**§4.1 的每一个性能预算都只是散文**。全仓无 `benches/` 目录、无 `criterion`、
+> 无 `#[bench]`（已 grep 确认），所以帧编解码 < 5 µs、路由 O(1)、capability < 200 ns、
+> host function < 20 µs、传输 > 100 MB/s、插件池命中 < 5 µs **全部没有测量**。
+> 唯一被测的是**分配次数**，不是时间。
+
+- [x] `STABILITY.md`：三层 + 每 crate 归属 —— **A，且本次修好了两个漏网的**。
+      三层在 `STABILITY.md:12-14`，逐 crate 归属；`api_guard::CRATES`(`tools/api-guard/src/lib.rs:134`) 镜像之。
+      ★ `synra-control` 与 `synra-plugin-sdk` **两张表都没有** —— 即没有等级、没有规则。
+      而守着这件事的测试当时断言的是 `CRATES.len() >= 13`（表的转述，不是与工作区的比对），
+      所以看不见第 14、15 个成员。已改成**读 `Cargo.toml`**，任何 `crates/` 下未分类的成员都会红；
+      两个 crate 已按 `Internal` 落表（保守选择：`Internal` 不承诺任何东西，日后**升级**不破坏任何人）。
+- [ ] `api/*.txt` 快照 + CI diff 守卫 —— **未做，且选型已被明确放弃**：
+      无 `api/` 目录、无快照文件、全仓无 `cargo public-api`、无 CI。
+      `STABILITY.md:101-103` 自己写明改用 `tools/api-guard` 的文本扫描。
+      ★ 那条替代方案**能抓什么、抓不到什么**要记清楚：抓得住"公开签名里出现具体容器"
+      "稳定层 pub enum 缺 `#[non_exhaustive]`""公开错误持有第三方类型"；
+      **抓不到 re-export、模块树可达性、pub 字段**。
+      而 `STABILITY.md` 声称它会报"a public struct whose fields are public" ——
+      `Violation` 只有四个变体，**没有 PublicField**，`public_fn_or_field` 的字段分支要求
+      `line.starts_with("pub ")`，缩进的字段行永远匹配不上，所以 `pub struct S { pub count: u32 }`
+      对它是隐形的。**这是一处过度声明，应当改掉或补上实现。**
+- [x] 热路径零分配断言（§6.2）—— **A，但类型改名，而且两份断言原先都是空转的**。
+      `AllocCounter` 不存在；真实名是 `CountingAllocator` / `CounterGuard` / `AllocationBudget` /
+      `AllocationCount`，在 **`synra-testkit-alloc`**（不是 `synra-testkit`）。
+      ★ 两处零分配测试（`synra-core/tests/hot_paths.rs`、`synra-protocol/tests/hot_path_alloc.rs`）
+      **原先都没有声明 `#[global_allocator]`** —— `CountingAllocator` 只是一个类型，
+      没有任何二进制把它装上去，所以计数器恒读 0，**每一条零断言都"通过"了**。
+      装上之后的真相：帧解码 0、capability 匹配 2、路由 2、门禁 3、查不到 5。
+      capability 匹配已改 `SmallVec`（2 → 0），门禁顺带 3 → 1（详见 [11](./11-design-principles.md)）；
+      剩下三条**断言实测值而不是 0**，测试名也改成了 `*_stays_within_its_budget`。
+      两份文件现在都带一个**阳性对照**：断言一个确定会发生的分配**被计数到了** ——
+      没有它，一个恒读 0 的计数器能让所有断言一起"通过"。
+- [ ] grep 守卫脚本（§6.3）接进 `just check` —— **未做**：无 `justfile`、无 xtask、无 CI。
+      `tools/guards` 是一个 Rust 二进制，含 5 项检查，**其中没有一项是 §6.3 表里的条目**；
+      §6.3 里已实现的两行（公开签名含容器、pub 字段）其实在 api-guard，而后者只实现了一半（见上）。
+      ★ **这 5 项里原本有 1 项永远不可能失败**：`guard_host_functions_are_gated` grep 的
+      `ungated_host_fn!` 只出现在它自己内部，它白名单的文件连目录都不存在。已重写为读生成表，
+      负控制确认会红。另外 4 项都做了负控制：`directories`、`protocol 无 IO`、`bin 瘦`、
+      `内核不依赖 GUI` **都能真的失败**。
+- [x] `synra-protocol`：`payload: Option<Box<RawValue>>` —— **A/一半**：
+      `envelope.rs:142` 精确。★ **`inbound_ref` / `EnvelopeRef` 全仓 0 命中** ——
+      真实 API 是 `Envelope::inbound(&RawValue, DeviceId)`(`:245`)/`inbound_any`(`:256`)，
+      返回**拥有**的 `Envelope` 而不是借用的视图。借用视图没有构建。
+- [x] `CapabilitySet` 内部结构 + 顺序无关 proptest —— **A**：
+      按域分桶 `SmallVec<[(Domain, Vec<Capability>); 8]>` + `SmallVec<[Capability; 8]>` patterns
+      + `DomainMask`；`contains`(`limits.rs:126`) 走 mask→bucket→any，**没有依赖顺序的提前退出**；
+      顺序无关 proptest 在 `set/proptests.rs:32`。
+      字段名是 `patterns` 不是 `wild`，掩码是新类型 `DomainMask` 不是裸 `u32`。
+- [x] 事件注册表（`EventId` + 路由表 + 有界缓存）—— **A/C**：
+      `EventId(u16)`(`routing.rs:52`) + `EventRegistry`(`:157`)，`routes: Vec<Vec<PluginKey>>`
+      （稠密 id 直接索引）、`wildcards` 受 `MAX_WILDCARD_RULES` 约束、
+      `by_name` 用带种子的 `RandomState` + 硬上限 `MAX_DISTINCT_NAMES = 1024`。
+      ★ 文档写的 `LruCache<EventName, EventId>` 被"到顶即丢"取代 —— 同样有界，且不需要一个缓存依赖。
+- [x] `FrameDecoder::push(Bytes)` / `next_frame()` / `recycle()` —— **A/三分之二**：
+      `next_frame()`(`frame.rs:627`) 与 `recycle()`(`:726`) 精确；
+      `push` 收 `&Bytes` 而不是 `Bytes` —— 同样避免复制。
+      ★ **没有 `Fragment` 类型**：`next_frame` 返回拥有型 `Frame`，其 body 是同一 allocation 的
+      `Bytes` 切片(`:669`)，零拷贝成立。
+- [ ] 传输路径零拷贝的 grep 守卫（§5.5）—— **未做**，该守卫不存在。
+- [ ] 依赖选型表落进 `Cargo.toml` + PR 模板 —— **一半，且 PR 模板没有**。
+      7 个里 4 个已落：`bytes`、`compact_str 0.9`、`smallvec 1`、`serde_json raw_value`。
+      `bitvec` / `foldhash` / `dashmap` **不在任何 `Cargo.toml`**（手写 `ProgressBitmap` 代替 bitvec、
+      `std::hash::RandomState` 代替 foldhash）。无 `.github/` → 无 PR 模板。
+- [ ] ★ 另外记一条**不在清单里但属于本文范围**的：根 `Cargo.toml` 的
+      `[profile.release] panic = "unwind"` 注释写着"插件 panic 必须能被 `catch_unwind` 捕获"，
+      而 `catch_unwind` 在全仓出现 **0 次** —— 为一个不存在的机制做的配置。
+      **本次已实现**：边界在 `synra-core/src/dispatch/plugins.rs` 的 `run_on`
+      （捕获 → 丢弃该实例 → 返回 `CallOutcome::Trap`），测试与负控制见
+      `dispatch/tests.rs` 的 `a_plugin_that_panics_the_host_does_not_stop_the_kernel`。

@@ -558,15 +558,48 @@ plugins-manifest.json   # 已装插件清单（id + version + source），用于
 
 ## 8. 实现清单
 
-- [ ] `Paths`（平台相关）+ 目录创建与权限
-- [ ] `rusqlite` + `bundled` + WAL + `rusqlite_migration`
-- [ ] 5 个初始迁移脚本 + CI 对"空库/旧库"各跑一次
-- [ ] `Store::write` / `Store::read` + SQLITE_BUSY 重试
-- [ ] 审计的异步批量提交
-- [ ] `PluginDataRoot` + `cap-std` 句柄式访问（消除 TOCTOU）
-- [ ] 配置分层（config.json + DB + 环境变量）+ `ConfigPatch` + 副作用处理
-- [ ] `SecretBackend` 五平台实现 + 降级链 + 用户提示
-- [ ] 插件 secure storage（XChaCha20-Poly1305 + 每插件 DEK）
-- [ ] `GcTask`（受监督任务）+ 各数据类型的清理策略 + GC 报告
-- [ ] 备份/恢复（VACUUM INTO + 导入导出）
-- [ ] 磁盘配额检查（安装前检查可用空间）
+> ★ 这一节在实现之前写就，长期整节未勾选。逐条核对源码后：**只有路径、SQLite 接线、沙箱逃逸防护三样是真的**，
+> 其余九条是"类型有、实现没有"或完全缺失。名字对不上的按真实名字记。
+
+- [x] `Paths` + 目录创建 —— **A/半个**。`Paths` 存在且字段私有（`crates/synra-store/src/paths.rs:32`），
+      `ensure_directories`（`:172`）有真实创建测试（`:440-469`）。
+      ★ **"平台相关"缺失**：`Paths::new(data_dir, cache_dir)` 把目录当**参数**收，
+      `Path::discover` 不存在、`directories` 也不是依赖 —— 平台解析根本没有。
+      ★ **"权限"完全缺失**：全仓 0 处 `set_permissions`/`PermissionsExt`，没有 0700/0600。
+- [x] `rusqlite` + `bundled` + WAL —— **C**：`rusqlite 0.40` + `bundled` 在
+      `crates/synra-store/Cargo.toml`；WAL 在 `db/migrations.rs:228`。
+      ★ `rusqlite_migration` **不是依赖**，用手写 `MIGRATIONS` 常量 + `db::apply` 取代。
+- [ ] 5 个初始迁移脚本 + CI 对"空库/旧库"各跑一次 —— **实际是 7 个**迁移
+      （`db/migrations.rs:18-209`），不是 5 个。空库有真实 SQLite 测试（`sqlite/tests.rs:18`）；
+      "旧库"只在纯模型层覆盖（`db/tests.rs:173` 用闭包而非真库）；
+      ★ **CI 不存在**（无 `.github/`），所以"各跑一次"这半没有。
+- [ ] `Store::write` / `Store::read` + SQLITE_BUSY 重试 —— **未做**。
+      **没有 `Store` 类型**。真实的是 `SynraDb`（`sqlite/mod.rs:115`）：持**单个** `Connection`，
+      没有 write/read 闭包，**没有 SQLITE_BUSY 重试** —— 只有一条 `busy_timeout=5000` pragma。
+      §2.5 的整个形状不存在。
+- [ ] 审计的异步批量提交 —— **未做**。`AuditRing` 有且接进了 `Kernel`（`kernel.rs:314`），
+      但**没有任何代码写 `plugin_audit` 表**（只有 `migrations.rs:109` 的 `CREATE TABLE`），
+      全仓无 batch/flush。内存环有，落盘没有。
+- [x] `PluginDataRoot` + 沙箱逃逸防护 —— **A，但"句柄式"是 B**。
+      真名 `PluginDataRoot`（`synra-store/src/sandbox.rs:99`）；`resolve()`(`:198`) 先 canonicalize
+      父目录(`:229`)、逃逸在 `:236` 被拒、判定用 `paths.rs` 的 `is_within`；真实逃逸测试含 symlink(`:474`)
+      + proptest(`:705`)。
+      ★ **`cap-std` 不是依赖**，实现是 canonicalize-then-compare，模块自己的注释（`sandbox.rs:14-17`）
+      就写明 cap-std 才是目标。**"消除 TOCTOU"没有做到**。
+- [ ] 配置分层（config.json + DB + 环境变量）+ `ConfigPatch` + 副作用处理 ——
+      **五层里两层有**。DB 配置表有（`sqlite/settings.rs:13/48`）；
+      `ConfigPatch` 只存在于 IPC DTO（`synra-ipc/src/dto/config.rs:32`）**且无消费方**；
+      `config.json` 只是个路径常量（`paths.rs:86`，无人读取）；
+      环境变量只有 `SYNRA_DATA_DIR`（`apps/synra-cli/src/session.rs:32`）。
+      无 `Config::patch`，无副作用处理（`KernelEvent::ConfigChanged` 只带一个计数）。
+- [ ] `SecretBackend` 五平台实现 + 降级链 + 用户提示 —— **枚举齐全，实现为零**。
+      trait 在 `secrets/backend.rs:18`，六个 kind 齐（`kind.rs:10-25`），
+      **但只有一个实现：`MemoryBackend`（`backend.rs:63`）**。五个平台 keychain、`EncryptedFile` 全 0 个。
+      `choose_backend`(`:123`) 是按 strength 取最大 —— 是**偏好排序而不是降级链**，且没有可降级目标。
+- [ ] 插件 secure storage（XChaCha20-Poly1305 + 每插件 DEK）—— **完全缺失**：
+      全仓 0 处 `chacha`/`aead`/`DEK`；`plugin_secrets` 表不在任何迁移里。
+- [ ] `GcTask` + 清理策略 + GC 报告 —— **缺失**，全仓 0 命中 `GcTask`/`GcReport`。
+- [ ] 备份/恢复（VACUUM INTO + 导入导出）—— **缺失**：无 `VACUUM INTO`、无备份代码；
+      `db/health.rs:42` 只**报告**损坏并提示"restore from a backup"，没有恢复路径。
+- [ ] 磁盘配额检查（安装前检查可用空间）—— **缺失**：`doctor/storage.rs:66` 的
+      `probe_disk_space` 是**诊断探针**，不是安装前检查；`Quota::max_storage_bytes` 是单插件运行时配额。
