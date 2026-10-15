@@ -364,7 +364,9 @@ async fn session_times_out_when_peer_is_silent() {
 >
 > | 用例 | 状态 | 证据 |
 > | --- | --- | --- |
-> | 1–5 死循环 / 内存 / 栈 / 越界 | **有真实档位但被 `#[ignore]`** ⚠ | 见下面 |
+> | 1 死循环 | **✓ 真实 guest**（第 72 轮） | `a_guest_that_loops_for_ever_is_stopped_by_its_instruction_budget` |
+> | 3 内存上限 | **✓ 真实 guest**（第 72 轮） | `a_guest_cannot_grow_past_the_ceiling_its_budget_names` |
+> | 2、4、5 超时 / 栈 / 越界 | **配置被证明装上了** ⚠ | `a_wall_clock_budget_arms_a_deadline_on_the_store` 等 |
 > | 6 panic | ✓ | `a_plugin_that_panics_the_host_does_not_stop_the_kernel` |
 > | 7 未声明的 host function | ✓ | `IMPORTS_UNKNOWN` 档位 + linker 的导入表 |
 > | 8–10 路径逃逸 / symlink | ✓ | `check_path` 的 `OutsideSandbox`、`is_within`、`expand.rs` **直接拒绝 symlink** |
@@ -380,6 +382,21 @@ async fn session_times_out_when_peer_is_silent() {
 > | 25–27 zip bomb / tar 穿越 / symlink | ✓ | `artifact::expand::plan`：条目数、单文件、总量、深度、symlink 全有测试 |
 > | 28 宿主 panic | ✓ | `catch_unwind` 的测试 |
 > | 29 `can_handle` 产生副作用 | ✓ | `HostCalls::pure()` + 纯会话拒绝副作用的测试 |
+>
+> ★ **而第 72 轮把其中两条从“只在档位上”变成了真的**：用 `deactivate: func()`（**无参数、无返回值**）
+> 做档位。它的 canonical lift 就是一个没有签名的 core 函数，所以手写 `.wat` **四行就够** ——
+> 而指令预算和内存上限是**引擎**的性质而不是接口的，在 `activate` 里死循环和在 `deactivate` 里死循环
+> 测的是**同一个限制**。于是：
+>
+> * **燃料**：一个真正死循环的 guest 被停下，结果是 `FuelExhausted { fuel: 100_000 }`；
+>   阴性对照（让 guest 直接返回）⇒ 测试红。
+> * **内存**：一个真正一直 `memory.grow` 的 guest，
+>   在被拒后自己 `unreachable`（因为被拒的 `memory.grow` **不 trap，只返回 -1**），
+>   结果是 `MemoryExceeded { limit }`，而断言比的是**调度给的那个数**：把预算改成 4 MiB
+>   而期望 1 MiB ⇒ 红（它不会因为引擎自己的 16 MiB 上限而假绿）。
+>
+> ★ 而一个死档位被删了：原来那个把循环 lift 成 `activate` 的 `SPINS`
+> **没有任何人调用**。一个死档位比没有档位更糟：它读起来像覆盖。
 >
 > #### ⚠ 1–5 的真实状态，比“只在档位上”更精确也更值得记
 >
