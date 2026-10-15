@@ -616,11 +616,34 @@ Content-Security-Policy:
       `KernelEventEnvelope` + `SequenceTracker` 是真货（`crates/synra-ipc/src/event.rs:193`、`:243`）。
       ★ **emit 桥不存在**：`synra-rust-app` 下所有 `.rs` 搜 `emit`/`Emitter`/`listen`
       只命中 `build.rs` 的一句注释 —— envelope 没有生产者。
-- [ ] 前端 `event-bridge.ts`（未知事件 → 全量刷新、`seq` 断裂 → 全量刷新）——
-      **逻辑是真的，接不上**。真名 `EventDispatcher`（`src/ipc/dispatcher.ts:62`）：
-      未知事件 → `:137` `#refresh('unknown')`，`seq` 断裂 → `:122` `#refresh('gap')`，两个都有测试。
-      ★ 但生产代码 **0 处引用**它，19 个测试全都自己 `new`；`src/kernel.ts:25` 把界面接在
-      `new FakeKernel()` 上（该文件自己写着 "That is not written yet"）。
+      ★ **本次补上了前端那一半，于是这个缺口现在是"一半对一半"而不是"两头都没有"。**
+      新增 `synra-rust-app/src/ipc/tauri.ts` 的 `TauriKernel`：实现 `Bridge` 的
+      `invoke` / `listen`，用 `@tauri-apps/api`（**不是** `window.__TAURI__` 全局，
+      理由见那个文件的头部：全局是注入到**页面**里的，而这个页面是宿主界面，
+      将来要托管第三方插件 UI；一个"只在某功能还没做时才安全"的决定不算决定）。
+      `kernel.ts` 现在按 **`window.__TAURI_INTERNALS__` 是否存在**选择
+      `TauriKernel` 还是 `FakeKernel` —— 这一句此前是注释里的承诺（"is not written yet"），
+      现在是有两个分支、且两个分支都有测试的代码。
+      ★ **但仍然不出声**：`src-tauri` 下依然 0 处 `emit`，
+      所以 `TauriKernel.listen('kernel-event', …)` 会订阅到一个**永远不触发的通道**。
+      后果具体：`DevicesPage.vue:194` 与 `injection.ts:270` 都真的调用了 `subscribe`，
+      所以打包后的应用会画出快照、然后**再也不更新** —— 而页面看起来是正常的。
+      补上它需要 shell 侧有一个事件源（本机内核的发现/传输回路）并把 envelope `emit` 到 WebView，
+      那不是这一轮的范围，记在这里。
+- [x] 前端 `event-bridge.ts`（未知事件 → 全量刷新、`seq` 断裂 → 全量刷新）——
+      **逻辑是真的，也仍然是"接不上"**。真名 `EventDispatcher`（`src/ipc/dispatcher.ts`）：
+      未知事件 → `#refresh('unknown')`，`seq` 断裂 → `#refresh('gap')`，两个都有测试。
+      ★ **本轮之后它的状态变了，值得更新**：`src/kernel.ts` 不再固定接在
+      `new FakeKernel()` 上，而是按环境选择；而 `TauriKernel` 提供真实的那一半。
+      所以"生产代码 0 处引用"这句话现在只对 `EventDispatcher` 成立 ——
+      **它仍然只有测试在 `new` 它**（`DevicesPage` 调的是 `kernel.subscribe`，
+      走的不是 `EventDispatcher`）。这是又一个"写好、测过、没人调用"，
+      而且它与上面那条是同一个洞的两端：没有事件生产者，所以接上也没有意义。
+      ★ 顺带修掉一处真实违反：`DevicesPage.vue` 与 `injection.ts` 曾经从
+      **`fake-kernel.ts`** 里 import 事件通道常量 —— 生产代码读夹具。
+      常量移到 `src/ipc/channel.ts`，并新增守卫
+      `fake-quarantine`（`scripts/check-shapes.ts`）：只有 `kernel.ts` 可以提到那个假实现。
+      负控制：让 `DevicesPage.vue` 再 import 一次 → 守卫红并点名该文件。
 - [ ] `PluginUiOp` 枚举 + 方法白名单 + `plugin_ui_rpc` —— **未做**。
       `PluginUiOp` 全仓 0 处；`plugin_ui_rpc` 只作为注释出现在 `command.rs:39`。
       `command.rs` 里 `Interface::{Host,Plugin}`、`:59` `allows()`、`:375` `plugin_allow_list()` 是真的且有测试，
