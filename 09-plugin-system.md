@@ -310,6 +310,17 @@ interface share {
    > 分不清"还没发生什么"和"这个孿主什么都不会送"；而审计会把一个**并不存在的能力**
    > 记成"已授权且成功使用"。已改为坦白拒绝（`notImplemented`），并有两条测试钉住。
 5. **`can-handle` 返回 JSON 字符串而不是 `outcome`**：因为"不处理"不是错误。
+   > ★ **而「必须无副作用」这件事，一直没有人守。** `Work::allows_side_effects` 存在，
+   > 它的注释写着"the host is what makes that true, by running it with a context whose action-shaped calls
+   > are refused"——而 **那个 context 不存在**：这个函数从来没被调用过。
+   > 于是 `can-handle` 可以做它能力允许的任何事——发消息、开浏览器、写存储、发请求——
+   > 而它会在**每一次匹配**时这么做，对用户后来取消的每一个分享都做。
+   > 现在：`Work::allows_side_effects()` → `StoreData::side_effects` → `HostCalls::pure()` →
+   > `ACTION_SHAPED` 一组函数拒绝（`sideEffectNotAllowed`，**不是** `capabilityDenied`：能力是持有的）。
+   > ★ **一处仍然没有测试覆盖**：`linker::run` 里读 `state.side_effects` 的那两行。
+   > 把它删掉，现有测试全部依然绿（第二个对照实验证实了这一点），
+   > 因为走通那条路需要一个真编译出来的 guest——受阻于 `wasm32-wasip2`。
+   > 它被明写在 `host_calls_tests.rs` 那条测试的注释里，而不是留给读者去猜。
 
 > **为什么是"订阅 + 拉取"而不是"响应式对象"**：Wasm 里没有 Vue，也没有任何"宿主可观测对象"能跨沙箱共享。
 > - 插件订阅 `device.*` 事件（内核推送变更）；
