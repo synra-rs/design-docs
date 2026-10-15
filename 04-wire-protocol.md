@@ -517,6 +517,10 @@ pub mod builtin {
 | `_synra.device.renamed`        | `{ deviceId, displayName }`                 | —    |
 | `_synra.pairing.changed`       | `{ deviceId, paired: bool, reason?: string }` | —  |
 | `_synra.share.received`        | `ShareItem`                                 | **只在无插件声明处理该分享时**才发（见下） |
+
+> ★ **上面那张图的第一步现在存在了**（已提交）：内核收到同伴的分享后会调 `Matcher`，候选进意图流程。
+> 但 **第四步（无候选时发 `_synra.share.received` 给插件）仍然没做**：
+> 那需要向插件投递事件，而 `EventDispatcher` 到今天仍然没有生产调用方。
 | `_synra.intent.completed`      | `IntentOutcome`                             | [§8.3](#83-意图) |
 | `_synra.intent.failed`         | `IntentOutcome`（`ok: false`）               | 同上 |
 | `_synra.transfer.completed`    | `{ transferId, kind, byteLength, digest, localPath?, meta }` | 摘要**已校验**过才发 |

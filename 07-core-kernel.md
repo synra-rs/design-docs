@@ -402,10 +402,18 @@ impl Supervisor {
 >   `synra intent show|decide|cancel <ID>`（`--plugin` / `--target` 选填）。
 >   在此之前，`share` 打印一个 id 而**没有第二个命令可以花它**——
 >   路由可以从命令行开始，不能在命令行结束。
+> * ★ **进程内那条路现在也接上了。** 同伴发来的文本是
+>   `_synra.clipboard.received` + `ClipboardText`，而 `transport.rs` 收到后调
+>   `Router::route`（`runtime/intent.rs`），走的是和 `intent_dispatch` **同一个** `dispatch`。
+>   ★ 这之前，`Decision::Delivered` 只带**事件名**，payload 被丢掉：
+>   事件到了、日志记了、没人能问插件，因为「能处理这个吗」需要的是正文。
+>   ★ 而且 `synra_core::text_to` **一直没有读者**：消息能写能发，没有任何东西能把它读回来，
+>   本轮补上了 `synra_core::text_from`。
 > * ★ **仍然没做的**：路由只到"候选人产生"为止。
 >   `intent_decide`（用户选择 / 确认 / 取消）与真正调用插件都还没有，
 >   而且这是刻意的："这个能处理吗"这个问题的副作用不该包含跑第三方代码。
 >   进程内那条路（`Decision::Delivered`）也还没接上——它需要 inbox 把物料还回来。
+>   ★ **这一句已经过时了：进程内那条路本轮接上了，见上。**
 >
 > ★ 本轮没有动手做它，因为它是一次跨三层的纵向切片（control + daemon + CLI），
 > 而不是一处接线；记在这里而不是留白，是因为**读本文的人会以为这一节描述的是能跑的东西**。
