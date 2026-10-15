@@ -587,6 +587,18 @@ Content-Security-Policy:
       ★ **`From<core::Error>` 不存在**：全仓 0 处 `impl From<..> for IpcError`，
       且 `synra-ipc/Cargo.toml` 只依赖 protocol/capability/observe —— `synra_core::Error` 根本不在作用域里。
 - [ ] ~40 个 Tauri command（见 §2.2）—— **13/39**。
+      > ★ 与之无关但同样是"看得见、跑不了"的一处：**CLI 的 `plugin` 子命令里，四个里只有一个能做任何事。**
+      > `plugin_request`（`synra-cli/src/session.rs`）对除 `list` 外的每个 action 都返回 `None`，
+      > 而 `question_for` 返回 `None` 会让 CLI 打出**"this command needs a running kernel, and none is reachable"**
+      > —— 一句在内核正常运行时**为假**的话，它把用户送去检查错误的东西。
+      > `plugin install/enable/disable/remove` 四个都出现在 `every_documented_command_exists` 的清单里，
+      > 参数测试也只断言"能解析"。
+      > ★ **本轮修好两个**：新增 `Request::PluginSetEnabled`，守护进程真的写库
+      > （`set_plugin_enabled` 在 store 里存在、有测试、**在生产里从来没有调用方**），
+      > CLI 的 `enable`/`disable` 真的发请求。
+      > ★ **剩下两个仍然不做，但现在说的是真话**：`dispatch` 对 `Command::Plugin` 给出
+      > "installing needs a registry client, and removing needs a decision about the plugin's stored data
+      > that nothing has made yet"，而不是那句关于内核的假话。
       39 个名字确实存在，但只在 `crates/synra-ipc/src/command.rs` 的 `commands!` 表里；
       `src-tauri/src/main.rs` 注册了 13 个（identity 2、devices 4、plugins 3、config 2、diag 2）。
       未实现的 26 个逐条列在 `synra-rust-app/src/ipc/registration.test.ts`
