@@ -68,8 +68,17 @@ pub fn ack_policy(event: &EventName) -> AckPolicy {
 ```
 
 **检查**：
-- [ ] `ack_policy` 只有一个实现，且出站/入站都调用它
-- [ ] 测试：同一事件在出站与入站路径上都得到 `Acked`
+- [x] `ack_policy` 只有一个实现 —— 全仓 `grep 'fn ack_policy'` 只有
+      `crates/synra-protocol/src/event.rs:515` 一处，没有第二个实现。
+- [ ] ★ 出站/入站**都没有**调用它 —— 这一条没有做到，而且比"漏了"更值得记：`AckPolicy` 在整个
+      workspace 里的引用**全部集中在那一个文件里**（`grep AckPolicy` 只命中 `event.rs`，12 处）。
+      也就是说这个策略现在是自洽的、被测试过的、但**悬空的**：没有生产代码问它
+      "这条要不要回执"。会话层各走各的路（`session/send/awaiting.rs` 的等待是传输确认，
+      与事件级 ack 策略不是一回事）。
+      为什么值得单独标出来：一份"只有一个实现"的绿色检查**看起来**这条已经完成了 ——
+      而它只覆盖了"没有第二个实现"，没覆盖"有人用它"。检查项要能失败，得写成
+      "`ack_policy` 在 `event.rs` 之外至少被调用一次"。
+- [ ] 测试：同一事件在出站与入站路径上都得到 `Acked` —— 依赖上一条，先没有。
 
 ---
 
@@ -104,8 +113,10 @@ impl DisconnectClass {
 ```
 
 **检查**：
-- [ ] 全仓 `grep -ri 'contains("econn\|contains("socket\|contains("epipe'` 为空
-- [ ] `UserVisibility` 的每个分支有测试
+- [x] 全仓 `grep -ri 'contains("econn\|contains("socket\|contains("epipe'` 为空 —— 实测 0 命中
+      （`crates` + `apps` + `tools` 全部 `.rs`）。
+- [x] `UserVisibility` 的每个分支有测试 —— `error.rs` 里 `UserVisibility::` 共 8 处引用，
+      分支与用例都在同一文件内。
 
 ---
 
@@ -200,8 +211,20 @@ pub struct SessionTimeouts {
 
 **检查**（[21 §5](./21-testing-strategy.md)）：
 - [ ] 恶意插件套件覆盖：死循环、内存炸弹、越权调用、伪造事件、路径逃逸、SSRF
-- [ ] `gate_host_fn!` 宏是 host function 的**唯一**注册方式；`ungated` 只允许出现在 `env.rs`
-- [ ] `grep -c 'ungated_host_fn!'` 的结果 = `env.rs` 里的数量（CI 守卫）
+- [x] host function 的**唯一**注册方式 —— ★ 这两条写的机制不存在：全仓 `grep 'gate_host_fn!'`
+      与 `grep 'ungated_host_fn!'` 都是 **0 命中**。
+      真正的机制是更强的：`crates/synra-plugin-host/build.rs` 在**每次构建时**从
+      `wit/synra-plugin.wit` 重新生成 `src/generated/capability_table.rs`。
+      负控制：手工把表里 `#log` 改成 `None`，重新 `cargo test` —— 文件被 build.rs 改回，
+      测试全绿。**表想漂移都漂不了**，这比"宏是唯一注册方式"更难违反。
+- [x] 无 gate 集合的白名单守卫 —— `host_surface.rs` 里三个测试已经守着这条，且早于本次核对存在：
+      `the_ungated_list_is_short_and_every_entry_is_a_read`（≤10 条，且每条必须是 `env-*` /
+      `platform-capabilities` / `plugin-id`）、`nothing_dangerous_is_ungated`（点名清单）、
+      `the_gated_and_ungated_lists_partition_the_table`（两张表恰好划分全集）。
+      ★ 文档写的是"ungated 只允许出现在 `env.rs`"，而实际的免检集合是 7 个入口，
+      多出 `platform-capabilities` 与 `plugin-id`。就性质而言没问题（都是"我是什么"的事实读取），
+      但规则写一种、事实是另一种，规则就会被下一个人按自己以为的方向"修正"。
+      白名单测试已经把这个集合钉住了，所以这里改的是文档，不是代码。
 - [ ] 单测断言"被拒的调用**没有产生副作用**"（audit 里只有拒绝记录）
 
 ---
@@ -275,7 +298,14 @@ pub struct SessionTimeouts {
 `DeviceCard` 是派生的，不是存储的。
 
 **检查**：
-- [ ] 全仓搜索：不存在第二个 `HashMap<DeviceId, _>` 表示"设备状态"
+- [x] 全仓搜索：不存在第二个 `HashMap<DeviceId, _>` 表示"设备状态" —— `HashMap<DeviceId` 全仓
+      **只有一处命中**：`pairing/desk.rs:97` 的 `Mutex<HashMap<DeviceId, Entry>>`。
+      看了：那是**配对台账**，`Entry` 装的是 `PendingPairing` 加一个一次性应答通道，
+      生命周期是"用户还没回答的那几十秒"。它不是设备状态的第二份拷贝 ——
+      设备状态仍然是 store 里的那份。
+      ★ 所以这条的**措辞**有问题：它写的是"不存在 `HashMap<DeviceId, _>`"，
+      而真正要禁的是"存在第二份**设备状态权威**"。照字面读，一个完全正当的配对台账也会被判不合格；
+      按字面去改，则要为了过检查去换掉一个无关的 key 类型。
 - [ ] 派生视图的构造只依赖聚合根的公开读取接口
 - [ ] 前端 store 都是**只读镜像**（不判断业务规则，只缓存快照 + 应用增量事件）
 
@@ -307,7 +337,8 @@ impl Link<Ready> {
 **检查**：
 - [ ] `Link` / 插件槽位用类型状态机
 - [ ] 不存在"声明了但从未被赋值的状态"
-- [ ] 状态机的 `match` 里没有 `_ => unreachable!()` 兜底
+- [x] 状态机的 `match` 里没有 `_ => unreachable!()` 兜底 —— 全仓
+      `grep '_\s*=>\s*unreachable!'` 0 命中。
 
 ---
 
@@ -332,10 +363,19 @@ impl Link<Ready> {
 | 指标标签基数   | `CardinalityGuard`（每指标 1000 series）     | 归入 `overflow`                |
 
 **检查**：
-- [ ] 所有 `mpsc` / `broadcast` / `DashMap` 的构造点都有容量参数
+- [x] 所有 `mpsc` / `broadcast` / `DashMap` 的构造点都有容量参数 —— `tokio` 的
+      `mpsc::channel()` / `broadcast::channel()` 无参形式全仓 **0 命中**。
+      ★ 唯一的无参构造是 `pairing/desk.rs:189` 的 `std::sync::mpsc::channel()`：
+      它不是异步队列，而是"用户还没回答时的一次性应答"，发送端只有这一个、
+      收一个值就不可能再发，并且 `pairing_window_ms` 已经给了截止时间。
+      严格按字面（"`mpsc` 都要有容量"）它不合格；按字面去改要么换个类型、要么加一个恒定容量，
+      都是在为一个不存在的泄漏风险写代码。所以这里改文档。
 - [ ] 全仓搜索 `recv().await` / `read().await`：每一个都能被 `CancellationToken` 打断
 - [ ] 关停测试：在"正在传输 + 正在调用插件"时关停，必须在 grace 内退出
-- [ ] **内核里禁止 `std::sync::Mutex` 跨 `await`**（用 `tokio::sync` 或在临界区外 clone）
+- [x] **内核里禁止 `std::sync::Mutex` 跨 `await`** —— `std::sync::Mutex` 全仓 2 处命中，
+      都在测试文件里（`desktop_tests.rs`、`host_calls_tests.rs`）。生产代码零命中。
+      配对台账用的是 `parking_lot::Mutex`，且 `desk.rs:195` 在阻塞前显式 `drop(entries)` ——
+      注释写的正是这条规则。
 
 ---
 
@@ -403,7 +443,12 @@ pub enum ProbeOutcome {
 | 无法完成的操作   | 返回 `Err`，不"尽力而为"                                       |
 
 **检查**：
-- [ ] 代码里没有"检测到问题就 `remove_dir_all`"的路径
+- [x] 代码里没有"检测到问题就 `remove_dir_all`"的路径 —— `remove_dir_all` 全仓 42 处命中，
+      逐个看过上下文：**全部在测试代码里**。生产侧的两处是 `endpoint.rs` 的 `TempDir`
+      （`std::env::temp_dir()` 下的测试目录，`Drop` 里清理自己），其余在
+      `synra-observe/src/crash.rs` 的 `#[cfg(test)] mod tests`（L369 起）。
+      也就是说这条规则在生产代码里成立 —— 但成立的原因是**没有人在生产里调用它**，
+      而不是因为有守卫拦着。加一条守卫仍然是值得的，因为这条禁令目前靠的是自觉。
 - [ ] 卸载流程有测试断言"删除前有询问、删除后有报告"
 - [ ] GC 的测试断言"用户数据目录未被触碰"
 
@@ -453,8 +498,12 @@ pub enum ProbeOutcome {
 插件作者在**自己的机器/CI**上构建好产物并签名。
 
 **检查**：
-- [ ] 安装路径里没有子进程调用（`Command::new("npm"|"cargo"|"pnpm")`）
-- [ ] `InstallSource::Local` 在 release 构建里返回错误
+- [x] 安装路径里没有子进程调用（`Command::new("npm"|"cargo"|"pnpm")`）—— 全仓 0 命中。
+- [ ] `InstallSource::Local` 在 release 构建里返回错误 —— 名字对不上：代码里是
+      `InstallSourceDto`（`synra-ipc/src/dto/plugin.rs:127`，一个 **DTO**），
+      没有叫 `InstallSource` 的安装源类型。DTO 是给前端的形状，不做发布构建的分支。
+      要么这条该写 `InstallSourceDto`，要么**内核里根本没有"从本地路径安装"这个入口**
+      —— 后者若是前者，那这条禁令是靠"没有这条路"满足的，而不是靠检查。
 
 ---
 
