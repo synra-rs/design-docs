@@ -140,6 +140,22 @@
 >
 > ★ **还差的**：`synra_core::Kernel` 依然无人构造——daemon 拿的是一个裸的 `Supervisor`，
 > 而不是图里那个把 store/identity/host/事件总线/审计环一起持有的 `Kernel`。
+>
+> ★ **为什么这一步不能只做一半（已量过，供下一轮直接用）。**
+> `Kernel::bootstrap` **吃掉** `SynraDb`，而 daemon 的 `Runtime` 自己持有一份
+> `Arc<Mutex<SynraDb>>`（`state.rs:67`，其文档说明"一个连接意味着写入顺序是这段代码的性质而不是锁的性质"）。
+> 于是 `Runtime` **不能**同时持有 `Kernel` 和自己的 `db`——那会是同一个 SQLite 文件上的两个连接，
+> 恰好丢掉那条性质。所以这不是"加一个字段"，而是"把三组访问点换掉"：
+>
+> | 字段 | 访问点 | 转换形状 |
+> |---|---|---|
+> | `db` | **30** | `self.db().x()` → `self.kernel.with_store(\|db\| db.x())` —— 近乎机械，因为 `with_store` 直接返回闭包的 `T` |
+> | `host` | **13** | `self.host.lock()` → 需要重组作用域，**不是重命名**：守卫的生命周期在今天决定了代码块边界 |
+> | `identity` | **10** | `self.identity` → `self.kernel.identity()` —— 机械 |
+>
+> ★ 而剩下的字段（`discovery`/`pairing`/`plugins`/`board`/`ports`/`scan_until_ms`）**不属于** `Kernel`，
+> 它们是宿主自己的决定——`state.rs:86-90` 已经写明了这一点（"引擎是宿主的决定，而这是宿主"）。
+> 所以正确的终态是 `Runtime { kernel: Arc<Kernel>, ...宿主的那些... }`，而不是把所有东西塞进 `Kernel`。
 
 ### 2.2 移动端（Android / iOS）
 
