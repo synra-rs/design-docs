@@ -1,5 +1,44 @@
 # 07 · 领域内核
 
+> ★ **本次核对发现的核心事实，它一次解释了此前几轮分别记下的好几个洞：**
+> **`synra_core::Kernel` 这个类型在生产代码里没有任何使用者 —— 只有它自己的测试。**
+>
+> 证据（全仓 `crates/`、`apps/`、`tools/` 搜过）：
+> * `Kernel::in_memory` / `Kernel::open` / `Kernel::desktop` / `Kernel::headless`
+>   只出现在 `crates/synra-core/tests/kernel_tests.rs`。
+> * `Kernel::` 这个前缀一共出现在五个文件里：它自己的 `kernel.rs`、`lib.rs`（re-export）、
+>   `kernel_tests.rs`，以及 **daemon/control 侧的 `synra_control::Kernel`（那是另一个东西，见下）**。
+> * `synra-rust-app` 的 Rust 侧一次都没提过它。
+>
+> ★ **有两个不同的 `Kernel`，这正是它容易被忽略的原因：**
+> * `synra_core::Kernel` —— **结构体**，本文第 9 节讲的"内核构造与生命周期"。有 bus、supervisor、
+>   审计环、数据库句柄、事件订阅、快照。
+> * `synra_control::Kernel` —— **trait**，`apps/synra-daemon/src/runtime/commands.rs:19`
+>   有一句 `impl Kernel for Runtime`。守护进程实现的是这个。
+> 两者同名而无关，所以"搜 Kernel"永远能搜到东西，而**搜到的不是那个没人用的**。
+>
+> ★ **守护进程没有用 `Kernel`，而是把它的零件手工拼了起来**：
+> `Runtime` 里是 `synra_core::Host`、`DiscoveryService`、`Identity`、`SynraDb`、`PairingDesk`、`PluginSet`
+> —— 都是本文描述的同一批东西，只是由 `apps/synra-daemon/src/serve.rs` 自己组装，
+> 而不是交给 `Kernel::bootstrap`。
+> 这不是"少写了一行"：`Kernel` 自己持有 bus 与 supervisor，所以**不用它就意味着那两个子系统没有生产者**。
+>
+> ★ **这就是下面这些现象的共同原因**（前几轮分别记录，现在归到一处）：
+> * **没有事件到达任何界面** —— bus 在 `Kernel` 里，而 `Kernel` 没人构造；
+>   `Kernel::publish` / `next_event` / `subscribe` 在生产里零调用。
+>   于是 app 侧 `TauriKernel.listen('kernel-event', …)` 订阅的是一个永远不触发的通道
+>   （[08](./08-ipc-and-frontend.md) §10 记的那条）。
+> * **审计是空的** —— `Kernel::record_action`（`kernel.rs:676`）是审计环唯一的写入路径，
+>   而它零调用；`AuditRing` 有界、有测试、有查询（`for_plugin` / `refusals_for_plugin`），
+>   就是没有生产者。
+> * **监督树没有驱动** —— `Supervisor` / `TaskSpec` 只经由 `Kernel` 可达。
+>
+> ★ **本文其余部分因此要这样读**：它描述的是一个**被完整实现、被完整测试、但没有被任何宿主采用**的编排层。
+> 每一节说的东西大概都在代码里找得到；找不到的是**那个把它们连起来并在生产中运行的调用者**。
+> 下一步不是再补一个零件，而是决定：让守护进程改用 `Kernel::bootstrap`，
+> 还是把 bus / 审计 / supervisor 从 `Kernel` 里取出来接到 `Runtime` 上。
+> 这是一个架构决定，不是一行改动，所以本轮只把它记清楚。
+
 > 本文是 Rust 重构的**技术核心**。它定义内核的领域模型、状态归属、并发结构、错误模型与扩展点。
 > 所有实现细节都以"Rust 最佳实践"为准：类型状态、`trait` 边界、结构化并发、显式错误。
 
