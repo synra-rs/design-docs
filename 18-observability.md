@@ -531,11 +531,37 @@ pub fn install_panic_hook(paths: &Paths, version: &str) {
 > 最要紧的两条写在前面：**日志系统完全没有初始化**，**崩溃报告没有任何生产者** ——
 > 两者都是"类型齐了、接线没做"，而测试都是绿的。
 
-- [ ] `tracing` 初始化（JSON + 轮转 + 非阻塞 writer）—— **完全没有**。
-      全仓 0 处 `tracing_subscriber` / `tracing_appender` / `set_global_default`；
-      `LogConfig`、`init()`、`LogGuard` 都不存在。
-      ★ `synra-observe/Cargo.toml` **声明了 `tracing` 与 `tracing-subscriber` 两个依赖，没有任何源文件使用它们** ——
-      死依赖。文档 §2.1 的技术选型没有代码支撑。
+- [x] `tracing` 初始化（JSON + 轮转 + 非阻塞 writer）—— **★ 本次实现了，但格式是文本而不是 JSON，原因值得记**。
+      原状：全仓 0 处 `tracing_subscriber`/`tracing_appender`/`set_global_default`；
+      而 `synra-observe/Cargo.toml` **声明了 `tracing` 与 `tracing-subscriber` 两个依赖，
+      没有任何源文件使用它们** —— 死依赖。日志层该有的东西都在（级别枚举、verbosity 窗口、
+      计数、`RedactingWriter`），**但没有任何一行被写出去**，因为没有东西装 subscriber。
+      下游后果是具体的：守护进程的 `synra logs` 读 `data_dir/logs` 下**没有任何代码创建过**的文件，
+      所以它永远回答"没有行"，而 CLI 的 `--follow` 与 `--trace` 没有东西可过滤。
+      **本次实现**：`logging::RotatingFile`（`logging/file.rs`）+ `logging::init`（`logging/init.rs`）。
+      `LogConfig` 收目录/级别/大小上限/保留份数，`init` 返回 `LogGuard`（持有 writer，drop 时 flush）。
+      写入链是 `tracing` → `RedactingWriter` → `RotatingFile`，**脱敏发生在落盘前的那一环**，
+      所以策略是"出去的路上做一次"，而不是每个调用点记得小心。
+      在守护进程里**先于插件宿主构建**安装（装在之后就不记录构建它时的失败）；
+      打不开日志只报告不终止 —— 一个写不了诊断文件的主机仍然能搬文件，为它拒绝启动是拿用户的实际工作换记录。
+      ★ **格式：文本而不是 JSON**，而且这不是偷懒：
+      * `tracing-subscriber` 在这个工作区只启用了 `["fmt", "env-filter", "registry"]`，**没有 `json`**；
+      * 更要紧的是守护进程的读取端（`reports.rs:152` 的 `logs_value`）**按空白分隔的 token 找级别**
+        （`is_debug_or_trace`，`reports.rs:145` 的注释专门解释过为什么不能用 `contains(" DEBUG ")`）。
+        JSON 里级别是 `"level":"DEBUG"`，不是 token，那个过滤器会一行都认不出来。
+      也就是说**文档要 JSON、读取端要文本**，两者是冲突的，而读取端是有测试的真代码。
+      先把写入端做成文本（可离线、与现有读取端一致），并把冲突记在这里，而不是加一个 feature 去换格式。
+      ★ 仍未做的一半：**"非阻塞 writer"没有** —— 写入是同步的，没有 `tracing-appender` 的
+      `non_blocking`。轮转是**按大小**（`DEFAULT_MAX_BYTES = 8 MiB`，`DEFAULT_KEEP = 7`），不是按天。
+      测试在 `crates/synra-observe/tests/logging.rs`（独立二进制，因为 `try_init` 是进程级的），
+      且**只有一个 `init` 测试**：两次安装会互相冲突，两个测试各装一次就是竞态。
+      它断言的是"行到了磁盘上"以及"**`hunter2` 没有到磁盘上**"—— 后者是脱敏唯一能失败的地方。
+      负控制：把 `redact_line` 改成原样返回 → 测试红（"the secret reached the disk"）。
+      另加一条守护进程侧的路由守卫
+      `the_log_reader_and_the_log_writer_agree_on_the_directory`：
+      写入端取 `Paths::log_dir()`、读取端手写 `data_dir.join("logs")`，
+      今天两者相等只是两行独立代码的巧合；`Paths` 一旦改变存放位置，
+      `synra logs` 会永远返回空列表**而不报任何错** —— 这条测试就是钉住这个巧合。
 - [x] 字段名命中 + 长度截断 + URL 去 query + 测试 —— **A/C**：
       `RedactionLayer` 不存在（**不是 `Layer<S>` 实现**）；真实机制是 `Redactor`(`redact.rs:154`)
       + `RedactingWriter`(`logging/writer.rs:16`)，一个 `Write` 包装器。
