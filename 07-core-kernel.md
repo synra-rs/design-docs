@@ -418,6 +418,18 @@ impl Supervisor {
 >   阴性对照（把 request id 从 `raise` 拿掉）会以 **`left: 2, right: 1`** 失败 —— 正是幂等失效的样子。
 >   `a_request_from_another_device_runs_here_and_answers_with_the_outcome` 同时断言动作**真的跑了**（回答是 `"opened"`），
 >   因为一个不跑东西就回 `ok` 的 handler 从发送方看完全一样。
+> * ★ **第三个事件 `INTENT_CANCEL` 也完成了（已提交）。** 取消一个**已下发**的意图时，
+>   `cancel` 会多出一个 `StateChange { outbound: Some(..) }`，由 daemon 送出；收信端是
+>   `accept_cancel`，用 `recall(from, request)` 找到自己为该请求立的意图并结束它。
+> * ★ **而它抓住了一个真的 bug**：`remote::cancel` 本来会**新铸**一个 request id，
+>   而对方正是用**被撤回那个请求的 id** 去 `recall` 的。于是撤回会被“送达”而对方继续跑。
+>   现在 id 是参数，不是在里面现铸的——**让调用方无法因为漏传而错**。
+>   阴性对照：改回现铸，`a_withdrawal_from_another_device_stops_work_that_has_not_run_yet`
+>   以 `it found the work that request raised` 失败。
+> * ★ **一个达不到的竞争被写成了测试**：撤回与 `INTENT_RESULT` 可能在线上交叉。
+>   当它们交叉时，动作**已经发生了**，而运行插件动作是不可撤销的，
+>   所以 `succeeded` 不被覆写成 `cancelled` —— 那会抹掉“它跑了”这个用户最需要知道的事实。
+>   `cargo test --workspace` **55 suites / 2785 passed**（+4）。
 >      幂等的**两半已经在 board 里**：`confirm` 重用而不新铸 request id，`recall(origin, request)`
 >      按来源查一个到达的请求。所以收信端只差把这两个接上 listener 的 `Decision`。
 >
