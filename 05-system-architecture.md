@@ -114,9 +114,20 @@
 > `Kernel::record_action` 没有调用者（没有 Kernel）、`AppState` 与 daemon 各持一份 store/identity/host。
 >
 > ★ 而 `synra-daemon` 在文档里是**可选的**那个（见上面第三条要点与之对应的 `kernel-remote` feature），
-> 现在却是唯一跑起来的网络实现。可行的下一步是先让 daemon 的 `transport.rs` 搬进库（`serve` 在 `:70`，
-> `bind` 在 `:364`），两个宿主都注册 `transport.accept` —— 和把编排从 `runtime/intent.rs` 搬进库是同一件事，
-> 那次已经做完了。
+> 现在却是唯一跑起来的网络实现。
+>
+> ★ **第一步已完成（已提交）：接受连接的那一半现在在库里。**
+> * `crates/synra-core/src/listener.rs` ← daemon 的 `transport.rs`（`serve`/`handle`/`handle_within`/`bind`）。
+> * `crates/synra-core/src/inbound.rs` ← daemon 的 `dispatch.rs`（`Decision`/`Inbox`/`PairingAnswer`），
+>   以及 daemon 的 `pairing.rs`（现为 `inbound::pairing_state_for`）。
+> * daemon 的三个文件变成一行 `pub use` —— **而它的测试留了下来**
+>   （`apps/synra-daemon/src/transport/tests.rs`），因为它们跑的是真的 `KernelHost`；
+>   在库里重写一份就得先捧一个库自己想出来的 host，那种测试测的不是产品会跑的东西。
+> * 证据：搬前搬后 `cargo test --workspace` 都是 **55 suites / 2771 passed**，clippy 与 5 个 guard 均绿。
+>
+> ★ **还差的**：两个宿主都还没有把 `transport.accept` 注册给 `Kernel` 的 `Supervisor`；
+> `synra_core::Kernel` 依然无人构造，`DiscoveryService` 也还没有作为任务被注册。
+> 现在两块都在库里，所以这一步只剩“把它们接上”。
 
 ### 2.2 移动端（Android / iOS）
 
