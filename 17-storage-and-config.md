@@ -531,6 +531,28 @@ impl GcTask {
 
 ---
 
+> ### ★ 而这一节里**三张表一直是空的**（第 62 轮查出，并修了一张）
+>
+> 迁移建了 `plugin_audit`、`transfer_sessions`、`intents` 三张表，而在**两个工作区里都没有任何代码**
+> 读或写它们 —— 搜 `(FROM|INTO|UPDATE|TABLE)` + 表名只命中 `migrations.rs` 里的 `CREATE TABLE`。
+> 于是：
+>
+> | 表 | 状态 | 后果 |
+> | --- | --- | --- |
+> | `intents` | **已修**：`save_intent`/`load_intents`/`forget_finished_intents` | 之前意图只在内存 `Board` 里，**重启就丢** |
+> | `plugin_audit` | 仍空：审计写在内存环里 | 需要先决定它该不该落盘 |
+> | `transfer_sessions` | 仍空：传输不写库 | 本节的“`expires_at` 过期即删”目前无对象 |
+>
+> ★ **所以“实现 GC”这件事本身要先分清楚**：对着一张没人写的表做收集，
+> 是一个**不可能失败**的功能 —— 正是这个仓库在别处一直在清理的形状。
+> 所以 `plugin_audit` 和 `transfer_sessions` 的收集器**没有写**：写进去只会是一个永远返回 0 的函数。
+>
+> ★ 而 **`devices_seen` 的保留（500 条）也还没写**：它是唯一真有数据的表，
+> 但这一轮没顾上，记在这里。
+>
+> ★ **凭什么说 `intents` 之前是死的**：内存 `Board` 是 `HashMap<IntentId, Intent>`，
+> 而全仓没有 `load_intents`、也没有任何 `INTO intents` —— 所以进程一退，意图全部消失。
+> 这也是为什么本节的“离线排队”当时不可能成立。
 ## 7. 备份与恢复
 
 | 数据              | 备份方式                                    | 说明                        |
