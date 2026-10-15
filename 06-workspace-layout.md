@@ -744,6 +744,26 @@ publish:     ; cargo harbor publish
 > `mobile-check` / `sqlite-check` / `wasm-check` 保留在 core，因为它们验证的是**内核能否交叉编译**，
 > 而不是"应用能否打包"。
 
+> ### ★ `synra-app` 的检查必须是"构建 + 测试"，不能只测 lib
+>
+> 记在这里是因为**这一条被漏掉了十四轮**。
+>
+> `src-tauri` 是**独立 workspace**（§4.1），它的 `main.rs` 是**二进制 crate root**，而 `cargo test --lib`
+> **根本不编译它**。于是 `PluginSet::new` 从"一个 engine 参数"变成"engine + host"那次改动
+> （见 [12](./12-wasm-host.md)）让 `main.rs:261` 停止编译，而没有任何东西报错：
+> 每次检查跑的都是 `cargo test --no-default-features --lib`，69 个测试全绿。
+>
+> ```
+> # synra-app / src-tauri
+> app-check:  ; cargo build                       # ★ 编译二进制，`--lib` 覆盖不到
+> app-test:   ; cargo test --no-default-features  # ★ 不带 `--lib`：lib + bin 的测试都跑
+> ```
+>
+> ★ 而修好之后多出来的东西比"恢复编译"多：`synra-platform` 的 `CommandPlatform`
+> （真的会 `xdg-open` / `open` / `start`，会用 `pbpaste` / PowerShell 读写剪贴板）
+> **在此之前只有它自己的测试在用它** —— 因为 shell 从来没有 `Host`，也就没有地方挂它。
+> 现在 `DesktopHost` 把它接上了，`platform:open-url` 在一台有桌面的机器上第一次真的能打开浏览器。
+
 ---
 
 
