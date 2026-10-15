@@ -347,16 +347,23 @@ Pages **一个都设不了**。逐个看影响：
 
 | # | 守卫                                            | 实现 |
 | - | ----------------------------------------------- | ---- |
-| 1 | **双语言结构一致**                                | `node scripts/check-structure.mjs`（§6） |
+| 1 | **双语言结构一致**                                | `pnpm check:structure` → `esno scripts/check-structure.ts` |
 | 2 | **死链检查**                                     | VitePress 构建时的 dead-link 检测（默认开启，失败了要让构建失败） |
-| 3 | **schema 是合法 JSON Schema**                     | `ajv` 编译每个 `public/schema/**/*.json`；失败即退出 |
-| 4 | **schema 字段集合与 Rust 类型一致**                 | 从 `synra-core` 的 `ts-rs`/schema 导出比对（跨仓库 job，nightly 或 tag 触发） |
-| 5 | **已发布 schema 版本的结构未被修改**                | `public/schema/.frozen/v1.sha256`（只对结构部分取哈希，忽略 `description`） |
-| 6 | **站点不出现 🔴 / 未定表述**                        | grep 守卫：`🔴`、`尚未拍板`、`待定` 出现在 `guide/` `reference/` `plugins/` 下即失败 |
-| 7 | **站点不出现内部设计文档链接**                       | grep 守卫：站内内容不得出现 `design-docs` / `synra-rs/design-docs` |
+| 3 | **schema 是合法 JSON Schema**                     | `pnpm check:schema` → `ajv` 编译每个 `public/schema/**/*.json`；失败即退出 |
+| 4 | **schema 字段集合与 Rust 类型一致**                 | ★ **未实现**。从 `synra-plugin-api` 导出字段集合比对（跨仓库 job，nightly 或 tag 触发） |
+| 5 | **已发布 schema 版本的结构未被修改**                | 同一个 `check-schema.ts`（冻结摘要，§5.5 / `types/frozen/`） |
+| 6 | **站点不出现 🔴 / 未定表述**                        | `pnpm check:public` → `scripts/check-public-content.ts` |
+| 7 | **站点不出现内部设计文档链接**                       | 同上，`check-public-content.ts` 的第 2 类 |
 | 8 | **每个页面的 frontmatter 有效**                     | 构建期校验（`title` 必填） |
 | 9 | **代码块里的命令可执行**（可选，P2）                  | 从 `guide/installation` 抽出命令做冒烟（只在 CI 有对应平台时） |
 | 10 | **Lighthouse 门禁**（可选，P2）                    | 性能 / 可访问性 / SEO 分数下限 |
+
+> ★ **本表原先写错了文件名（本次核对后更正）。** 原来第 1 行写的是
+> `node scripts/check-structure.mjs`，而仓库里**没有任何 `.mjs` 文件** ——
+> 守卫全是 `.ts`，用 `esno` 跑，入口是 `pnpm check:structure` / `check:schema` / `check:public`
+> （`package.json`）。照原表敲命令会得到 "Cannot find module"。
+> 守卫 6 和 7 也不是两个独立文件，而是 `check-public-content.ts` 里的两类规则；
+> 守卫 3 和 5 同属 `check-schema.ts`。清单里按编号勾选时看不出这一点，所以在这里写明。
 
 ### 7.1 守卫 6 为什么重要
 
@@ -468,6 +475,15 @@ docs/public/schema/manifest/v1.json    （手写的 JSON Schema，带 descriptio
 
 ## 10. 实现清单
 
+> ★ **本节已于本次逐条对过 `synra-rs/docs` 仓库的实际内容，注释基本准确。**
+> 抽查确认的事实：`scripts/` 是 4 个 `.ts`（3 个守卫 + 1 个翻译脚手架）；
+> `.github/workflows/deploy.yml` 在；`types/frozen/manifest__v1.json.sha256` 确实在 `public/` **之外**；
+> `public/` 下只有 `CNAME` 与 `schema/`，所以"缺 favicon / brand-mark / og-image / robots.txt"是真的；
+> `public/schema/plugin-events/v1.json` 确实还没有。
+> **本次改掉两处**：§7 表格里的文件名与运行方式（原文写的 `.mjs` 文件不存在），
+> 以及守卫 4 那条**已经过期的阻塞理由**（见下）。
+> 这两处都是"照它做会做错"的错误，而不是措辞问题 —— 一处命令跑不起来，一处让人去找一个早已存在的东西。
+
 > 本仓库已建好骨架并推送（`synra-rs/docs`，首个提交 `93cca1d`）。清单反映**实际状态**。
 
 仓库骨架（✅ 已完成）：
@@ -515,7 +531,12 @@ schema：
 CI：
 
 - [x] 守卫 1（双语结构）、2（死链，VitePress 内建）、3（schema 合法 + `$ref` 可解析 + `$id` 与路径一致）、5（结构未变）、6（无未定表述）、7（无设计文档链接）
-- [ ] 守卫 4（schema ↔ Rust 类型一致）—— 需要 `synra-core` 先有 manifest 类型
+- [ ] 守卫 4（schema ↔ Rust 类型一致）—— ★ **原写的阻塞理由已过期**：这里说"需要 `synra-core` 先有 manifest 类型"，
+      但 `synra-plugin-api` **早就有**完整的 manifest 类型（`Manifest` / `CapabilityDeclaration` / …，
+      本节 §7.2 自己指的就是它）。所以真正缺的不是上游类型，而是**那个跨仓库比对 job 本身**：
+      `docs` 仓库的 CI 只有 `deploy.yml`，没有任何跨仓库触发。
+      这是一条"理由过期了但清单没更新"的项 —— 与 `diag_logs_tail` 那次同一形状：
+      清单上的理由比现实活得久，而读清单的人会据此以为还差上游一步。
 - [ ] 守卫 8（frontmatter 有效）、9（命令冒烟）、10（Lighthouse）
 - [x] Pages 站点设置（Source = GitHub Actions、custom domain、Enforce HTTPS）
 - [ ] **Netlify → Pages 的实际切换**（DNS 记录、域名验证）—— 首次部署后做
