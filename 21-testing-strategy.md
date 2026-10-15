@@ -357,6 +357,40 @@ async fn session_times_out_when_peer_is_silent() {
 **每个用例是一个故意的恶意 Wasm 插件（或恶意 UI 插件）。**
 这是整套测试里最重要的一组：安全属性在"写错"时功能测试照样全绿，只有对抗测试能发现。
 
+> ### ★ 而这张表的 29 条，**真实状态是什么**（第 71 轮逐条核对）
+>
+> 下面那句“未做：没有”已经过时了 —— 大多数用例在之后的轮次里被逐个覆盖，
+> 只是**分散在各自的模块里**。按“未做”去写会写出已经存在的测试，而比那更糟的是它会**掩盖真正没有的那几条**。
+>
+> | 用例 | 状态 | 证据 |
+> | --- | --- | --- |
+> | 1–5 死循环 / 内存 / 栈 / 越界 | **只在档位上** ⚠ | 见下面 |
+> | 6 panic | ✓ | `a_plugin_that_panics_the_host_does_not_stop_the_kernel` |
+> | 7 未声明的 host function | ✓ | `IMPORTS_UNKNOWN` 档位 + linker 的导入表 |
+> | 8–10 路径逃逸 / symlink | ✓ | `check_path` 的 `OutsideSandbox`、`is_within`、`expand.rs` **直接拒绝 symlink** |
+> | 11–13 scheme / 环回 / 169.254 | ✓ | `synra_core::network` 的守卫测试（各有一条） |
+> | 14 重定向到白名单外 | ✓ | `a_redirect_to_a_host_nobody_granted_is_refused_at_that_hop` |
+> | 15 DNS 重定向 | ✓ | `FixedResolver`：只交出已校验的地址 |
+> | 16 事件命名空间 | ✓ | `EventName::check_emittable_by` |
+> | 17 `device.send` 未授权 | ✓ | gate 的 `CapabilityDenied` 测试 |
+> | 18 高频调用 | ✓ | `RateKind` 五维，`rate_kind()` 分类 |
+> | 19 超大 payload | ✓ | `PayloadTooLarge`（包体与帧两处） |
+> | 20 递归调 action | **未实现** ✗ | `action_invoke` 在两个宿主里都拒绝 |
+> | 21–24 伪造 manifest / 摘要 / 签名 / 公钥 | ✓ | `verify`、`DigestMismatch`、`BadSignature`、`Untrusted` |
+> | 25–27 zip bomb / tar 穿越 / symlink | ✓ | `artifact::expand::plan`：条目数、单文件、总量、深度、symlink 全有测试 |
+> | 28 宿主 panic | ✓ | `catch_unwind` 的测试 |
+> | 29 `can_handle` 产生副作用 | ✓ | `HostCalls::pure()` + 纯会话拒绝副作用的测试 |
+>
+> #### ⚠ 1–5：它们只证了**内核处理结果**，没证**引擎真的会截断**
+>
+> `Scripted::FuelExhausted` / `Scripted::MemoryExceeded` 是**档位的回答**，所以它们证的是
+> “燃料耗尽这个结果传回来时内核怎么办”，**不是**“真的燃料耗尽时 wasmtime 会 trap”。
+> 而全仓只有**一处** `wat::parse_str`（`wasmtime_tests.rs`），且没有任何 `.wat` 里有
+> `loop` / `br 0` / `memory.grow` —— 所以 `call_fuel`、`call_timeout_ms`、`max_memory_bytes` 三个配置
+> **没有一条测试证明它们对真的 guest 生效**。这正是“测试自己捏造了它断言的状态”的形状。
+> 下一步就是写一个真正会死循环和一个真正会无限分配的 `.wat`，并断言引擎拒绝它们。
+>
+
 ### 5.1 headless 插件
 
 | #  | 攻击                                             | 期望结果                                       |
