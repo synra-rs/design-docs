@@ -614,6 +614,31 @@ pub fn install_panic_hook(paths: &Paths, version: &str) {
       原因是有**两个**读者：守护进程答 `synra logs`，shell 往诊断包里放日志摘录。
       两套实现会漂移，而漂移是不可见的 —— 两个读者对"哪些行是 debug"意见不一致，
       要等有人对比两份输出才会被发现。
+       ★ **本次补上了 `--verbose` 缺的那一半（它此前是空头承诺）。**
+       原状：`with_max_level` 在 subscriber 构建时就把级别钉死，而 `tracing` 每进程只允许一个 subscriber ——
+       于是**这个进程在它有生之年写不出一行 debug**，`synra logs --verbose` 从一个永远不含 DEBUG 的文件里
+       把 DEBUG 过滤掉，结果与不加 `--verbose` 完全一样。**没有任何东西失败，标志只是什么也没做。**
+       修法分两层：
+       * `logging/init.rs`：级别判定从常量改成**每次事件问一次**（`DynamicLevel` 这个 `Layer`），
+         它读的是 `Verbosity::effective()` —— 于是 `Verbosity` 这个**早就写好、测试齐全、零生产调用者**
+         的类型终于有了调用者。窗口（`VERBOSE_WINDOW`，30 分钟）比"提升"本身同样重要：
+         一个不会过期的提升就是一台没人看的机器上一直开着的 debug 日志，那是磁盘被填满的经典方式。
+       * `runtime/reports.rs` 的 `logs_value`：请求里带 `verbose` 就把级别提到 `Debug`，
+         带 `trace` 就提到 `Trace`（跟一个 id 是更窄也更刻意的请求，值得更多细节），
+         并在回答里回 `raised` 与 `level` —— **因为第一次读确实不会有新的 debug 行**，
+         不说明的话用户会认为这个标志没用（而那正是它此前的样子）。
+       * `Runtime` 新增 `verbosity: Option<Arc<Verbosity>>`：`None` 表示"日志没跑起来"
+         （文件打不开的守护进程照样回答这个命令），此时它**不能声称自己提升过**。
+       测试三层：`logging.rs` 的集成测试在同一次运行里**先写一行 raise 之前的 debug、再写一行之后的**，
+       断言前者不在磁盘上、后者在（只断言后者的话，一个无条件写 debug 的实现也会通过，而那正是要防的）；
+       守护进程侧断言的是 **logger 自己的状态**，因为那才是决定 debug 行写不写的东西；
+       加一条"没有 logger 时不谎报"的用例。
+       负控制：把 gate 改成恒 `true` → 集成测试红（"a debug line was kept before anything asked for one"）；
+       把 `raise_for_a_while` 改成空操作 → 守护进程测试红。
+       ★ 顺带记一个自己踩的坑：新加的两个测试最初用了与**已有测试相同的临时目录名**
+       （`logs-verbose` / `logs-trace`），而 `TempDir::new` 会先删掉那个目录 ——
+       于是它们互相删对方的日志文件，表现为两个**原本通过**的测试变红。
+       是测试套件抓住的，不是我看出来的：同一进程里并行跑的测试共享 `temp_dir`，名字必须唯一。
       ★ **shell 现在也有自己的日志**：`AppState::start_logging`（独立于 `AppState::new`，
       因为 `tracing` 每进程只允许一个 subscriber，而 `AppState::new` 也被测试调用），
       `LogGuard` 由 `AppState` 持有 —— 持有而不是泄漏，因为 drop 才会 flush。
