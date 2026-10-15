@@ -364,7 +364,7 @@ async fn session_times_out_when_peer_is_silent() {
 >
 > | 用例 | 状态 | 证据 |
 > | --- | --- | --- |
-> | 1–5 死循环 / 内存 / 栈 / 越界 | **只在档位上** ⚠ | 见下面 |
+> | 1–5 死循环 / 内存 / 栈 / 越界 | **有真实档位但被 `#[ignore]`** ⚠ | 见下面 |
 > | 6 panic | ✓ | `a_plugin_that_panics_the_host_does_not_stop_the_kernel` |
 > | 7 未声明的 host function | ✓ | `IMPORTS_UNKNOWN` 档位 + linker 的导入表 |
 > | 8–10 路径逃逸 / symlink | ✓ | `check_path` 的 `OutsideSandbox`、`is_within`、`expand.rs` **直接拒绝 symlink** |
@@ -381,14 +381,26 @@ async fn session_times_out_when_peer_is_silent() {
 > | 28 宿主 panic | ✓ | `catch_unwind` 的测试 |
 > | 29 `can_handle` 产生副作用 | ✓ | `HostCalls::pure()` + 纯会话拒绝副作用的测试 |
 >
-> #### ⚠ 1–5：它们只证了**内核处理结果**，没证**引擎真的会截断**
+> #### ⚠ 1–5 的真实状态，比“只在档位上”更精确也更值得记
 >
-> `Scripted::FuelExhausted` / `Scripted::MemoryExceeded` 是**档位的回答**，所以它们证的是
-> “燃料耗尽这个结果传回来时内核怎么办”，**不是**“真的燃料耗尽时 wasmtime 会 trap”。
-> 而全仓只有**一处** `wat::parse_str`（`wasmtime_tests.rs`），且没有任何 `.wat` 里有
-> `loop` / `br 0` / `memory.grow` —— 所以 `call_fuel`、`call_timeout_ms`、`max_memory_bytes` 三个配置
-> **没有一条测试证明它们对真的 guest 生效**。这正是“测试自己捏造了它断言的状态”的形状。
-> 下一步就是写一个真正会死循环和一个真正会无限分配的 `.wat`，并断言引擎拒绝它们。
+> **全仓只有两个 `#[ignore]`，而它们正是证明真实 guest 能跑通的那两个**，都在 `wasmtime_tests.rs`：
+>
+> * `:270` `a_call_reaches_the_guest_and_its_answer_comes_back`
+> * `:306` `a_guest_that_loops_for_ever_is_stopped_by_its_instruction_budget`
+>
+> 属性里写的理由是：**手写的 `.wat` 档位不符合 canonical ABI 对 `string` 参数与返回值的要求**，
+> 而修好它的路径是**用 `bindgen!` 从 WIT 文件生成档位**。换句话说：查找、实例化、
+> 安装内存上限、装配 epoch 都有测试，**而“一次完整的调用真的进了 guest 并回来了”没有**。
+>
+> ★ 而 `a_wall_clock_budget_arms_a_deadline_on_the_store` 与
+> `a_memory_ceiling_is_installed_before_the_guest_runs` 是**真断言**：它们断言实例实际被给了多少 tick、
+> 以及上限是否装上，而不是断言一个档位的回答。所以这一行的真实状态是：
+> **配置被证明装上了，没被证明对一个真会死循环的 guest 生效。**
+>
+> ★ **而一个错误的归因在这里被纠正了**：这两个 `#[ignore]` 一度被说成“因为缺 `wasm32-wasip2` 而阻塞”。
+> `unsafe`/target/`wasm-tools` 那三个理由是 `crates/synra-plugin-sdk/tests/guest/world_fixture.rs` 的，
+> 而那个文件**根本不参与编译** —— 它自己写明了“没有 `#[ignore]`，因为编译不了的测试不是被跳过的测试”。
+> 两件事各自成立，不是一件。
 >
 
 ### 5.1 headless 插件
