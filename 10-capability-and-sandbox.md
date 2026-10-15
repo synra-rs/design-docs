@@ -771,7 +771,22 @@ pub struct AuditEntry {
 > 而 `request-json` 的**具体形状文档没定**（和 intent 的 payload 一样），所以它要像
 > `synra_core::intent::remote` 那样，**把决定写在模块文档里**，而不是散在代码里。
 >
-> **本轮没有交代码** —— 上面五条是调查结果，写下来是为了让下一轮不重复调查它们。
+> ★ **已实现（已提交）**：新 crate `crates/synra-fetch`。`Client::fetch` 把上面五条全部落了地：
+> 解析 → `check_resolved` → `FixedResolver` 只交出通过的地址（证书仍验原域名）→
+> `max_redirects(0)` + 自己的重定向循环（每跳过 `next_hop`）→ 响应体限额在**读的时候**生效。
+> * ★ **测试真的开了 socket**：一个 `TcpListener` 写固定响应，因为这个模块的每一个判断都是关于
+>   一个**即将发出的请求**，而把传输换成桩就只能测桩自己对守卫的理解。
+> * ★ **两个阴性对照**：让客户端自己跟重定向（→ 5 个测试红）；
+>   把响应体上限改回 `u64::MAX`（→ `a_body_larger_than_the_limit...` 红）。
+> * ★ **而它捕到了两件事**：
+>   1. `ureq` 的 `limit(n)` 在剩余为 0 时读一次就报错，而 `read_to_string` 总会多读一次看结尾
+>      —— 所以**恰好等于上限的响应体会被拒**。传 `limit + 1` 才让“超过才拒”名副其实。
+>   2. 我的第一版重定向测试转向了**同一台主机的另一个端口**，而它**通过了守卫**
+>      —— 因为能力授权的是 **host**（它的拼写就是 `network:fetch:<host>`），端口不在授权里。
+>      是测试错了而不是守卫错了；现在改成转向 `localhost`，并另加一条**断言端口确实不在授权里**。
+>
+> ★ **而它还在等一个宿主**：`KernelHost::fetch`/`DesktopHost::fetch` 仍然拒绝，
+> 所以插件还是发不出请求。下一步是把 `Client` 接到两个宿主上。
       整个 workspace **没有任何 HTTP 客户端**（搜 `reqwest`/`hyper::`/`ureq`/`isahc` 只有 `Host::fetch`
       的 trait 声明与测试桩）。`ErrorCode::IpNotAllowed`/`RedirectBlocked` 有码无生产者。
 > ★ **而它当时没有生产调用方 —— 因为守护进程把整组 `platform:*` 一律拒绝了。**
