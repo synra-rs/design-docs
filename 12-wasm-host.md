@@ -625,6 +625,35 @@ Wasm **验证与编译本身**是攻击面（一个精心构造的模块可以�
          测试 `session_tests.rs` 跑在**默认 feature** 下（281 条里那 4 条），
          其中 `the_session_type_exists_without_an_engine` 就是钉这件事的。
       ★ **仍未做的，以及为什么它不是"补一行"**：
+      ★ **上面列的三条本轮全部做完了，所以闸门现在真的会跑。** 做法如下：
+      * **`Arc<dyn Host>` 进了 `PluginSet`**，且 `PluginSet::new(backend, host)` 是**必填**的：
+        没有诚实的默认值——无 session 的实例会拒绝每一次调用，
+        而那个失败会读成"插件有问题"而不是"孿主没说效果该去哪"。
+      * **同时抽出了 `Authority`**（grants + `Arc<Budget>` + `Arc<Mutex<Vec<AuditEntry>>>`），
+        `Loaded` 持有它。这样抽的理由有两个：
+        budget 和审计属于**插件**而不是实例（每实例一份会把限额乘以实例上限），
+        而且"这个插件能做什么"是一句**不需要 `.wasm` 就能测**的话。
+        测试 `a_session_carries_the_plugins_own_authority` 和
+        `two_instances_of_one_plugin_share_their_rate_and_their_record` 就是这两句话（后者用指针相等，
+        因为"同一份限额"正好是副本不是的东西）。
+      * **审计现在有了写入者**：`LinkerSession.audit` 是共享句柄，
+        `PluginSet::call` 在每次调用后把它排入 `synra_observe::audit::AuditRing`，
+        并暴露 `audit()` / `audit_for()` / `refusals_for()`。
+        环本来就有界、有测试、有查询——只是没有写入者；
+        而之前唯一的写入路径是 `Kernel::record_action`，那个类型没有任何孿主构造（见 [07](./07-core-kernel.md) 开头）。
+      * **生产的 `impl Host` 在守护进程里**：`apps/synra-daemon/src/runtime/plugin_host.rs`。
+        它服务 `env-*`（`sdk-version` / `host-kind` / `locale` / `dark-mode` / `can`）、`log`、`devices`，
+        其余一律以 **`NOT_IMPLEMENTED`** 拒绝。
+        拒绝不是占位：插件按 code 分支，而编造一个看起来合理的答案才是唯一更糟的选择。
+        `can` 读的是 **`plugin_grants` 里用户真正授予的集合**，所以它与门的判定一致；
+        `devices` 读已配对且 `is_usable` 的行——不把离线设备当成诺言。
+      * ★ **一处契约缺陷记在这里**：`platform_capabilities` / `locale` / `dark_mode`
+        返回**值**而不是 `Result`，所以孿主**无法拒绝**。
+        前者答空列表（这个构建没有平台集成，空是真的），
+        后两者读配置。一个**不可失败的问题无法区分"没答案"与"没有"**，
+        而插件两者都分不出来——这是契约本身的问题，不是这份实现的。
+      * 仍然卡住的只有**端到端**：两条真跑 wasm 的测试仍是 `#[ignore]`，
+        所以"闸门跑了"是靠实例上的 session 证明的，不是靠一个 guest 跑完证明的。
       * `PluginSet` 需要持有一个 `Arc<dyn Host>`，`run_on` 需要为每次调用构造 session
         （`LinkerSession::new` 要 `Arc<quota::Budget>`，而 `Loaded` 只带 `CapabilitySet`，**没有 budget**）；
       * 需要一个**生产用的 `impl Host`** —— 27 个方法。`synra-core` 的依赖够（platform/observe/store/net 都在），
