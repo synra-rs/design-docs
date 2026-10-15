@@ -550,6 +550,28 @@ pub struct CallBudget {
   - 要么标记"有状态插件"不允许池化（manifest 可声明 `stateful: true`）。
 - **`fuel` 与 `timeout` 都要有**：fuel 保证确定性（同输入同消耗），timeout 兜底（防止 host function 阻塞导致 fuel 不减少）。
 
+
+> ★ **存储有表了，而之前它一个字节都存不了。**
+>
+> 6 月份就写在这里的 `storage-get/set/delete/keys/quota` 五个函数，
+> 能力目录里的 `storage:local:read` / `storage:local:write`，一直都在；
+> 而 **仓库里每一个宿主对这五个都回 `notImplemented`**，存储层也没有表。
+> 于是一个想记住一个设置的插件，唯一的办法是**每次运行都重新问用户**。
+>
+> * `plugin_storage(plugin_id, key, value, updated_ms)`，主键是 `(plugin_id, key)` —— 两个插件都叫
+>   `settings` 时是两份设置，共享键空间会让装一个无关插件改变另一个读到什么。
+> * `ON DELETE CASCADE`，因为行上面那一行没了之后，没有任何查询能把残留值归给任何东西。
+> * ★ **计算的是值的字节数**（`LENGTH(CAST(value AS BLOB))`）而不是行或页的大小：
+>   后者会让同一个插件在 SQLite 升级后因为看不到的原因超配额。
+> * ★ **而前缀是前缀，不是模式**：`LIKE` 会把 `%` 和 `_` 当通配符，而插件的键可以含它们。
+>   已转义（`ESCAPE '\'`）。阴性对照：改回拼接，`a_prefix_containing_a_wildcard_is_a_prefix_rather_than_a_pattern`
+>   以 `not every key` 失败。
+> * 证据：**55 suites / 2796 passed**（+11），clippy、5 guard、matrix 均绿。
+>
+> ★ **而它顺手暴露了一件事**：存储层**没有任何删除插件行的方法**
+> （无 `remove_plugin`），所以级联只能在 SQL 层面断言。卸载路径仍然不存在。
+>
+> **还差的一半**：五个宿主函数仍然拒绝，配额（`max_storage_bytes`）还没有人在 `storage-set` 上执行。
 ### 6.2 配额
 
 ```rust
