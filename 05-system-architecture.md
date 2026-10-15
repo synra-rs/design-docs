@@ -125,9 +125,21 @@
 >   在库里重写一份就得先捧一个库自己想出来的 host，那种测试测的不是产品会跑的东西。
 > * 证据：搬前搬后 `cargo test --workspace` 都是 **55 suites / 2771 passed**，clippy 与 5 个 guard 均绿。
 >
-> ★ **还差的**：两个宿主都还没有把 `transport.accept` 注册给 `Kernel` 的 `Supervisor`；
-> `synra_core::Kernel` 依然无人构造，`DiscoveryService` 也还没有作为任务被注册。
-> 现在两块都在库里，所以这一步只剩“把它们接上”。
+> ★ **第二步也完成了：`Supervisor` 不再只是记账。**
+> 它一直完整存在（注册、取消令牌、重启策略、每任务一条记录、停机报告）并且有测试，
+> 而**真正跑任务的那一个函数 `run_task` 除了它自己的测试没有任何调用者**；daemon 用的是裸的
+> `std::thread::spawn` 加一个进程全局 `Arc<AtomicBool>`。现在：
+> * `listener::serve` 与 `worker::run`/`run_recording` 改收 **`&Cancellation`**，取消令牌就是它们的停止条件；
+>   一个单向令牌不会像那个叫 `stop` 却表示“继续跑”的布尔值一样把极性写反——而那个极性**确实被写反过一次**，
+>   后果是监听循环第一次检查就退出，于是设备绑定了端口、广播了端口，却静默拒绝每一个连接。
+> * daemon 建一个 `Supervisor`，注册 `transport.accept` 与 `discovery.udp`，用 `run_task` 跑起来；
+>   心跳发现自己不再拥有目录时调 `begin_shutdown()`，而不是去改一个全局布尔值 —— **停机只剩一条路**。
+> * 证据：`cargo test --workspace` **55 suites / 2772 passed**（+1），clippy、5 guard、matrix 均绿。
+>   新增那一条断言“工作者被取消后会返回”——它自己的文档原本声称它不会。
+>   阴性对照：把 `while !cancel.is_cancelled()` 改回 `loop`，该测试**挂死**而不是失败。
+>
+> ★ **还差的**：`synra_core::Kernel` 依然无人构造——daemon 拿的是一个裸的 `Supervisor`，
+> 而不是图里那个把 store/identity/host/事件总线/审计环一起持有的 `Kernel`。
 
 ### 2.2 移动端（Android / iOS）
 
