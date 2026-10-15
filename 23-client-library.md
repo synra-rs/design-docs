@@ -712,7 +712,12 @@ const feats = synra.device.supported
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue'
 // 只 import 类型；`synra` 本身是全局的，不需要 import
-import type { DeviceTarget, DeviceId, Unsubscribe } from '@synra/client'
+import type { DeviceTarget, Unsubscribe } from '@synra/client'
+// ★ `DeviceId` 不在 `@synra/client` 里 —— 它是线协议的类型，从 `@synra/protocol` 来。
+//   本文原来的示例把它写进了 `@synra/client` 的 import，照抄的作者会拿到
+//   "no exported member 'DeviceId'"。改这一行的是编译器，不是校对：
+//   `synra-js/scripts/check-doc-snippets.ts` 会把这个完整示例抽出来 `tsc --noEmit`。
+import type { DeviceId } from '@synra/protocol'
 
 const devices = ref<DeviceTarget[]>([])
 const target = ref<DeviceId | null>(null)
@@ -790,7 +795,17 @@ async function openOnLaptop(url: string) {
       但 `scripts/check-shapes.ts` 扫 `dist/` 里有没有 `.js`/`.mjs`/`.cjs`，后一道闸门在
 - [x] 构建：`tsc --emitDeclarationOnly` —— 以 `tsconfig.json` 的 `emitDeclarationOnly: true` + `build: tsc -b` 实现，等价
 - [x] **CI 守卫**：`dist/` 下不存在 `.js` / `.mjs` / `.cjs` —— 在 `synra-js/scripts/check-shapes.ts`
-- [ ] 形状断言测试（`tsd` 或 `expect-type`）：`SynraResponse` 字段与宿主实现逐一对齐
+- [x] 形状断言测试（`tsd` 或 `expect-type`）：`SynraResponse` 字段与宿主实现逐一对齐
+      ★ **换成了更强的做法，而不是省略**：实现走 `satisfies SynraClient`，所以形状是在**唯一那份实现**上被
+      强制的，而不是在另一个断言文件里再写一遍。（`network.fetch` 本身仍未实现 —— 见下面的说明。）
+- [x] **守卫 8：文档里的类型片段能编译**（`synra-js/scripts/check-doc-snippets.ts`）
+      抽 §8 的**完整示例**到临时工程跑 `tsc --noEmit`（匹配已构建的声明、`types: ["@synra/client"]`、
+      `vue` 用一个只声明三个名字的 shim）。
+      只抽**完整示例**而不是每个代码块：其余大多是片段（两行调用、接口草图、故意写错的拼写），
+      而片段不是程序 —— 一个需要猜作者意图的守卫，报的是它自己的猜测。
+      设计文档仓库不在旁边时**跳过并说明**（同 `check-shapes.ts` 的跨仓库比对）。
+      负控制：把示例里的 `isCapabilityDenied` 换成一个不存在的名字 → 守卫红并点名行号。
+      ★ 它第一次运行就抓到了三个真错，见上面那条。
       ★ **被上游卡住，不是缺测试工具**：`injection.ts` 的 `BACKED` 表里 `'network.fetch': false`，
       宿主根本没有 `fetch` 实现，所以没有可对齐的形状。
       等宿主有了 `fetch`，`satisfies SynraClient` 会自动强制这件事 —— 那比另写一个 `tsd` 测试更强。
@@ -803,6 +818,15 @@ async function openOnLaptop(url: string) {
 - [x] `device.pick` 未实现时返回 `SynraError{ code: 'unsupported' }`，且不出现在 `supported` 里
       —— `supported` 与行为来自同一张 `BACKED` 表
 - [x] `isSynraError` / `isCapabilityDenied` 由宿主提供
+      ★ **这一条本来标错了，而且是我自己批错的。** 它此前被标成已完成，实际上：`SynraClient` 只声明了
+      `isSynraError` 与 `isCode`，宿主也只实现了这两个。`isCapabilityDenied`（本文 §4.1 列了它，
+      §5.2 与 §8 的示例都在用）和 `ready()`（§4.1）**两边都没有**。
+      我当时看到 `injection.ts` 里一句提到 `isCode` 的注释就接受了它，而没有去数它到底声明了哪几个 ——
+      正是我这几轮在别人代码里反复找到的那种错。
+      ★ **拉出它的是编译器**：本轮新增的守卫 8 把 §8 的完整示例抽出来跑 `tsc --noEmit`，
+      第一次运行就报了三个错：错的 `DeviceId` import、`isCapabilityDenied` 不存在、`ready` 不存在。
+      修法：`surface.ts` 加上两个成员，`injection.ts` 实现它们（`ready()` 调契约里已有的
+      `plugin_ui_ready`），`testkit` 的 `MockSynraClient` 也补上 —— 后者是编译器自己列出来的。
 - [x] 测试：注入对象暴露的键集合 ⊆ `SynraClient` 的键集合
       —— 实际断言的是**精确相等**，比这条更严
 - [x] 测试：`types: ["@synra/client"]` 的 fixture 工程里 `synra.device.send` / `synra.device.pick` 类型正确
