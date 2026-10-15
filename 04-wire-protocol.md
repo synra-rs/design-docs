@@ -1466,6 +1466,12 @@ pub enum TrustLevel {
       三个错误结论有同一个来源 —— **只测一次、只测自己看得见的部分**。所以文件里现在有
       `the_counter_counts_an_allocation_that_definitely_happens` 这一条：它断言一个**确定会发生**的分配
       被计数到了。没有它，一个恒读 0 的计数器能让上面每一条都"通过"。
-- [ ] capability 匹配热路径零分配断言 —— **未做**。`Feature` 与协商在 `handshake.rs`，
-      `PeerCapabilities` 交集计算在同文件，但那里还没有分配计数器测量。
+- [x] capability 匹配零分配 —— **已实现，已修正**。`crates/synra-core/tests/hot_paths.rs` 里本来有
+      9 条零分配断言，全部通过、全部无效：它同样没有装 `#[global_allocator]`，读的一直是没装上的
+      计数器。装上之后真相是：帧解码 0、capability 匹配 2、路由 2、门禁 3、查不到 5。
+      capability 匹配是唯一值得马上改的（它跑在系统每一次权限检查上），已改成 `SmallVec`，
+      **2 → 0**；门禁顺带 3 → 1。
+      剩下三条（路由 2、门禁 1、查不到 5）**断言的是实测值而不是 0**，并且测试名已经改成
+      `*_stays_within_its_budget` —— 名字不能说零分配而断言说不是。去掉它们要动 `RouteOutcome`
+      的公开 payload 和静态表的预解析，属于设计变更，另开一轮做，不在这里偷偷改到能过为止。
 - [ ] 双内核端到端（`KernelPair`）：全部会话走通、断链重连、幂等重试、传输校验
