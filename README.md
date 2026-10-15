@@ -110,13 +110,16 @@ synra-core/
 │  ├─ synra-plugin-host/           #     ★ Wasm 沙箱 + 能力闸门
 │  ├─ synra-plugin-ui/             #     UI 插件 artifact 管理
 │  ├─ synra-platform/              #     Platform trait + 各平台实现
+│  ├─ synra-ipc/                   #     ★ 宿主壳 ↔ 界面：命令 / 事件 / 错误的契约
+│  ├─ synra-control/               #     ★ 命令行客户端 ↔ 同机内核的控制通道
 │  ├─ synra-core/                  #     ★ 领域内核 + 编排
-│  └─ synra-testkit/               #     测试夹具（publish = false）
+│  ├─ synra-testkit/               #     测试夹具（publish = false）
+│  └─ synra-testkit-alloc/         #     计数全局分配器（publish = false）
 ├─ apps/{synra-cli,synra-daemon}/   #   薄宿主（"内核不依赖 UI"的验收工具）
-├─ tools/{synra-plugin-cli,wit-codegen}/
+├─ tools/{synra-plugin-cli,wit-codegen,guards,matrix,api-guard}/
 ├─ wit/synra-plugin.wit            #   ★ 插件接口定义（单一真相源）
 ├─ fixtures/wire/ · benches/ · fuzz/
-└─ spike/                          #   M0 的技术验证（[19 §0.1](./19-roadmap.md)）
+└─ spike/                          #   M0 的技术验证，不进 workspace，结论见 RESULTS.md
 ```
 
 **本仓库不含设计文档** —— 设计文档在 [`docs` 仓库](https://github.com/synra-rs/docs)。
@@ -338,9 +341,12 @@ docs/
 | Tauri    | `2.12.x`           | 桌面 + 移动统一外壳，channel/event IPC                   |
 | Rust     | edition 2024       | `async fn in trait`、`let-else`、RPITIT                |
 | **MSRV** | **`1.88`**         | 写在 `Cargo.toml` 的 `[workspace.package] rust-version`  |
-| Wasmtime | `48.x`             | 组件模型 + WASI 0.2/0.3                                |
+| Wasmtime | **`38.x`**         | 组件模型 + cranelift（以 `Cargo.toml` 实锁版本为准）       |
 | tokio    | `1.x`              | 异步运行时与结构化并发                                   |
-| rusqlite | `0.3x`（`bundled`） | 本地持久化                                             |
+| rusqlite | **`0.40`**（`bundled`） | 本地持久化。`bundled` 是**移动端的前提**，不是可选项（见 spike 4） |
 | quinn    | `0.11.x`           | 可选传输（[ADR-004](./20-adr.md)）                      |
 
 > ⚠️ **不写 `rust-toolchain.toml`**（会让 CI 的 MSRV job 失效，[ADR-014](./20-adr.md)）。
+>
+> ⚠️ **Wasmtime 早先在此处写的是 `48.x`，workspace 实际锁的是 `38`。**
+> 本文改为记录实际值：一份比现实更响亮的版本锚点，正是它本该防住的那种漂移。

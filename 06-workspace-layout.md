@@ -18,8 +18,6 @@ synra-core/                   # ← Cargo workspace 根 = git 仓库根
 ├─ STABILITY.md                    # ★ 稳定性分级（哪些 crate 遵守 SemVer）
 ├─ rustfmt.toml / deny.toml
 ├─ .cargo/config.toml              # 目标平台别名、链接参数
-├─ justfile + xtask/               # 统一任务入口 + 结构守卫
-├─ design-docs/                        # 本文档集里归 core 的部分（见 README §2 分流表）
 ├─ crates/
 │  ├─ synra-core/                  # ★ 领域内核：模型、聚合根、状态机、编排
 │  ├─ synra-protocol/              # ★ 线协议：信封、事件、帧、版本协商
@@ -31,17 +29,23 @@ synra-core/                   # ← Cargo workspace 根 = git 仓库根
 │  ├─ synra-capability/            # capability DSL：解析、匹配、授权集
 │  ├─ synra-observe/               # tracing / metrics / 诊断包
 │  ├─ synra-platform/              # Platform trait + 各平台实现
-│  └─ synra-testkit/               # 测试夹具（publish = false）
+│  ├─ synra-ipc/                   # ★ 宿主壳 ↔ 界面：命令、事件、错误的契约（纯类型）
+│  ├─ synra-control/               # ★ 命令行客户端 ↔ 同机内核的控制通道
+│  ├─ synra-testkit/               # 测试夹具（publish = false）
+│  └─ synra-testkit-alloc/         #   计数全局分配器（供 testkit 测分配，publish = false）
 ├─ apps/
 │  ├─ synra-cli/                   # CLI（复用内核）
 │  └─ synra-daemon/                # 无 UI 守护进程（可选形态）
 ├─ tools/
 │  ├─ synra-plugin-cli/            # 插件作者工具：new/build/verify/sign/publish
-│  └─ wit-codegen/                 # WIT → Rust/TS 绑定生成
+│  ├─ wit-codegen/                 # WIT → Rust/TS 绑定生成
+│  ├─ guards/                      # ★ 结构守卫 + MSRV 检查（Rust 二进制，不是 shell 脚本）
+│  ├─ matrix/                      # ★ feature / target 组合矩阵（Rust 二进制）
+│  └─ api-guard/                   # 稳定 crate 的 public API 快照比对
 ├─ wit/                            # 插件接口定义（组件模型）
 │  ├─ synra-plugin.wit             # 主世界
 │  └─ deps/                        # 依赖的 WIT 包（wasi 等）
-├─ spike/                          # M0 的 8 个技术验证（[19 §0.1](./19-roadmap.md)）
+├─ spike/                          # M0 的技术验证（**不进 workspace**），结论见 RESULTS.md（[19 §0.1](./19-roadmap.md)）
 └─ testharness/
    └─ fixtures/                    # 协议编解码 fixture（[21 §3](./21-testing-strategy.md)）
 ```
@@ -396,17 +400,49 @@ synra db dump                       # 导出 SQLite（调试用，[17 §2.3](./1
 > core 只保证**内核本身**在所有 feature 组合下能编、能测；**移动端目标**的验证在 core 做
 > （因为它验证的是"wasmtime/rusqlite 能否交叉编译"，这是内核的问题），而**应用的打包**在 app 仓库。
 
-| 组合                        | 用途                    | 验证命令（示意）                                                        |
-| --------------------------- | ----------------------- | ----------------------------------------------------------------------- |
-| `--no-default-features`     | 最小内核                | `cargo check -p synra-core --no-default-features`                       |
-| 默认（含插件）               | 常规开发/发布            | `cargo check --workspace`                                               |
-| **移动目标（AOT，无 JIT）**   | 验证内核可交叉编译        | `cargo check -p synra-plugin-host --target aarch64-linux-android --features wasmtime-aot` |
-| **移动目标（SQLite）**        | 验证持久化可交叉编译      | `cargo check -p synra-store --target aarch64-linux-android`             |
-| 轻量（wasmi）                | 体积敏感                 | `cargo check -p synra-core --no-default-features --features plugins --features synra-plugin-host/wasmi` |
-| CLI only                     | 无 UI 内核验收           | `cargo check -p synra-cli`                                              |
-| 无插件                       | 最小可用                 | `cargo check -p synra-core --no-default-features --features transport-tcp` |
+> ⚠️ **这张表以前是七行"示意命令"，一行都没有跑过。**
+> 其中五行点了当时并不存在的 feature（`plugins`、`wasmtime-aot`、`transport-tcp`、
+> `synra-plugin-host/wasmi`），另外两行能跑但验证不了任何东西——
+> `--no-default-features` 用在一个没声明任何 feature 的 crate 上，就是默认构建本身。
+> 现在矩阵是 `tools/matrix`（`cargo run -p matrix`），它只报三种结论，并且三者不得混淆：
 
-> **core 的 CI 必须跑满这个矩阵**，否则"内核可 headless / 可移动"会悄悄退化。
+> | 结论 | 含义 |
+> | ---- | ---- |
+> | `ok`   | cargo 真的编了这些组合，有东西被检查过 |
+> | `FAIL` | cargo 跑了并拒绝，是真缺陷 |
+> | `SKIP` | cargo 跑不了，或这个组合还不存在；**必须写明缺什么** |
+>
+> 一行不能跑时报 `SKIP` 而不是通过，是这个工具唯一不可协商的规则。
+
+### 6.1 今天真实跑通的行
+
+| 组合                    | 用途               | 验证命令                                              |
+| ----------------------- | ------------------ | ----------------------------------------------------- |
+| 协议层 → Android        | 线协议可移植        | `cargo check -p synra-protocol -p synra-capability --target aarch64-linux-android` |
+| 传输层 → Android        | 组网可移植          | `cargo check -p synra-net --target aarch64-linux-android` |
+| 持久化 → Android        | `bundled` SQLite    | `cargo check -p synra-store --target aarch64-linux-android` |
+| 内核 → Android          | 整个内核可交叉编译  | `cargo check -p synra-core --target aarch64-linux-android` |
+| **插件宿主 → Android（带真引擎）** | 移动端 Wasm 后端 | `cargo check -p synra-plugin-host --features wasm-runtime --target aarch64-linux-android` |
+| 插件宿主（不带引擎）    | 最小插件宿主        | `cargo check -p synra-plugin-host --no-default-features` |
+| CLI only                | 无 UI 内核验收      | `cargo check -p synra-cli`                            |
+
+> ⚠️ **`cargo check` 不链接、不运行。** "带真引擎"这一行证明的是依赖图能挺过这个目标，
+> 不是 `.so` 能链接，更不是 Cranelift 的 JIT 能在 release 安卓上拿到可执行内存。
+> 后者是 spike 1 / 2 的事，见 `synra-core/spike/RESULTS.md`。
+
+### 6.2 还跑不了的行（`SKIP`，各带原因）
+
+| 行                        | 缺什么                                                    |
+| ------------------------- | --------------------------------------------------------- |
+| 内核可关掉插件子系统      | `synra-core` 没有 `plugins` feature——它的源码从不引用 `synra_plugin_host`，**没有子系统可关** |
+| 用 wasmi 解释器            | 没有 `wasmi` 依赖；编译期替代还是运行期替代仍是设计问题     |
+| 移动端用预编译引擎        | 没有 `wasmtime-aot` feature；且证据显示这是 **iOS** 的要求，不是 Android 的 |
+| 内核可关掉 TCP            | `synra-net` 没有 feature，且 TCP 是唯一实现的传输          |
+
+> 这四行**不是**"忘了加 feature"。加一个什么都不开关的 flag，会让矩阵变绿而内核仍然没有插件子系统——
+> 那正是上一段警告的那种失败，只是低了一层。缺口先写在屏幕上，flag 后加。
+
+> **core 的 CI 必须跑这个矩阵**，否则"内核可 headless / 可移动"会悄悄退化。
 > **app 仓库的 CI** 另外跑：Tauri 桌面构建、Android 构建（M5 起 iOS）、前端测试、E2E。
 
 ---
@@ -652,7 +688,13 @@ synra-observe
 > 落点：`crates/synra-plugin-host/src/ffi.rs` 集中所有 `unsafe`，文件头写明为什么需要它，
 > 且该文件**必须**有独立的测试覆盖（越界、null、对齐）。
 
-### 7.2 推荐的 `justfile` 任务
+### 7.2 任务入口
+
+> ⚠️ **仓库里没有 `justfile`，也没有 `xtask/`。** 本文档早先给出的 `justfile` 任务调用
+> `./xtask/guards.sh`、`./xtask/check-matrix.sh`、`./xtask/check-msrv.sh` —— 这三个文件从未存在。
+> 实际的做法是**把它们写成 Rust 二进制**放进 `tools/`，理由和 `tools/guards` 自己的文档头一样：
+> 仓库只含 Rust，一个 `.sh` 会成为本仓库第一种语言，并让守卫依赖"每台机器都有 bash"。
+> 下面的 `justfile` 片段因此读作"任务 → 实现"的对照表，实现是 `cargo run -p <tool>`。
 
 ```make
 # 全量检查（每次提交前，对齐 peon-burrow 的 CI `checks` job）
@@ -666,19 +708,22 @@ test-doc:   ; cargo test --workspace --doc
 doc:        ; cargo doc --no-deps --workspace
 bench:      ; cargo bench -p synra-protocol -p synra-capability -p synra-net
 
-# 结构守卫（§7.1 的 5 条）
-guards:     ; ./xtask/guards.sh
+# 结构守卫（§7.1 的 5 条）+ MSRV 检查
+# ★ 是 Rust 二进制，不是 shell 脚本：仓库里不引入第二种语言，守卫随 cargo 一起在每台机器上跑
+guards:     ; cargo run -p guards
 
-# feature 矩阵（与 §6 对应）+ MSRV
-matrix:     ; ./xtask/check-matrix.sh
-msrv:       ; ./xtask/check-msrv.sh          # 读 Cargo.toml 的 rust-version 真编一遍
+# feature / target 矩阵（与 §6 对应），三态结论见该节
+matrix:     ; cargo run -p matrix
 
-# mobile-check: ; cargo check -p synra-net --target aarch64-linux-android
-                cargo check -p synra-net --target aarch64-apple-ios
+# 移动端交叉编译。★ 需要 Android NDK，并且变量要指向它：
+#   set CC_aarch64_linux_android=%NDK%\toolchains\llvm\prebuilt\<host>\bin\aarch64-linux-android24-clang.cmd
+#   set CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=<同上>
+# `cargo run -p matrix` 已经把这两行包在里面，所以日常只需 `matrix`；这里列出原始命令是为了说明它验的是什么。
+mobile-check: ; cargo check -p synra-net --target aarch64-linux-android
 sqlite-check: ; cargo check -p synra-store --target aarch64-linux-android
-                cargo check -p synra-store --target aarch64-apple-ios
-wasm-check:   ; cargo check -p synra-plugin-host --target aarch64-linux-android \
-                  --features synra-plugin-host/wasmtime-aot
+wasm-check:   ; cargo check -p synra-plugin-host --features wasm-runtime --target aarch64-linux-android
+# ⚠️ `--features wasm-runtime` 不是本文档早先写的 `wasmtime-aot`：后者至今不存在，
+#    而证据（spike RESULTS）显示 Android 允许 JIT，AOT 是 iOS 的约束。见 §6.2。
 
 # 协议一致性（[21 §3](./21-testing-strategy.md)）
 wire:       ; cargo nextest run -p synra-protocol --test wire_fixtures
