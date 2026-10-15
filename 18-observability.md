@@ -562,6 +562,15 @@ pub fn install_panic_hook(paths: &Paths, version: &str) {
       写入端取 `Paths::log_dir()`、读取端手写 `data_dir.join("logs")`，
       今天两者相等只是两行独立代码的巧合；`Paths` 一旦改变存放位置，
       `synra logs` 会永远返回空列表**而不报任何错** —— 这条测试就是钉住这个巧合。
+      ★ **读取端现在是共享的**：`synra_observe::logging` 暴露
+      `tail` / `newest_file` / `is_debug_or_trace` / `LogTail`，
+      守护进程的 `runtime/reports.rs` 不再自己实现这三件事。
+      原因是有**两个**读者：守护进程答 `synra logs`，shell 往诊断包里放日志摘录。
+      两套实现会漂移，而漂移是不可见的 —— 两个读者对"哪些行是 debug"意见不一致，
+      要等有人对比两份输出才会被发现。
+      ★ **shell 现在也有自己的日志**：`AppState::start_logging`（独立于 `AppState::new`，
+      因为 `tracing` 每进程只允许一个 subscriber，而 `AppState::new` 也被测试调用），
+      `LogGuard` 由 `AppState` 持有 —— 持有而不是泄漏，因为 drop 才会 flush。
 - [x] 字段名命中 + 长度截断 + URL 去 query + 测试 —— **A/C**：
       `RedactionLayer` 不存在（**不是 `Layer<S>` 实现**）；真实机制是 `Redactor`(`redact.rs:154`)
       + `RedactingWriter`(`logging/writer.rs:16`)，一个 `Write` 包装器。
@@ -589,10 +598,24 @@ pub fn install_panic_hook(paths: &Paths, version: &str) {
       `AuditRing` + `PluginActivity::of`(`audit.rs:384`) 能出摘要，但 app 里没有任何 audit 组件；
       更要紧的是 `Kernel::record_action`(`kernel.rs:676`) **只被 `kernel_tests.rs:380` 调用** ——
       闸门与宿主**从不写审计条目**。`AuditRing` 是一个只有测试往里填数的空壳。
-- [x] `DiagnosticBundle` + 导出流程（内容清单确认）—— **A**：
+- [x] `DiagnosticBundle` + 导出流程（内容清单确认）—— **A，而且本次让"debug 日志"这一节真的有内容了**。
       `diagnostics/records.rs:94` + `BundlePlan::build`(`plan.rs:190`) +
       `DiagExportOptions{include_audit, include_debug_logs, log_lines}` 三项默认 `false`
       （`synra-ipc/src/dto/config.rs:74-82`）+ CLI `doctor --bundle`(`args.rs:264`)。
+      ★ 原状：`diag_export` 里 `sources.log_lines = Some(Vec::new())` ——
+      **一节被"包含"但内容是空的**。这正是半成品功能的样子：同意页与文件就一节没有内容的章节达成了一致，
+      而分享了这个包的用户以为自己已经把日志发出去了。
+      守它的测试 `asking_for_the_debug_log_carries_the_section_too` 只断言这一节**被列出**，
+      所以它从始至终都是绿的。
+      **本次**：shell 自己也有了日志（`AppState::start_logging`），
+      `diag_export` 用共享读取器（`synra-observe::logging::tail`）填 `log_lines`，
+      并且是 `verbose = true` —— 用户要的就是 debug 日志，安静过滤会恰好把他要的藏起来。
+      新测试 `the_debug_log_section_carries_the_lines_the_shell_wrote`
+      真的写一份日志再要求它出现在 bundle **文件**里；负控制（改回空列表）确认会红，
+      失败信息里就是 `"logs":{"tail":[],...}` 那个空章节。
+      另加 `the_debug_log_section_is_empty_rather_than_absent_when_there_is_no_log`，
+      区分"这一节是空的"与"这一节不存在"—— 与审计那节同一个判断。
+      ★ 审计那一节仍然是空列表，因为**仍然没有审计写入方** —— 两者情况不同，所以答案也不同。
 - [x] `run_probes` 系列（§6.3）+ 设置页诊断展示 —— **A/一半**：
       `run_probes(targets, host)`(`doctor/mod.rs:54`) 含端口/数据目录可写/磁盘空间/插件完整性，
       测试 `doctor/tests.rs:347`/`:375`。
