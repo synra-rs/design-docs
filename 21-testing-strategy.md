@@ -366,7 +366,8 @@ async fn session_times_out_when_peer_is_silent() {
 > | --- | --- | --- |
 > | 1 死循环 | **✓ 真实 guest**（第 72 轮） | `a_guest_that_loops_for_ever_is_stopped_by_its_instruction_budget` |
 > | 3 内存上限 | **✓ 真实 guest**（第 72 轮） | `a_guest_cannot_grow_past_the_ceiling_its_budget_names` |
-> | 2、4、5 超时 / 栈 / 越界 | **配置被证明装上了** ⚠ | `a_wall_clock_budget_arms_a_deadline_on_the_store` 等 |
+> | 2 超时 | **✓ 真实 guest（第 73 轮）**：死循环的 guest 被 deadline 截断 | `a_wall_clock_budget_arms_a_deadline_on_the_store` |
+> | 4、5 栈 / 越界 | **配置被证明装上了** ⚠ | 见下面 |
 > | 6 panic | ✓ | `a_plugin_that_panics_the_host_does_not_stop_the_kernel` |
 > | 7 未声明的 host function | ✓ | `IMPORTS_UNKNOWN` 档位 + linker 的导入表 |
 > | 8–10 路径逃逸 / symlink | ✓ | `check_path` 的 `OutsideSandbox`、`is_within`、`expand.rs` **直接拒绝 symlink** |
@@ -397,6 +398,21 @@ async fn session_times_out_when_peer_is_silent() {
 >
 > ★ 而一个死档位被删了：原来那个把循环 lift 成 `activate` 的 `SPINS`
 > **没有任何人调用**。一个死档位比没有档位更糟：它读起来像覆盖。
+>
+> ★ **而 `string -> string` 这条路还是带着证据地 `#[ignore]` 着**（第 73 轮）：试了两种写法，
+> 引擎对每一种都给了确切的回答，而这两句话现在写在 `#[ignore]` 里：
+>
+> * 把返回区指针当**前置参数**：`lowered parameter types [I32, I32] do not match parameter types
+>   [I32, I32, I32]` —— 也就是说降下来的参数**只有输入串**，没有返回指针；
+> * 把返回区地址当**平的 i32 结果**：编译过，运行时 trap `expected 1 result(s), got 0`。
+>
+> ★ 而它的断言也被换了：原来是 `assert!(!text.is_empty() || text.is_empty())` ——
+> **一个对任何字符串都成立的断言**，所以即使档位修好了它也什么都证不了。
+> 现在它比的是那个 21 个字符的答案本身。
+>
+> ★ 而另两个限制测试（超时、内存）**之前一直围绕一个 trap 在断言**：
+> 它们用的档位同样有 ABI 错误，所以那次调用立刻 trap，而它们断言的 deadline/ceiling
+> 是在**一次根本没跑起来的调用**上被装上的。现在它们用那个真正会死循环的 guest。
 >
 > #### ⚠ 1–5 的真实状态，比“只在档位上”更精确也更值得记
 >
