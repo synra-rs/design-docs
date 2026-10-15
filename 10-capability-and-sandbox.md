@@ -633,16 +633,92 @@ pub struct AuditEntry {
 
 ## 8. 实现清单
 
-- [ ] `synra-capability::syntax`：解析器 + 规范化（含各 domain 的 qualifier 规则）
-- [ ] `synra-capability::pattern`：`*` / `**` 匹配（精确优先）+ 表驱动边界用例 + proptest
-- [ ] `synra-capability::grant`：`CapabilitySet`、包含关系、通配展开（用于 UI 展示）
-- [ ] `synra-capability::error`：`CapabilityDenied` 结构化错误（含被拒能力、已授予、修复建议）
-- [ ] `gate_host_fn!` / `ungated_host_fn!` 宏 + CI 检查（所有 host fn 都过闸门）
-- [ ] `PluginSandbox`：路径解析 + canonicalize + 组件级前缀比较 + TOCTOU 安全（句柄式）
-- [ ] Windows 路径陷阱处理（短路径、保留名、UNC）
-- [ ] `NetworkGuard`：scheme 白名单 + host 规范化 + DNS 后 IP 校验 + 重定向逐步校验 + SSRF 拒绝表
-- [ ] `RateLimiter`：各 RateKind 的令牌桶
-- [ ] `UiSessionRegistry`：签发/校验/撤销 + Tauri initialization script 注入
-- [ ] `AuditLog`：环形缓冲 + 无 payload + UI 查询接口
-- [ ] 装载期 `verify_effective_caps`：manifest ∩ grant ∩ wasm imports
-- [ ] 恶意插件测试套件（[22](./21-testing-strategy.md) §5）
+> ★ 这一节在实现之前写就，长期整节未勾选。以下每一条都重新核对过源码。
+> **能力层（636-639、644、646、647）是真的、有真测试的；缺的是路径陷阱、网络守卫和恶意插件套件。**
+> 名字对不上的按真实名字记（标 `C`）。
+
+- [x] 解析器 + 常量 —— **C**：真实路径是 `crates/synra-capability/src/capability/syntax.rs`
+      （不是 `synra-capability::syntax`）；`parse` 在 `:142`，`MAX_LEN = 256`(`:20`)、
+      `MAX_SEGMENTS = 6`(`:17`) 与 §2.1 逐字相符；`capability/tests.rs:49-100` 覆盖
+      `BareWildcard` / `EmptySegment` / `WildcardPrefix`。
+      ★ 但"规范化（含各 domain 的 qualifier 规则）"被代码**明确放弃**了：
+      `syntax.rs:316-322` 的注释说按 domain 分开做就是"五个解析器共用一个调用方"，
+      `:323` 的 `is_qualifier_segment` 用一套字符类 `[A-Za-z0-9._@/*-]` 管所有 domain。
+      没有 host 小写化、没有去尾点、没有 punycode，也没有 fs qualifier 的 canonicalize。
+- [x] `*` / `**` 匹配 + 表驱动边界用例 + proptest —— **A**：
+      `capability/matching.rs:50` 的 `matches`（一套算法同时处理 prefix 与 qualifier）、
+      `:210` `glob_matches`；`capability/tests.rs:202-226` **逐行**搬了 §3.3 的全部十行
+      （含 `:213` `ui:*` vs `ui:page:extra` = ❌、`:222` `network:fetch:api.x.com` vs `…:POST` = ❌）；
+      proptest 在 `capability/proptests.rs` 与 `set/proptests.rs:32`
+      `contains_does_not_depend_on_insertion_order`。
+      模块名是 `capability::matching` 而不是 `pattern`，纯命名差异。
+      ★ 本次另修：`matches` 原先**每调用分配两个 `Vec`**，已改 `SmallVec`，2 → 0 次分配
+      （见 [11](./11-design-principles.md) 与 [26](./26-core-stability-and-perf.md)）。
+- [x] `CapabilitySet`、包含关系 —— **C/A**：在 `set/limits.rs:29`（模块叫 `set` 不是 `grant`）；
+      `contains`(`:126`)、`grants`(`:150`)、`iter`(`:175`)、`patterns`(`:183`)。
+      ★ "通配展开（用于 UI 展示）"其实**不是展开**：`describe_all()`(`:193`) +
+      `Capability::describe()`(`capability/consent.rs:15`) 把通配**渲染成一句话**
+      （"read from any website"）。没有任何地方把 `network:fetch:**` 展开成具体能力列表。
+- [ ] `CapabilityDenied` 结构化错误（含被拒能力、**已授予**、**修复建议**）—— **三要素只做到第一个**。
+      没有 `synra-capability::error` 模块，三样东西各答一半：
+      `CapabilityError`(`syntax.rs:40`) 是**解析**错误；
+      `GateRefusal::NotGranted{capability}`(`gate.rs:16-23`) 只带被拒的那个能力；
+      面向插件的是 `CallError::denied`(`host_calls.rs:81`) + `ErrorCode::CapabilityDenied`
+      + `AdmissionRefusal`(`synra-core/src/admission.rs:264`)。
+      没有一个带上**已授予集合**或**修复建议**；最接近的 `admission.rs:266` 只是散文式地列出**缺失**项。
+- [x] host fn 都过闸门 —— **C，且 CI 检查曾经是空转的**。
+      两个宏全仓无定义；真实机制更强：`build.rs` 每次从 `wit/synra-plugin.wit` 重新生成
+      `capability_table.rs`，`host_calls.rs:374-380` 拒绝表外一切调用，
+      `host_surface.rs` 有三个测试（免检白名单 ≤10 条且每条必须是事实读取 / 危险清单点名 / 两表恰好划分全集）。
+      ★ `tools/guards` 里那条标着 "10 §3.1" 的守卫**曾经永远不可能失败**：
+      它 grep 的 `ungated_host_fn!` 只出现在它自己内部，它白名单的
+      `crates/synra-plugin-host/src/host_funcs/env.rs` 连目录都不存在。
+      **本次已重写**为直接读生成表、要求每个 `None` 条目属于 `env-` / `platform-capabilities` /
+      `plugin-id` 三族，并加了"解析出 0 条即报错"的自检；负控制（把 `network-fetch` 改成 `None`）确认它会红。
+- [x] 路径解析 + canonicalize + 组件级前缀比较 —— **C/A**：真名 `PluginDataRoot`
+      （`synra-store/src/sandbox.rs:99`，不是 `PluginSandbox`）；`resolve()`(`:198`) 先
+      canonicalize 父目录(`:229`)、逃逸在 `:236` 被拒、判定用 `paths.rs` 的 `is_within`
+      （按 `Path::components()` 逐段比较，`:522` 有 proptest）。真实逃逸测试（含 symlink）在 `:474`。
+      ★ **"TOCTOU 安全（句柄式）"没有做到**：返回的是 `PathBuf` 而不是已打开的 `File`/`Dir` 句柄。
+      模块自己的注释（`sandbox.rs:14-17`）就写明这是已知差距，`cap-std` 也**不是依赖**。
+- [ ] Windows 路径陷阱处理（短路径、保留名、UNC）—— **未做**：全仓 0 处
+      `dunce` / 保留名（`CON`/`NUL`/`AUX`）/ 8.3 短路径（`PROGRA~1`）/ `\\?\` verbatim 处理。
+      只有三处 `cfg!(windows)` 测试字面量。
+      ★ 而且有一个**方向相反的**性质：`is_within` 用 `Path::components()` 的 `PartialEq`，
+      在 Windows 上**大小写敏感**、且把 `\\?\` 当不同 Prefix 组件，所以 `C:\Data` 与 `c:\data`
+      会被判为不同。这是 fail-closed（安全），但与 §4.3 要求的"比较时大小写不敏感"正相反。
+- [ ] `NetworkGuard`：scheme 白名单 + host 规范化 + DNS 后 IP 校验 + 重定向逐步校验 + SSRF 拒绝表 ——
+      **完全缺失**。无 `NetworkGuard`、无 `IpPolicy`/`allow_link_local`/`allow_cidrs`。
+      整个 workspace **没有任何 HTTP 客户端**（搜 `reqwest`/`hyper::`/`ureq`/`isahc` 只有 `Host::fetch`
+      的 trait 声明与测试桩）。`ErrorCode::IpNotAllowed`/`RedirectBlocked` 有码无生产者。
+      `guard.rs:21` 的 `check_url` 是 `platform:open-url` 的 scheme/host 存在性检查，不做解析。
+      ★ 同时也说明：**SSRF 这一类漏洞目前无法被触发，因为还没有东西会去发请求** —— 这是"没有功能"而不是"有漏洞"。
+- [x] 各 RateKind 的令牌桶 —— **C**：`RateLimiter` 确实存在
+      （`synra-platform/src/guard.rs:200`）但它是**每个 `PlatformAction` 的冷却/小时窗**限流器，与 `RateKind` 无关。
+      文档要的令牌桶在 `synra-plugin-host/src/quota/`：`RateKind`(`limits.rs:13`)、
+      `TokenBucket::try_consume`(`ledger.rs:79`)、`Budget::consume`(`budget.rs:237`)，
+      `quota/proptests.rs:18` 有 proptest。性质完全成立，只是名字和 crate 换了 —— **是两套独立机制**。
+- [x] `UiSessionRegistry`：签发/校验/撤销 —— **A，但"注入"那半是 B**。
+      名字完全一致：`synra-plugin-ui/src/session/registry.rs:17`，`issue_with`(`:46`)、
+      `validate`(`:140`，要求 nonce + plugin_id + version 三者一致)、`revoke`(`:113`)、
+      过期清扫(`:232`)；proptest `session/proptests.rs:66`
+      `a_revoked_nonce_is_indistinguishable_from_an_unknown_one`。
+      ★ **Tauri initialization script 注入完全没有**：`synra-rust-app/src-tauri/Cargo.toml`
+      **根本没有依赖 `synra-plugin-ui`**，全仓 0 处 `initialization_script`。注册表实现了，app 没用它。
+- [x] 环形缓冲 + 无 payload + UI 查询接口 —— **C/A**：真名 `AuditRing`
+      （`synra-observe/src/audit.rs:179`，不是 `AuditLog`）。`MEMORY_CAPACITY = 10_000` 与 §7 一致；
+      无 payload 是**构造性**的（`AuditEntry` 的字段没有一个能装内容，`audit.rs:437` 有断言）；
+      UI 查询接口齐全（`for_plugin`/`refusals_for_plugin`/`PluginActivity::of`/`clear_plugin`/`clear`）。
+      ★ 但**生产代码从不写它**：`Kernel::record_action` 只在测试里被调用（见 [18](./18-observability.md)）。
+- [x] 装载期 `verify_effective_caps`：manifest ∩ grant ∩ wasm imports —— **A/C**：
+      同名函数在 `set/interface.rs:67`，四步齐全：grant ⊆ manifest(`:74-80`)、
+      每个 import interface 被覆盖(`:83-87`)、effective 取交集(`:92-97`)、
+      已授权但未 import → 警告而不拒绝(`:100-104`)；测试 `set/tests.rs:206,219,231,246,260`。
+      ★ 签名漂移：文档写 `(&PluginManifest, &Grant, &ImportSet)`，真实是
+      `(&CapabilitySet, &CapabilitySet, &ImportSet)` —— 两者都已解析过，
+      "manifest 声明必须语法合法"是在构造 `CapabilitySet` 时强制的，不在这个函数里。
+- [ ] 恶意插件测试套件（[21](./21-testing-strategy.md) §5）—— **未做**：没有
+      `PluginHostFixture::install("malicious-loop")` 之类的套件，没有 `tests/malicious*`，
+      **也没有任何测试断言 §5.1 那句"内核仍可用 + 其它插件仍可用"**。
+      29 条里约三分之一有孤立的对抗测试（归档穿越/symlink/体积、签名吊销、令牌伪造、装载期 import 覆盖），
+      但 SSRF 那 11-15 行**无法测**（没有 fetch 实现可攻击），§5.2 的 UI 插件 10 行整组没测。
