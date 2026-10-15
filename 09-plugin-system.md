@@ -275,6 +275,18 @@ interface share {
     can-handle: func(item-json: string) -> string;   // JSON: {"handled":false} | {"handled":true,"action":...,"presentation":...}
     /// 执行一个动作
     execute: func(action: string, args-json: string) -> outcome;
+    // ★ 这两行之间有一个契约漏洞：**`execute` 拿不到被分享的东西。**
+    //
+    // `can-handle` 拿到 `item-json`，而它的答案（本文上一行：`{"handled":true,"action":...,"presentation":...}`）
+    // **没有 `args`**；代码里的 `Proposal` 也确实没有这个字段，
+    // 所以 `into_candidate` 把 `args` 定为 `Value::Null`（`dispatch/matching.rs:92`）。
+    // 于是一个说"我能打开这个链接"的插件，被调用时只收到 `("open", "null")`——
+    // **它没有办法知道要打开哪个链接**。
+    //
+    // ★ 这不是实现漏了一行，而是**契约少了一个传递**：修它要么给 `execute` 加上 item，
+    // 要么让 `can-handle` 的答案带 `args`（并且这个 args 要经过能力闸门）。
+    // 目前实现选择的是**不碰它**，并在 `runtime/intent.rs` 的测试里把它钉住：
+    // 那个配置只在 `args_json == "null"` 时生效，所以一旦有人修好，测试会失败并提醒他更新它。
 }
 ```
 

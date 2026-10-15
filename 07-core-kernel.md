@@ -369,6 +369,20 @@ impl Supervisor {
 >   ★ 第一版配置里我把 `can-handle` 的答案写成了 `pluginId` + `requiredCaps`，
 >   而代码把它记为 **misbehaved**："can-handle returned missing field `handled`"——
 >   正是这一声拒绝证明了配置不是真的插件行为。
+> * ★ **现在路由能走到底了：`IntentSnapshot` / `IntentDecide` / `IntentCancel` 已加入控制协议，
+>   `IntentDecide` 会 `choose` → `confirm` → `execute` → `conclude`，
+>   而 `synra_core::dispatch::execute`（新文件 `dispatch/execute.rs`）是**全系统唯一跑插件动作的函数**。
+>   它用自己的 `EXECUTE_BUDGET_MS`（5 s），而不是复用 `CAN_HANDLE_BUDGET_MS`（50 ms）：
+>   后者要保证弹窗出现在用户还在看的时候，前者要完成用户要的动作。
+> * ★ **三个契约/设计漏洞在这一轮被测试逼出来了**，它们都记在代码里：
+>   1. **`Board` 没有回答"在哪里跑"的方法。** 一个插件没建议 target 时，
+>      `settle` 把意图停在 `Choosing`（它就是"在哪里"这个问题），而 `choose` 对无 target 的候选人
+>      **又回到 `Choosing`**、`confirm` 拒绝一切不是 `Confirming` 的状态——于是那个状态**无法前进**。
+>      所以 `IntentDecide` 没有 `target` 参数：一个接了就丢的字段比没有更糟。
+>   2. **远程 target 不能当地执行。** `confirm` 之所以返回 `request_id`，
+>      是因为常规下发是**发给另一台设备的信件**。实现在 target 不是本机时**坦白拒绝**
+>      （`Unsupported`），而不是在用户**分享来源**的那台机器上跑他的动作。
+>   3. **`execute` 拿不到被分享的东西**——见 [09](./09-plugin-system.md) 的 `share` 契约注释。
 > * ★ **仍然没做的**：路由只到"候选人产生"为止。
 >   `intent_decide`（用户选择 / 确认 / 取消）与真正调用插件都还没有，
 >   而且这是刻意的："这个能处理吗"这个问题的副作用不该包含跑第三方代码。
