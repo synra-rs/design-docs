@@ -398,6 +398,10 @@ impl Supervisor {
 >      ★ 而它能藏一轮的原因值得记：**`ScriptedBackend` 的索引键是 `work.to_string()`，
 >      而 `Work` 的 `Display` 是 `interface.function` —— 每一次 `execute` 都落在同一个键上，配置看不见自己的输入。**
 >      已改为把 payload 纳入键（`key_for`）；现在把 `args` 改回 `null` 会让**两个**测试变红，而修之前只有一个。
+> * ★ **命令行现在能把它走完了。** `synra share <TEXT>` 开始，然后
+>   `synra intent show|decide|cancel <ID>`（`--plugin` / `--target` 选填）。
+>   在此之前，`share` 打印一个 id 而**没有第二个命令可以花它**——
+>   路由可以从命令行开始，不能在命令行结束。
 > * ★ **仍然没做的**：路由只到"候选人产生"为止。
 >   `intent_decide`（用户选择 / 确认 / 取消）与真正调用插件都还没有，
 >   而且这是刻意的："这个能处理吗"这个问题的副作用不该包含跑第三方代码。
