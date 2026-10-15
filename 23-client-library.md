@@ -1,5 +1,46 @@
 # 23 · 客户端库 `@synra/client`
 
+> ★ **本文的实现清单已逐条对过源码（本次）。结论：核心几乎全部落地，缺的是"模板侧"两项和一项被上游卡住的测试。**
+>
+> 已经做好的（位置与本文写的略有出入，但要求都满足）：
+> * `packages/client/src/surface.ts` 的 `SynraClient` 与各 namespace；
+>   `http.ts` 的 `SynraFetchInit` / `SynraResponse`。
+>   ★ 本文写的 `errors.ts`、`device.ts` **不存在** —— 错误类型与 `device.pick` 都在 `surface.ts` 里。
+>   这是命名差异而不是缺失，但一张按文件名找东西的清单会让人以为它们没写，所以记在这里。
+> * `global.ts`（本文写 `global.d.ts`，实际是 `.ts`）；`type-tests/consumer.ts` 是**不带任何 import**
+>   的消费方文件 —— 它钉的是"`types: ["@synra/client"]` 一行就够拿到全局 `synra`"，
+>   这件事包的自身构建是发现不了的。
+> * `package.json`：**没有 `main`/`module`**，`exports` 只给 `types` —— 与本文一致。
+>   ★ `files` 写的是 `["dist"]`，本文要求 `["*.d.ts"]`。两者不等价，但**后一道闸门在**：
+>   `synra-js/scripts/check-shapes.ts` 会扫描 `dist/`，发现 `.js`/`.mjs`/`.cjs` 就报错。
+>   真正保证"没有运行时"的是 `emitDeclarationOnly: true`（在 `packages/client/tsconfig.json` 里，
+>   所以 `build: tsc -b` 等价于本文写的 `tsc --emitDeclarationOnly`），
+>   `check-shapes` 检查的是**它确实生效了**，而不是相信它生效了。
+> * `synra-app` 侧：`src/ipc/injection.ts` 末尾 `} satisfies SynraClient`（`:442`），
+>   并且注释解释了为什么必须是 `satisfies` 而不是类型标注 ——
+>   标注允许**多**一个字段，而多出来的字段在运行时是 `undefined`。
+>   `isSynraError` / `isCapabilityDenied` / `isCode` 由宿主提供；
+>   `supported` 列表与行为**来自同一张表**（`'network.fetch': false` 那一张），
+>   所以"广告了却拒绝"不可能发生。
+> * app 侧测试断言的是**精确键集**（`Object.keys(synra).sort()` 全等），比本文要求的"⊆"更严。
+>
+> ★ **没做的一项，以及它被卡住的真正位置**：
+> 本文要求"形状断言测试（`tsd` 或 `expect-type`）：`SynraResponse` 字段与宿主实现逐一对齐"。
+> 这个测试不存在 —— 但**不是因为缺测试工具**，而是因为**没有可对齐的宿主实现**：
+> `injection.ts` 的 `BACKED` 表里 `'network.fetch': false`，宿主把它作为 `unsupported` 拒绝，
+> 压根没有 `fetch` 实现。所以这一项真正的阻塞点是
+> **[10 §4.4](./10-capability-and-sandbox.md) 记的那件事：全仓没有任何 HTTP 客户端**。
+> 等宿主有了 `fetch`，`satisfies SynraClient` 会自动强制 `SynraResponse` 的形状 ——
+> 那比另写一个 `tsd` 测试更强，因为它是在**唯一那份实现**上强制的。
+> 把它写成"缺一个测试"会让人去找测试框架，而该找的是一条 HTTP 通路。
+>
+> ★ **另外两项没做（模板侧）**：`synra-plugin new` 生成的工程里**没有 `ui/` TypeScript 工程**。
+> 现在的模板（`tools/synra-plugin-cli/src/template.rs`）写的是 `manifest.json`、`Cargo.toml`、
+> `src/lib.rs`、`README.md`、`.gitignore`，以及一份 UI 的 HTML 文档 ——
+> 所以"`ui/tsconfig.json` 默认含 `types: ["@synra/client"]`"和
+> "`ui/package.json` 的 devDependencies 含 `@synra/client`"都无从谈起。
+> 这两条是真正待做的开发项，已记录在下面的清单里。
+
 > 本文定义插件 UI 侧的**类型库** `@synra/client`：它属于 **`synra-js` JS monorepo**（[25](./25-js-monorepo.md)），
 > 是一个 **`.d.ts` only 包**——编译后**只有类型声明，没有任何 `.js`**。
 >
@@ -727,27 +768,40 @@ async function openOnLaptop(url: string) {
 
 `@synra/client`（`synra-js` 仓库）：
 
-- [ ] `surface.ts`：`SynraClient` 与 10 个 namespace 的接口
-- [ ] `global.d.ts`：`declare global { const synra; interface Window { synra? }; type Unsubscribe }`
-- [ ] `http.ts`：`SynraFetchInit` / `SynraResponse`（★ 两侧共用）
-- [ ] `errors.ts`：`SynraError` / `SynraErrorCode` / `SuggestedAction`（纯类型）
-- [ ] `device.ts` 里 `pick` + `supported: ClientFeature[]`
-- [ ] `package.json`：**没有 `main`/`module`**；`exports` 只给 `types`；`files` 只含 `*.d.ts`
-- [ ] 构建：`tsc --emitDeclarationOnly`
-- [ ] **CI 守卫**：`dist/` 下不存在 `.js` / `.mjs` / `.cjs`
+- [x] `surface.ts`：`SynraClient` 与 10 个 namespace 的接口
+      （错误类型与 `device` 也在这里，本文另写的 `errors.ts` / `device.ts` 不存在）
+- [x] `global.d.ts`：`declare global { const synra; interface Window { synra? }; type Unsubscribe }`
+      —— 实际文件是 `src/global.ts`，内容覆盖了这条要求
+- [x] `http.ts`：`SynraFetchInit` / `SynraResponse`（★ 两侧共用）
+- [x] `errors.ts`：`SynraError` / `SynraErrorCode` / `SuggestedAction`（纯类型）—— **在 `surface.ts` 里**
+- [x] `device.ts` 里 `pick` + `supported: ClientFeature[]` —— **在 `surface.ts` 里**
+- [x] `package.json`：**没有 `main`/`module`**；`exports` 只给 `types`；`files` 是 `["dist"]` 而非 `["*.d.ts"]`，
+      但 `scripts/check-shapes.ts` 扫 `dist/` 里有没有 `.js`/`.mjs`/`.cjs`，后一道闸门在
+- [x] 构建：`tsc --emitDeclarationOnly` —— 以 `tsconfig.json` 的 `emitDeclarationOnly: true` + `build: tsc -b` 实现，等价
+- [x] **CI 守卫**：`dist/` 下不存在 `.js` / `.mjs` / `.cjs` —— 在 `synra-js/scripts/check-shapes.ts`
 - [ ] 形状断言测试（`tsd` 或 `expect-type`）：`SynraResponse` 字段与宿主实现逐一对齐
+      ★ **被上游卡住，不是缺测试工具**：`injection.ts` 的 `BACKED` 表里 `'network.fetch': false`，
+      宿主根本没有 `fetch` 实现，所以没有可对齐的形状。
+      等宿主有了 `fetch`，`satisfies SynraClient` 会自动强制这件事 —— 那比另写一个 `tsd` 测试更强。
 
 `synra-app` 侧（保证两侧字段一致）：
 
-- [ ] 注入脚本 `import type { SynraClient } from '@synra/client'`，
+- [x] 注入脚本 `import type { SynraClient } from '@synra/client'`，
       并用 `satisfies SynraClient`（或显式标注）实现——**漏字段/多字段在编译期就报错**
-- [ ] `device.pick` 未实现时返回 `SynraError{ code: 'unsupported' }`，且不出现在 `supported` 里
-- [ ] `isSynraError` / `isCapabilityDenied` 由宿主提供
-- [ ] 测试：注入对象暴露的键集合 ⊆ `SynraClient` 的键集合
-- [ ] 测试：`types: ["@synra/client"]` 的 fixture 工程里 `synra.device.send` / `synra.device.pick` 类型正确
+      （`src/ipc/injection.ts:442`，并且注释写明了为什么是 `satisfies` 而不是类型标注）
+- [x] `device.pick` 未实现时返回 `SynraError{ code: 'unsupported' }`，且不出现在 `supported` 里
+      —— `supported` 与行为来自同一张 `BACKED` 表
+- [x] `isSynraError` / `isCapabilityDenied` 由宿主提供
+- [x] 测试：注入对象暴露的键集合 ⊆ `SynraClient` 的键集合
+      —— 实际断言的是**精确相等**，比这条更严
+- [x] 测试：`types: ["@synra/client"]` 的 fixture 工程里 `synra.device.send` / `synra.device.pick` 类型正确
+      —— `packages/client/type-tests/consumer.ts`，**不含任何 import**，所以它只会因为
+      `types` 那一行失效而失败
 
 文档 / 模板侧：
 
-- [ ] [13 §5.2](./13-plugin-authoring.md) 指向本文与 [25](./25-js-monorepo.md)
+- [x] [13 §5.2](./13-plugin-authoring.md) 指向本文与 [25](./25-js-monorepo.md)
 - [ ] `synra-plugin new` 生成的 `ui/tsconfig.json` 默认含 `"types": ["@synra/client"]`
+      ★ **没做**：模板根本不生成 `ui/` TypeScript 工程（见本节开头的说明）
 - [ ] `ui/package.json` 的 `devDependencies` 含 `@synra/client`（+ 可选 `@synra/testkit`）
+      ★ **没做**，同一条原因
