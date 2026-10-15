@@ -559,13 +559,23 @@ Wasm **验证与编译本身**是攻击面（一个精心构造的模块可以�
 - [x] `EpochTicker`：默认 10ms —— **A/C**：`engine/executor.rs:38` `EPOCH_PERIOD = 10ms`、
       `:101` `EpochTicker`、`:161` `Drop`、`:361` `enforces_timeouts()`。
       ★ 但它不是"受监督任务"：`apps/synra-daemon` 里搜不到任何 ticker/epoch 监督代码。
-- [ ] `CallBudget` + `PluginInstance::call`：fuel + epoch + memory 三层 ——
-      **两层真的生效，第二层物理上永远不会触发**。
-      `CallBudget{fuel, timeout, max_memory_growth}` 存在，`wasmtime_backend.rs:271-303` 也依次 apply 了三层。
-      但 `Engine::increment_epoch()` 在全仓 **0 命中** —— 本 crate 自己的 `Epoch` 原子量与 wasmtime
-      engine 的 epoch 计数器**没有任何连接**。
-      后果：一个**阻塞在 host call 里**的 guest（不消耗指令，所以 fuel 不减少）永远不会被中断，
-      而"墙钟超时是唯一能停下阻塞在 host 调用里的 guest 的那一层"正是它的存在理由。
+- [x] `CallBudget` + `PluginInstance::call`：fuel + epoch + memory 三层 ——
+      **★ 已修：三层现在都真的会触发**。原先 `Engine::increment_epoch()` 在全仓 **0 命中** ——
+      本 crate 自己的 `Epoch` 原子量与 wasmtime engine 的 epoch 计数器**没有任何连接**：
+      store 被告知"你的 deadline 是第 25 tick"，ticker 也确实把 `Epoch` 从 0 推到 25，
+      而 wasmtime 自己的计数器永远是 0。后果是一个**阻塞在 host call 里**的 guest
+      （不消耗指令，所以 fuel 不减少）**没有任何东西能中断它**，而"墙钟超时是唯一能停下
+      阻塞在 host 调用里的 guest 的那一层"正是它的存在理由。
+      修法：`Epoch` 增加 observers（`advance()` 通知它们），`WasmtimeBackend::with_epoch`
+      把 `engine.increment_epoch()` 注册进去 —— 两个计数器从此是同一个动作，调用方不需要记得两边都推。
+      另外 `WasmtimeBackend::new` 原先等于 `with_epoch(kind, Epoch::new())`，即**一个没有 ticker 的私有 epoch**，
+      正是隔壁构造函数注释里称为"impossible"的那种失败；现在它自己起一个 ticker 并持有。
+      测试：`an_engine_sharing_an_epoch_is_joined_to_it`、`an_engine_with_its_own_epoch_advances_it`、
+      `an_observer_moves_when_the_epoch_does`、
+      `every_observer_is_called_and_none_needs_the_lock_to_be_free`（后者守的是 observer 里读 epoch 不死锁）。
+      两处负控制都做了：去掉 observe 注册 → 测试红；把 `new()` 改回无 ticker → 测试红。
+      ★ 仍未做的：`EpochTicker` 在 `apps/synra-daemon` 里**没有监督者** —— 它靠 `Drop` 停止，
+      而没有任何地方检查它还活着。
 - [x] `catch_unwind` 包住 Wasm 调用 —— **已补上**。原先全仓 `catch_unwind` 0 命中，
       而 `Cargo.toml` 的 `[profile.release] panic = "unwind"` 注释给的理由恰恰是
       "插件 panic 必须能被 catch_unwind 捕获" —— 为一个不存在的机制做的配置。
