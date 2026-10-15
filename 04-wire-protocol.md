@@ -1474,4 +1474,22 @@ pub enum TrustLevel {
       剩下三条（路由 2、门禁 1、查不到 5）**断言的是实测值而不是 0**，并且测试名已经改成
       `*_stays_within_its_budget` —— 名字不能说零分配而断言说不是。去掉它们要动 `RouteOutcome`
       的公开 payload 和静态表的预解析，属于设计变更，另开一轮做，不在这里偷偷改到能过为止。
-- [ ] 双内核端到端（`KernelPair`）：全部会话走通、断链重连、幂等重试、传输校验
+- [ ] 双内核端到端（`KernelPair`）：全部会话走通、断链重连、幂等重试、传输校验 ——
+      **★ harness 是存在的，而且很完整；缺的是"用它跑真内核"。**
+      先纠正一处：本轮我一度以为 `KernelPair` 不存在（在 `src/` 下按文件找 `pair.rs`，没找到）。
+      它在 `crates/synra-testkit/src/pair/`，是一个目录（`mod.rs`/`harness.rs`/`expectation.rs`/
+      `helpers.rs`/`record.rs`/`tests.rs`）。**这是我看错了，不是代码的问题。**
+      已有的能力恰好就是这一条要的：`KernelPair<K>` 把两个内核用一个 `MemoryTransportLink` 接起来、
+      共用一块 `MockClock`（`advance` 推时间，不用 sleep），并且带
+      **断链**（`cut()`）、**故障注入**（`inject(Side, Fault)`）、
+      **重试计数**（`attempts`）、**丢弃计数**（`dropped`）、
+      **有序期望**（`Expectation` + `check`，缺失/顺序/事件不匹配各有区分）。
+      `pair/tests.rs` 22 条测试把这些都覆盖了。
+      ★ **但全仓 `KernelPair`/`PairedKernel`/`MemoryTransport` 在 `synra-testkit` 之外 0 处使用** ——
+      那 22 条测试跑的是它自己的 `FakeKernel`。也就是说：**这个夹具测的是夹具自己**。
+      它证明了 harness 能用，没有证明**真内核**经过它能把三类会话走通、能断链重连、能幂等重试、
+      能校验传输。所以这一条保持未勾选，措辞也对齐一下：
+      它不是"要造一个 `KernelPair`"，而是"**要拿现有的 `KernelPair` 去跑 `Kernel`**"。
+      `synra-testkit` 的模块注释（`src/lib.rs:14-16`）其实已经写明了它的用途 ——
+      "so two kernels can be linked in one process with no sockets. This is what makes the end-to-end tests of §4.3
+      possible without a network" —— 而 §4.3 的那些端到端测试还没有写。
