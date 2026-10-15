@@ -739,6 +739,16 @@ synra-plugin keygen --out ~/.synra/keys/dev.key
   | `defineComponent` + `SynraPlugin` 类 | WIT `lifecycle.activate/deactivate` |
 - [ ] 移除 `provide` 包装与任何 bridge 对象（宿主只注入全局 `synra` 门面）
 - [ ] 把 capability 声明从字符串数组改成 `{ cap: "..." }` 数组（支持可选性）
+      ★ **前半已经做了，后半没有 —— 而且"支持可选性"这个说法是错的。**
+      `synra-plugin-api` 的 `CapabilityDeclaration`（`manifest/types.rs:190`）现在确实是
+      `{ cap, reason }` 结构，不再是字符串数组。
+      但它**没有 `optional` 字段**：`reason` 是"作者为什么想要它"，是给人看的文案，
+      不是"没有它也能用"的声明。所以当前 manifest **无法表达可选性**，
+      每一条声明都只能按"必需"理解。
+      这不是小事：`plugins_consent_respond`（app 侧，本次新增）要决定"用户拒绝某条之后插件还算不算被信任"，
+      而它能依据的只有这个字段。现在的规则是**拒绝任何一条即不信任** ——
+      在没有可选性表达的前提下，这是唯一不是凭空发明的规则。
+      要支持可选性，加的是 `CapabilityDeclaration::optional`，然后改那一处判断。
 - [ ] 跑 `synra-plugin verify --strict`
 - [ ] 在真实宿主里 `synra-plugin dev` 验证
 

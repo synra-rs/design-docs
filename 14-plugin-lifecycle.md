@@ -59,6 +59,43 @@
 > 因此仍然不会装载。缺的是本文 §2.4 的 `AwaitingConsent` 那一步：
 > 展示它要的能力、记录每一条决定（写 `plugin_grants`）、再置 `trusted`。
 > 那一步同时会给 `plugin_grants` 补上它一直缺的写入方。
+>
+> ★ **那一步本轮补上了：`plugins_consent_respond`（app 侧）。**
+> 两处代码：
+> * **store 的写入方** `SynraDb::record_grants`（`synra-store/src/sqlite/plugins.rs`）。
+>   `plugin_grants` 此前有 schema、有索引、有行类型、有读者，**就是没有写入方** ——
+>   全仓每一句 `INSERT INTO plugin_grants` 都在测试里。
+>   `decided_ms` 与 `manifest_digest` 是**每条决定**的而不是每插件的，因为两者回答的都是
+>   "用户同意的是哪一份文档"：一个升级后多声明了能力的插件，其 digest 不同，
+>   于是旧行明显早于磁盘上现在的 manifest —— 这就是让"能力悄悄变多"可被发现而不是隐形的东西。
+>   每行 upsert，所以改主意是覆盖而不是堆积历史（历史在审计里，这张表是当前状态）。
+> * **那个动作** `plugins_consent_respond(plugin_id, granted)`。
+>   规则：**manifest 声明的每一条都被授予，才算 trusted**；拒绝任何一条就不算。
+>   ★ 这比设计文档暗示的更严，而且是刻意的 —— 见 [15](./15-plugin-sdk.md) 里对
+>   "支持可选性"那一条的更正：`CapabilityDeclaration` 只有 `{ cap, reason }`，
+>   **没有 `optional`**，所以没有"作者说少了它也能用"这回事，
+>   任何猜测哪条可以不要的规则都是凭空发明。
+>   一个缺了声明能力的插件跑起来，正是同意机制存在的意义所在。
+> * 无法读取 manifest 时**拒绝**而不是当作"什么都没声明"：
+>   后者会记下一组空决定，与"用户全部拒绝"无法区分，还会把插件标成已信任 ——
+>   而没有任何东西被展示给任何人。
+>
+> 负控制两条，都对：把记录改成写空数组 → `granting_every_capability…` 红；
+> 把 `trusted` 改成恒为 true → `declining_a_capability…` 红（`right: "awaiting_consent"`）。
+>
+> ★ **整条链现在通了**：目录被发现（上一轮）→ 出现在列表里且状态是 `awaiting_consent`
+> → 用户回应 → 决定写入 `plugin_grants`、`trusted` 置位 → `should_run` 为真 → 装载。
+> 路径上**每一个环节此前都是断的**，而现在只剩最后一跳没验证：
+> 让一个真的 wasm 插件走完它（受夹具与环境限制，见 [12](./12-wasm-host.md)）。
+>
+> ★ 一个仍然存在的不一致（记下来而不是藏着）：装载器 `load_one` 仍然用
+> `grants_of(&manifest)`，**没有读 `plugin_grants`**。
+> 也就是说用户现在可以拒绝某条能力，而装载路径照样按 manifest 授权。
+> 这不是可以顺手改的一行：一旦取交集，任何**没有**做过同意的插件（例如手工放进目录、
+> 从未打开过设置界面的）授权集就是空的，会全部停止工作。
+> 正确的下一步是在装载时**检查**是否存在与当前 `manifest_digest` 匹配的决定，
+> 不匹配就拒绝装载并说明原因（"需要重新确认"），而不是静默取交集。
+> 那需要一个"拒绝并让用户去确认"的交互闭环，比一行交集大。
 
 ---
 
