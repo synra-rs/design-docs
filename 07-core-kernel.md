@@ -328,6 +328,33 @@ impl Supervisor {
 
 ## 6. 意图路由（`Intent`）—— 内核最核心的编排
 
+> ★ **本节描述的东西实现得很完整，而它在生产里没有任何入口 —— 这是全系统最大的功能空洞。**
+>
+> 逐条核对（全仓 `crates/`、`apps/`、`tools/`）：
+> * `Matcher`（`dispatch/matching.rs`，`:213` 的 `match_share`）—— **只有 `dispatch/tests.rs` 在用它**，
+>   19 处全是 `Matcher::new(&mut set).match_share(...)`。
+> * **控制协议根本传不了它**：`synra_control::Request` 的变体只有
+>   `Hello` / `Status` / `Devices` / `SendText` / `SendFile` / `Plugins` / `Logs` / `Pair` / `PairAnswer`
+>   —— **没有 `Intent*`**。守护进程实现的 `Kernel` trait 也没有任何 intent 方法
+>   （只有 `version` / `status` / `devices` / `send_text` / `send_file` / `plugins` / `logs` / `pair` / `pair_answer`）。
+> * CLI 的 args 里没有 intent 子命令（只有 `devices` / `status` / `send` / `plugin` / `logs` / `doctor` / `db`）。
+> * app 侧有 `intent_dispatch` / `intent_snapshot` / `intent_decide` / `intent_cancel`
+>   四个名字（在 `command.rs` 的 39 条契约里），四个都在 26 个未注册命令里。
+>
+> ★ **而守护进程收到一份分享时做的是：把它写进 inbox 目录。**
+> `apps/synra-daemon/src/dispatch.rs` 的 `absorb` 落盘、校验文件名、拒绝越界路径 —— 这些都做得很仔细 ——
+> 然后**没有任何东西去问插件"你能处理这个吗"**。
+> 也就是说：**产品价值的落点（本节第一句自己写的）在端到端意义上不存在。**
+> 一台设备发来的分享会变成对方硬盘上的一个文件，而不会变成一次动作。
+>
+> ★ 这与 [第 21 轮记下的那件事](./07-core-kernel.md) 是同一个形状但**不是同一个原因**：
+> 那个是 `synra_core::Kernel` 没人构造（bus / supervisor / 审计没有驱动者）；
+> 这个是**编排本身没有传输层**。修好 `Kernel` 的采用问题**不会**顺带修好这个 ——
+> `Matcher` 的调用点需要在控制协议上新增一个请求、在 daemon 上实现它、并给它一个 `Board`。
+>
+> ★ 本轮没有动手做它，因为它是一次跨三层的纵向切片（control + daemon + CLI），
+> 而不是一处接线；记在这里而不是留白，是因为**读本文的人会以为这一节描述的是能跑的东西**。
+
 这是产品价值的落点（[01](./02-domain-and-flows.md) §1 的三层结构）。
 
 ### 6.1 数据模型
