@@ -43,9 +43,29 @@
 ```
 
 **检查**（[21 §2.2](./21-testing-strategy.md)）：
-- [ ] `FrameDecoder::next_frame` 的**任何** `Err` 都导致链路关闭（代码审查 + 测试）
-- [ ] 表驱动用例覆盖：太短 / 超长 / 未知 kind / JSON 失败 / 字段多余 / 长度不符
-- [ ] `cargo-fuzz`：任意字节流不 panic、不无限消耗内存
+- [x] `FrameDecoder::next_frame` 的**任何** `Err` 都导致链路关闭（代码审查 + 测试）——
+      ★ 补上了缺的那一半。解码器侧本来就有测试（`frame.rs:1055`
+      `poisoned_decoder_refuses_further_use`：一次错误后再用返回 `Poisoned`），
+      但"**链路**会停下来"只有代码阅读、没有测试。新增
+      `crates/synra-core/src/link.rs` 的
+      `a_frame_the_decoder_refuses_ends_the_link`：直接往 socket 上写一个未知 kind 的帧，
+      断言第一次读被拒、**第二次读也被拒**（不是"继续返回下一条"）。
+      ★ 这个测试只能这样写：走 `send_frame` 的话**编码器先拒**（`BodyKindMismatch`），
+      那样只能证明"发送方很小心"，证明不了接收方。对端不是编码器，对端是另一端上任意的东西。
+- [x] 表驱动用例覆盖：太短 / 超长 / 未知 kind / JSON 失败 / 字段多余 / 长度不符 ——
+      拆在两层，都在：
+      `frame.rs`：`length_below_the_minimum_is_rejected`(910) /
+      `length_above_the_ceiling_is_rejected_rather_than_buffered`(925) /
+      `a_ceiling_breach_inside_scratch_is_also_rejected`(940) /
+      `unknown_kind_bytes_are_rejected`(779，`#[case]` 表驱动) /
+      `a_body_on_a_control_frame_is_rejected`(992) /
+      `a_chunk_shorter_than_its_id_is_rejected`(1005) /
+      `an_oversized_chunk_is_rejected`(1018) /
+      `mismatched_body_shapes_cannot_be_encoded`(1136，`#[case]` 表驱动)；
+      `envelope.rs:559` `unknown_fields_are_rejected`（字段多余）。
+- [ ] `cargo-fuzz`：任意字节流不 panic、不无限消耗内存 —— **未做**。见
+      [04 §11](./04-wire-protocol.md) 的同名条目：现在只有 proptest 覆盖任意字节不 panic，
+      property 测试与 fuzz 的输入族不同，前者通过不能当作后者的结论。
 
 ---
 
