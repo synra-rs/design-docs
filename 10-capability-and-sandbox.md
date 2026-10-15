@@ -172,6 +172,51 @@ pub fn verify_effective_caps(
 
 ### 3.1 第三层是唯一必经路径（用类型强制）
 
+> ★ **先记两处本次核对出来的、比下面这一节更要紧的实情。** 它们都属于"机制齐全、没有人调用"这一类，
+> 而且都落在上面那张三层图里：
+>
+> **（一）第二层的 import 检查原先没有任何生产调用者 —— 本次已接上。**
+> 图上写的是「wasm 模块的 import 集合 ⊆ 用户授予的能力」。
+> 实现它的函数是 `host_surface::undeclared_imports`（有测试），
+> 而用它的管线 `synra_plugin_host::verify::verify` **全仓没有生产调用者** ——
+> 于是"导入了一个 manifest 从未声明的 host function"的 wasm 会被正常装载并运行，
+> 唯一的症状是之后某次调用在闸门被拒，而那时已经离装载很远了，作者也无从据以修改。
+> **本次接上**：`PluginSet::load` 在编译之后用
+> `undeclared_imports(compiled.imports(), &spec.grants)` 检查并拒绝
+> （`PluginSetError::UndeclaredImport`）。
+> * 检查的是**组件自己报告的 import**（编译期从类型里读出来），不是 manifest 声明的东西 ——
+>   这是"声明"与"事实"的区别，也是它只能放在编译之后的原因：字节编译完之前不存在 imports。
+> * 为此 `CompiledArtifact` 增加了 `imports()`（默认空）——内核持有的是
+>   `Box<dyn CompiledArtifact>`，不能为了拿到 imports 就去依赖某个具体引擎。
+> * 拒绝时的消息**点名那个 import 而不是那个 capability**：作者需要知道删掉或声明哪一个 import；
+>   对用户点名 capability 会暗示"改个设置就能跑"，而事实相反。
+> * 测试双向：未覆盖 → 拒绝且名字对得上；同一 import 配上 capability → 正常装载。
+>   负控制把检查关掉后测试红（"should refuse the load, got Ok(())"）。
+> * ★ 这是**第 1 层**的检查（imports ⊆ manifest），不是第 2 层写的那个（imports ⊆ **用户授予**）——
+>   后者要等下面（二）解决之后才有意义，而那时这段代码不用改：它比的一直是 `spec.grants`。
+>
+> **（二）per-capability 的用户同意，端到端没有实现；装载器把 manifest 的声明直接当作授权。**
+> 图上第 2 层写的是「wasm 模块的 import 集合 ⊆ **用户授予的能力**」，第 3 层与 §7 的审计都假定存在一份
+> "用户授予了什么"的记录，表 `plugin_grants` 就是为它建的。实际情况：
+> * `crates/synra-store/src/db/sqlite/plugins.rs:150` 的 `plugin_grants()` 是**读者**，
+>   而它**只在测试里被调用**（`tests.rs:375/387/402`）。
+> * **没有任何生产代码写这张表** —— 全仓 `INSERT INTO` 里没有 `plugin_grants`。
+> * 于是 `apps/synra-daemon/src/runtime/plugins.rs:178` 的
+>   `let grants = grants_of(&manifest)?;` 就是全部：**插件声明什么能力，就拿到什么能力**。
+>   唯一的门槛是 `should_run()` = `enabled && trusted`，一个**每插件一个布尔**。
+> * 装载路径也**完全没有调用 verify 管线**（`load_one` 里没有任何 `verify` 调用）——
+>   本次接上的是其中 import 覆盖这一条，签名/摘要/发布者信任那几步仍然没有调用者。
+> * app 侧也没有同意界面：`plugins_consent_respond` 在未注册清单里，
+>   前端 13 个 TS 文件里 `consent` 只出现在 `fake-kernel.ts` 这个夹具里。
+>
+> ★ **为什么这一条不能就地修**：把 `load_one` 改成读 `plugin_grants` 并取交集，
+> 在**没有任何写入方**的今天会让每个插件的授权集变空 —— 插件全部停止工作。
+> 也就是说当前"用 manifest 当授权"是**承重的**，不是一处可以单独打补丁的疏忽。
+> 要修它得先有同意流程（安装 → 展示能力 → 记录决定 → 写 `plugin_grants`），
+> 而那是一条完整的纵向功能，涉及内核、IPC（`plugins_consent_respond`）、前端三处。
+> 记在这里而不是改一行，是因为改一行会让整件事从"不安全"变成"不能用"。
+
+
 **问题**：如何保证"所有 host function 都过闸门"？人工审查不可靠。
 
 **做法**：host function 的注册**只能**通过一个宏，该宏强制要求 capability 描述符：
