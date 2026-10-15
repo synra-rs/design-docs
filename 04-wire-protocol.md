@@ -1428,24 +1428,44 @@ pub enum TrustLevel {
 
 `crates/synra-protocol/`：
 
-- [ ] `ids.rs`：6 个 newtype + `TraceId` + `PluginId` / `PluginSlug`，`FromStr` 严格校验
-- [ ] `frame.rs`：`FrameKind` / `Frame` / `FrameDecoder` / `FrameEncoder`；**超限即错误**（§4.2）
-- [ ] `envelope.rs`：`Envelope` + `outbound` / `reply_to` / `inbound` 三个入口 + 不变量校验
-- [ ] `event.rs`：`EventName` + 常量表 + `NO_AUTO_ACK` + `DataPlaneEvent`
-- [ ] `inbound.rs`：`Inbound` 语义枚举 + 从 `Envelope` 的解析（含 `Unknown` 兜底）
-- [ ] `handshake.rs`：`Hello` / `HelloAck` / `LinkIntent` / 陈旧配对自愈规则
-- [ ] `session.rs`：三类会话的状态机类型 + `SessionTimeouts`
-- [ ] `pairing.rs` / `intent.rs` / `transfer.rs`：各会话的 payload 类型
-- [ ] `discovery.rs`：查询/响应/离线公告的编解码 + `ScanBudget`
-- [ ] `limits.rs`：§7.1 的全部常量
-- [ ] `feature.rs`：`Feature` / `PeerCapabilities` / 协商
-- [ ] `error.rs`：`SynraError` + 稳定错误码 + `user_visibility()`
-- [ ] **无 IO 依赖**：`cargo tree -p synra-protocol` 里不出现 `tokio` / `wasmtime` / `rusqlite`
+> ★ 这一节在实现之前写就，之后长期没有跟着代码走，所以它曾经整体是未勾选状态，而其中大部分工作早已完成。
+> 下面每一个勾选都是**这一次重新核对过的**：文件存在、被点名的类型存在、被点名的性质有测试。核对不到的那几条
+> 保持未勾选，因为"文件建了"不等于"清单要求的东西在里面"。
+
+- [x] `ids.rs`：6 个 newtype + `TraceId` + `PluginId` / `PluginSlug`，`FromStr` 严格校验
+- [x] `frame.rs`：`FrameKind` / `Frame` / `FrameDecoder` / `FrameEncoder`；**超限即错误**（§4.2）
+- [x] `envelope.rs`：`Envelope` + `outbound` / `reply_to` / `inbound` 三个入口 + 不变量校验
+- [x] `event.rs`：`EventName` + 常量表 + `NO_AUTO_ACK` + `DataPlaneEvent`
+- [x] `inbound.rs`：`Inbound` 语义枚举 + 从 `Envelope` 的解析（含 `Unknown` 兜底）
+- [x] `handshake.rs`：`Hello` / `HelloAck` / `LinkIntent` + 陈旧配对自愈规则
+- [x] `session.rs`：三类会话的状态机类型 + `SessionTimeouts` + 配对/意图/传输三类会话的 payload 类型
+      （`PairRequest` / `PairResponse` / `IntentInvocation` / `IntentOutcome` / `IntentDisplay` /
+      `TransferRequest` / `TransferComplete` / `TransferAbort`）
+- [x] `discovery.rs`：查询/响应/离线公告的编解码 + `ScanBudget`
+- [x] `limits.rs`：§7.1 的全部常量
+- [x] `feature.rs`：`Feature` / `PeerCapabilities` / 协商 —— `Feature` 与协商在 `handshake.rs`，
+      `PeerCapabilities` 为该类型上的 `required` / `offered` 集合与 `Hello` / `HelloAck` 的交集计算
+- [x] `error.rs`：`SynraError` + 稳定错误码 + `user_visibility()`
+- [x] **无 IO 依赖**：`cargo tree -p synra-protocol` 不出现 `tokio` / `wasmtime` / `rusqlite`
+      （实测依赖只有 `bytes` / `compact_str` / `rand_core` / `serde` / `serde_json` / `smallvec` /
+      `thiserror` / `time` / `uuid`）
 
 测试（[21](./21-testing-strategy.md)）：
 
-- [ ] proptest：帧编解码往返、任意字节流不 panic、信封 `deny_unknown_fields`
-- [ ] 表驱动：§4.2 的每一行、§5.2 的每一条不变量
-- [ ] cargo-fuzz：`FrameDecoder::next_frame`、`Envelope::inbound_ref`/`inbound`
-- [ ] 热路径零分配断言（帧解码、capability 匹配，[26 §6.2](./26-core-stability-and-perf.md)）
+- [x] proptest：帧编解码往返、任意字节流不 panic、信封 `deny_unknown_fields`
+- [x] 表驱动：§4.2 的每一行、§5.2 的每一条不变量
+- [ ] cargo-fuzz：`FrameDecoder::next_frame`、`Envelope::inbound_ref`/`inbound` —— **未做**。
+      现在只有 proptest 覆盖任意字节不 panic。property 测试与 fuzz 覆盖的输入族不同（property 按生成器走，
+      fuzz 按覆盖反馈走），所以前者通过**不能**当作后者的结论，这里保持未勾选。
+- [x] 帧解码热路径零分配断言 —— `crates/synra-protocol/tests/hot_path_alloc.rs`，用
+      `synra-testkit-alloc` 的计数分配器实测：整帧一次读到时走 `next_frame` 的快路径，**0 次分配**；
+      `EventName::parse` 也是 0 次。断言是 0，不是"实测值"。
+      ★ 这条之所以值得记一笔，是因为它先给了两个**错的**答案：计数器没有装 `#[global_allocator]`，
+      所有断言都读到 0，看着全绿；装上之后读出"每帧 1 次分配"，差点被当成真实结论写进
+      `lib.rs` 的设计原则。真相是那 1 次是首次触碰的一次性成本，再加一轮预热就归零。
+      三个错误结论有同一个来源 —— **只测一次、只测自己看得见的部分**。所以文件里现在有
+      `the_counter_counts_an_allocation_that_definitely_happens` 这一条：它断言一个**确定会发生**的分配
+      被计数到了。没有它，一个恒读 0 的计数器能让上面每一条都"通过"。
+- [ ] capability 匹配热路径零分配断言 —— **未做**。`Feature` 与协商在 `handshake.rs`，
+      `PeerCapabilities` 交集计算在同文件，但那里还没有分配计数器测量。
 - [ ] 双内核端到端（`KernelPair`）：全部会话走通、断链重连、幂等重试、传输校验
