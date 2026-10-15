@@ -621,6 +621,20 @@ Content-Security-Policy:
       >   其中一个。**我的 grep 模式里漏了 `config_set`，而我没有跑测试就提交。**
       >   已恢复并补全，且在注释里写明它**不是清单**——清单是 `main.rs` 的 `generate_handler!`，
       >   而核对它的是 `src/ipc/registration.test.ts`。
+      >
+      > ★ **一个报告里的四个常量值，和一个与注释相反的值。**
+      >
+      > `diag_export` 把每个插件的 `version` 写成 `String::new()`、`active` 写成 `false`、
+      > `had_refusals` 写成 `false`。后两个不是省略，是**声明**：尤其 `had_refusals: false` 告诉维护者
+      > “这个插件从没被拒绝过”—— 而用户发包精压缩包的时候，往往就是在问“为什么不行”，
+      > 而拒绝通常就是答案。三个现在都从 `PluginSet`（`version`/`contains`/`refusals_for`）和
+      > `paired_devices`（`is_usable`）读。
+      >
+      > ★ **而更重的是 `devices.rs` 里那一行**：`card_from_paired` 的注释写着
+      > “a paired device with no open session is **offline** rather than absent”，而紧跟着的代码是 `online: true`。
+      > **注释是对的。** 所以仪表板对一台关了一周的笔记本亮着绿灯，用户第一次知道
+      > 不对是发送失败的时候。现在用 `SessionRegistry::live_for`，它回答的正是卡片在问的问题。
+      > 已有阴性对照：改回 `true` 会让 `a_paired_device_with_no_session_is_offline` 变红。
       > ★ **现在是 17/39：四个 intent 命令已注册**（`commands/intent.rs`，
       > `main.rs` 的 `generate_handler!`）。它们之前卡在的不是接线，而是**编排住在二进制里**：
       > 现在在 `synra_core::dispatch::orchestrate`，两个孿主各自只写一层映射。
