@@ -231,6 +231,13 @@ pub struct Sampler {
 
 ## 4. 指标
 
+>
+> ★ **而第 76 轮把这条链接通了**，并且选了 `status` 而不是新开一个读者：它是一个
+> **已经存在、已经能用**的命令，而它的返回值是 `serde_json::json!`，所以加一个字段是**增量**的。
+> ★ 而读者**直接序列化 `MetricsSnapshot`**，不重新塑形：那四个类型本来就 `derive(Serialize)`
+> 并且 `rename_all = "camelCase"` —— 它们就是为了跨这道边界而写的。第一版把快照拆开重建成
+> `{name, labels, value}`，那是**同一份数据的第二种拼法**：读者得同时懂两种，而没有任何东西
+> 保持它们一致。
 > ### ★ 而这一整组指标的真实状态（第 75 轮核对）
 >
 > 设计写的是一个带命名字段的 `Metrics` 结构；实现出来的是 `RingRecorder` + `SeriesKey`（名字 + 标签）。
@@ -240,8 +247,9 @@ pub struct Sampler {
 > | 环节 | 状态 |
 > | --- | --- |
 > | 生产者 | **已有**（第 75 轮）：闸门记下 `gate_checks_total`、`gate_denied_total`、`gate_rate_limited_total` |
-> | 传输 | **未做**：需要 `LinkerSession` 和 `Authority` 各自带上记录器，才能从守护进程传到 `HostCalls` |
-> | 读者 | **未做**：`diag_metrics` 只在 `command.rs` 的表里，`synra-control` 的 `Kernel` trait 没有它，守护进程也没有 handler |
+> | 传输 | **已通**（第 76 轮）：守护进程持有记录器 → `PluginSet::with_metrics` → `Authority` → `LinkerSession` → `HostCalls` |
+> | 读者 | **已有**（第 76 轮）：`status` 的 `metrics` 字段报告记录器自己的 `MetricsSnapshot` |
+> | `diag_metrics` | **仍然未做**：只在 `command.rs` 的表里，`synra-control` 的 `Kernel` trait 没有它，守护进程也没有 handler —— 但现在它背后的数据存在了 |
 >
 > ★ **而为什么从闸门开始**：它是唯一一个**已经知道这四个答案**的地方 —— 是否通过、
 > 哪个插件、哪个能力，以及没通过时是**能力集还是限流器**说的不。在别处记一次，
