@@ -776,6 +776,22 @@ publish:     ; cargo harbor publish
 > > **改 `synra-rust-core` 的任何 `pub` 签名之后，`synra-rust-app` 的 `cargo build` 是必需的一步，
 > > 不是可选的。** 它没有被任何守卫强制，因为两个仓库是分开的 —— 这一点正是它会被漏掉的原因。
 >
+> ★ **而这条规则现在有守卫了。** 上面那句"没有被任何守卫强制"写下的当天就被推翻了：
+> `cargo run -p guards` 现在多一条 —— **用 `--no-default-features` 构建兄弟仓库的 app**，
+> 三态而不是两态（`ok` / `SKIP` 带原因 / `FAIL`）：core-only 的检出没有 app 可弄坏，它这么说；
+> 而"没能检查"不等于"检查过，没问题"。所以现在 `7 guard(s) passed`。
+>
+> ★ 阴性对照是第 51 轮那次真实的破坏（把 `cancel` 改回三个参数）：
+>
+> ```
+> FAIL  the sibling app no longer builds against this crate's public API
+>         error[E0061]: this function takes 4 arguments but 3 arguments were supplied
+> ```
+>
+> ★ **代价要说清楚**：它是这个工具里最贵的一条 —— 对着已构建的 target 是几秒，冷 target 是几分钟。
+> 如果哪天它成了"有人不再跑守卫"的原因，诚实的做法是把它变成可选的**并在这里写明**，
+> 而不是删掉它、退回到靠记性。
+>
 > ```
 > # 一次改动的完整验证，两个工作区都要跑
 > core:  cd synra-rust-core && cargo test --workspace && cargo clippy --workspace --all-targets
