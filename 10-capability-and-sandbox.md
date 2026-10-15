@@ -785,8 +785,22 @@ pub struct AuditEntry {
 >      —— 因为能力授权的是 **host**（它的拼写就是 `network:fetch:<host>`），端口不在授权里。
 >      是测试错了而不是守卫错了；现在改成转向 `localhost`，并另加一条**断言端口确实不在授权里**。
 >
-> ★ **而它还在等一个宿主**：`KernelHost::fetch`/`DesktopHost::fetch` 仍然拒绝，
-> 所以插件还是发不出请求。下一步是把 `Client` 接到两个宿主上。
+> ★ **守卫现在有生产调用方了**：守护进程的 `KernelHost::fetch` 已接上 `Client`。
+> * 授权的 host 从**已记录的授权里读**：`network:fetch:<host>`，而 `network:fetch:api.github.com:POST`
+>   里的方法不归守卫管（守卫管的是去哪里）。
+> * ★ **而 `network:fetch:*` 授权不等于“任何 host”**：`*` 是**门**对整个族的拼写，
+>   把它当主机名就是为一台叫 `*` 的机器建守卫，把它当“任意”就是 SSRF 守卫本身要防的能力。
+>   所以它一个 host 也到不了，拒绝码是 `capabilityDenied`（去要一个具体的）。
+> * ★ **客户端缓存带着它建立时的 host 列表**，列表一变就重建 ——
+>   否则**用户撤回了一个 host，插件还能通过缓存的客户端继续访问它**。有一条测试就是这个：
+>   授予 → Ok，撤回 → **必须**拒绝（如果缓存只按 plugin 作 key，这条会红）。
+> * ★ **而一条旧测试当场失败了**，正如它该失败：`the_groups_this_build_does_not_implement_refuse_with_one_code`
+>   把 `fetch` 列在“本构建未实现”里。现在它不在那个名单里了，并且像 storage 一样
+>   **被正面断言**（拒绝码是 capability 而不是 notImplemented），所以“从名单里删掉”
+>   不会被误认为“把功能删掉了”。
+>
+> **仍然没做**：桌面 shell 的 `DesktopHost::fetch`；`network-websocket`；
+> 以及一个真实的 HTTPS 请求——测试跑在本机 `TcpListener` 上，因为本轮不能联网。
       整个 workspace **没有任何 HTTP 客户端**（搜 `reqwest`/`hyper::`/`ureq`/`isahc` 只有 `Host::fetch`
       的 trait 声明与测试桩）。`ErrorCode::IpNotAllowed`/`RedirectBlocked` 有码无生产者。
 > ★ **而它当时没有生产调用方 —— 因为守护进程把整组 `platform:*` 一律拒绝了。**
