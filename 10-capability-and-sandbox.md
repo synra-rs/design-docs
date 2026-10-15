@@ -747,6 +747,31 @@ pub struct AuditEntry {
       * 证据：**55 suites / 2820 passed**（+22），clippy、7 guard（含兄弟 app 构建）均绿。
       ★ **但它还没有生产调用方**：`network-fetch` 本身仍然拒绝（仓库里没有
       HTTP 客户端）。所以这是**把守卫先建好**，而不是“拥有了护拦”。
+>
+> ### ★ 而现在可以写了 —— 下一轮要用的事实在这里，不要重新调查
+>
+> **1. 客户端依赖离线可用。** `ureq 3.4.2` 已在本机 registry 缓存里，带 `rustls` + `gzip`；
+> 已用一个临时 crate 验证 `cargo build --offline` **能解析并编译**。TLS 栈（`rustls`/`ring`/`aws-lc-rs`/`webpki-roots`）也全在缓存里。
+>
+> **2. 放在哪里：新建一个宿主侧 crate，不是 `synra-net`。**
+> * `synra-net` 的自述是「两台设备之间、socket 已经建立之后的事」，而且它**不做 IO**；HTTP 客户端两条都违背。
+> * 放进 `synra-core` 会把 **TLS 拖进内核的依赖图**，而 `synra-core` 是要向 Android 交叉编译的（见 `matrix`）。
+> * 所以：一个只有宿主依赖的 crate，内核的依赖图不变。
+>
+> **3. DNS 重定向防御是可实现的，不是口号。** `ureq` 有 `Resolver` trait（`unversioned/resolver.rs:29`），
+> 经 `Agent::with_parts(config, connector, resolver)`（`agent.rs:130`）装入。于是可以做成：**解析 → 守卫校验每一个地址
+> → 只把通过的地址交给 ureq**，而证书仍然是对**原域名**验的。
+> 把 URL 直接换成 IP 是错的（证书校验会失败，或更糟的：被绕过），而守卫里已经写下了这一点。
+>
+> **4. 自动重定向必须关掉。** 设计要求**每一跳都重新校验**，而 `ureq` 的 `max_redirects` 是自己跟：
+> 能限次数，不能每跳都问 `NetworkGuard::next_hop`。所以要 `max_redirects(0)` +
+> `max_redirects_will_error(false)`，然后**自己跟**，每跳调一次 `next_hop`。
+>
+> **5. 响应体上限有现成的。** `BodyWithConfig::limit(u64)`（`body/mod.rs:502`）。
+> 而 `request-json` 的**具体形状文档没定**（和 intent 的 payload 一样），所以它要像
+> `synra_core::intent::remote` 那样，**把决定写在模块文档里**，而不是散在代码里。
+>
+> **本轮没有交代码** —— 上面五条是调查结果，写下来是为了让下一轮不重复调查它们。
       整个 workspace **没有任何 HTTP 客户端**（搜 `reqwest`/`hyper::`/`ureq`/`isahc` 只有 `Host::fetch`
       的 trait 声明与测试桩）。`ErrorCode::IpNotAllowed`/`RedirectBlocked` 有码无生产者。
 > ★ **而它当时没有生产调用方 —— 因为守护进程把整组 `platform:*` 一律拒绝了。**
