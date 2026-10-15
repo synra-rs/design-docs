@@ -586,6 +586,18 @@ Content-Security-Policy:
       `:144` `SuggestedAction`，转换是 `:221` 的固有方法 `IpcError::from_synra_error(&SynraError)`。
       ★ **`From<core::Error>` 不存在**：全仓 0 处 `impl From<..> for IpcError`，
       且 `synra-ipc/Cargo.toml` 只依赖 protocol/capability/observe —— `synra_core::Error` 根本不在作用域里。
+      > ★ **而其中四个 intent 命令的理由，原来是错的。**
+      > `synra-rust-app/src/ipc/registration.test.ts` 原来写的是
+      > “needs the intent board behind AppState” —— 而 **board 已经在 `AppState` 里了**
+      > （`state.rs:57 pub board: Arc<Mutex<Board>>`，`:119` 构造）。理由错的方向正好是**会代价的那个**：
+      > 读者一查，看到 board 已经在了，就以为这件事快好了。
+      > * 真正缺的是**编排本身**：`synra-daemon/src/runtime/intent.rs` 里的
+      >   `raise` → `Matcher::match_share` → `settle` → `choose` → `confirm` → `execute` → `conclude`
+      >   **住在一个二进制 crate 里**，所以第二个孿主（桌面 shell）**无法复用**，
+      >   只能把大约 250 行抄一遍 —— 而那正是设计反对的事。
+      > * ★ 它除了 `synra_control::Refusal` 之外**没有任何守护进程依赖**，所以“搬进库”是一次
+      >   干净的移动（换一个域内错误类型，两个孿主各自映射到 `Refusal` / `IpcError`），
+      >   而不是一次重写。已记在这里作为下一步。
 - [ ] ~40 个 Tauri command（见 §2.2）—— **13/39**。
       > ★ 与之无关但同样是"看得见、跑不了"的一处：**CLI 的 `plugin` 子命令里，四个里只有一个能做任何事。**
       > `plugin_request`（`synra-cli/src/session.rs`）对除 `list` 外的每个 action 都返回 `None`，
