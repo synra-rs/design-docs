@@ -352,6 +352,28 @@ impl Supervisor {
 > 这个是**编排本身没有传输层**。修好 `Kernel` 的采用问题**不会**顺带修好这个 ——
 > `Matcher` 的调用点需要在控制协议上新增一个请求、在 daemon 上实现它、并给它一个 `Board`。
 >
+> ★ **现在有入口了（已提交）。** 做法：
+> * `synra_control::Request::IntentDispatch { mime, text }` + `Kernel::intent_dispatch(&self, mime, text)` ——
+>   请求带的是**内容**而不是 `ShareItem`：`ShareItem.from` 是"哪台设备分享的"，
+>   而本机 socket 上的调用方**不是一台设备**——只有内核知道自己是谁。
+>   所以调用方发内容，内核补上 `from`，而不是让调用方自己编一个认证不了的 id。
+> * 守护进程新增 `runtime/intent.rs`：`raise` → `Matcher::match_share` → `settle`。
+>   `Runtime` 持有 `Arc<Mutex<Board>>`（`state.rs`），否则意图没地方存。
+>   ★ 窗口是**关掉**而不是等完：`settle` 要 `now >= deadline`，而 deadline 的用途是绑定这一轮——
+>   轮到这里时**每个插件都已经答过**，所以再等剩下的毫秒是为了睡而睡。
+> * 答案里同时有 candidates 和整轮报告（`asked` / `handled` / `declined` / `offered` / `misbehaved`）——
+>   ★ 这两者是为了分开**"什么都没装"与"全部崩了"**：从一个候选列表上看，它们一模一样。
+> * CLI 新增 `synra share <TEXT> [--mime]`，它与 `send` 恰好相反：
+>   `send` 指定设备并投递，`share` 什么都不指定、让内核去问每个插件。
+> * 测试断言的是**候选人**（而不是"调用了").
+>   ★ 第一版配置里我把 `can-handle` 的答案写成了 `pluginId` + `requiredCaps`，
+>   而代码把它记为 **misbehaved**："can-handle returned missing field `handled`"——
+>   正是这一声拒绝证明了配置不是真的插件行为。
+> * ★ **仍然没做的**：路由只到"候选人产生"为止。
+>   `intent_decide`（用户选择 / 确认 / 取消）与真正调用插件都还没有，
+>   而且这是刻意的："这个能处理吗"这个问题的副作用不该包含跑第三方代码。
+>   进程内那条路（`Decision::Delivered`）也还没接上——它需要 inbox 把物料还回来。
+>
 > ★ 本轮没有动手做它，因为它是一次跨三层的纵向切片（control + daemon + CLI），
 > 而不是一处接线；记在这里而不是留白，是因为**读本文的人会以为这一节描述的是能跑的东西**。
 
