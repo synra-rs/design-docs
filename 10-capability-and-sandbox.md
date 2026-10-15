@@ -704,7 +704,18 @@ pub struct AuditEntry {
       ★ "通配展开（用于 UI 展示）"其实**不是展开**：`describe_all()`(`:193`) +
       `Capability::describe()`(`capability/consent.rs:15`) 把通配**渲染成一句话**
       （"read from any website"）。没有任何地方把 `network:fetch:**` 展开成具体能力列表。
-- [ ] `CapabilityDenied` 结构化错误（含被拒能力、**已授予**、**修复建议**）—— **三要素只做到第一个**。
+- [x] `CapabilityDenied` 结构化错误（含被拒能力、**已授予**、**修复建议**）—— **三要素已完成**（第 74 轮）：
+      新模块 `synra_capability::error::CapabilityDenied`（正是下面那句说缺的那个），
+      而 `CallError::denied` 现在**接过会话自己的授予集**，`details` 是三个字段：
+      `{"capability":…,"granted":[…],"suggestion":"…"}`。
+      ★ **而建议是从两个集合推出来的，不是手写的**：它不只说“去要 X”，
+      还会看插件**是否已经拥有同域的另一个能力** —— `storage:local:read` 与
+      `storage:local:write` 是同一件事上的两个权限，而“用户已经信任这个插件做存储”与
+      “什么都没授”是两个不同的问题。
+      ★ 而它**不承诺会被授予**：授不授是用户的决定，一句把拒绝写成形式的话
+      会让插件作者以为它只是流程。
+      ★ 而被拒能力**无法解析时仍然给出拒绝**（只是没有域提示）：
+      把一个坏拒绝变成“没有拒绝”是门控绝不能产生的结果。
       没有 `synra-capability::error` 模块，三样东西各答一半：
       `CapabilityError`(`syntax.rs:40`) 是**解析**错误；
       `GateRefusal::NotGranted{capability}`(`gate.rs:16-23`) 只带被拒的那个能力；
