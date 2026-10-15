@@ -589,8 +589,12 @@ pub struct CallBudget {
 >   —— 那会告诉插件“你太快了，等一下”，而它真正该做的是存少一点。
 > * 证据：**55 suites / 2798 passed**，clippy、5 guard 均绿。
 >
-> ★ **而它暴露了一个假的测试与一个真的缺口**：该测试断言的是
-> 它自己的双重都在断言自己的双重都在断言自己的 stub。另外，app 的 `DesktopHost` 仍然对五个全部拒绝。
+> ★ **而它暴露了一个空转的测试与一个真实的缺口。**
+> `a_storage_quota_is_a_pair_of_numbers_a_plugin_can_read` 断言的是 **stub 自己的两个常量**——
+> 双重回答 `storage_quota` 时给出一对写死的数字，于是测试验证的只是"双重编造的数字原样返回"。
+> 而真正缺的那一半是：**app 的 `DesktopHost` 仍然对五个函数全部拒绝**，
+> 所以桌面 shell 里的插件依然存不下任何东西。
+
 ### 6.2 配额
 
 ```rust
