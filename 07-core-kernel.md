@@ -395,7 +395,23 @@ impl Supervisor {
 >      `INTENT_INVOKE` / `INTENT_RESULT` / `INTENT_CANCEL`（`event.rs:352-356`），它们进了
 >      `ALL`、进了 `AckPolicy::Await`的表、`inbound.rs:459` 的 `is_kernel` 也把它们当内核事件——
 >      而**全仓没有任何一处发或收**（命中全在定义、表和测试里）。
->      ★ 所以远程下发**不是契约缺失，是实现缺失**：四件事要做——
+>      ★ **已做完发信那一半（已提交）。**
+>      `synra_core::intent::remote` 定义了两个 payload（`Invoke`/`InvokeResult`，文档未规定形状，
+>      所以它写在那个模块的文档里）与两个 envelope 构造器。`decide` 在 target 不是本机时
+>      **不再拒绝**，而是返回一个 `Decided { outbound: Some(..), state: "dispatching" }`——并且不跑本地插件。
+>      发送在 daemon 的 `Runtime::send_outbound`：库构造信，宿主送信，因为 `synra-core` **没有 transport**。
+> * ★ **证据**：`cargo test --workspace` **55 suites / 2778 passed**（+6），clippy 与 5 个 guard 均绿。
+>   其中 `a_share_aimed_at_another_device_produces_an_envelope_instead_of_a_refusal` 同时断言两件事：
+>   信被构造出来了，**而插件没在本机跑**（跑了就是在用户分享来源的那台机器上执行他的动作，而从外面看和成功一模一样）。
+> * ★ **而它暴露了一个真的漏洞**：daemon 的 shim 原来把 `Decided` 立即 `to_json()`，
+>   于是**信封在能被送出去的一行之前就被丢了**。现在 shim 返回类型化的 `Decided`，
+>   由 host 先用它能用的东西，再渲染给线路。
+>
+>      ★ **剩下的三件**：收信后本地跑插件、回 `INTENT_RESULT`、按 `request_id` 做幂等。
+>      幂等的**两半已经在 board 里**：`confirm` 重用而不新铸 request id，`recall(origin, request)`
+>      按来源查一个到达的请求。所以收信端只差把这两个接上 listener 的 `Decision`。
+>
+>      原来的四件事写在这里，作为对照：
 >      发信、收信后本地跑插件、回 `INTENT_RESULT`、按 `request_id` 做幂等；
 >      而且它还需要 transport 线程拿到 `board` 与 `plugins`（参见下一条）。
 >   3. **`execute` 拿不到被分享的东西** —— ★ **已修复**：`Proposal` 新增 `args`，
