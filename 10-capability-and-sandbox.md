@@ -726,7 +726,19 @@ pub struct AuditEntry {
       （按 `Path::components()` 逐段比较，`:522` 有 proptest）。真实逃逸测试（含 symlink）在 `:474`。
       ★ **"TOCTOU 安全（句柄式）"没有做到**：返回的是 `PathBuf` 而不是已打开的 `File`/`Dir` 句柄。
       模块自己的注释（`sandbox.rs:14-17`）就写明这是已知差距，`cap-std` 也**不是依赖**。
-- [ ] Windows 路径陷阱处理（短路径、保留名、UNC）—— **未做**：全仓 0 处
+- [x] Windows 路径陷阱（保留名、ADS、设备命名空间）—— **已实现**（第 70 轮）：
+      `synra_platform::guard`。3 个新拒绝理由（`reservedName`/`alternativeStream`/`deviceNamespace`）。
+      ★ **而三条各自对应一个“内核与文件系统对同一个名字理解不同”**：
+      * `NUL`/`CON`/`COM1`… 在 Windows 上**先于文件系统被解析** —— 以为写了 `<root>/NUL` 实际什么都没写；
+        而且 **扩展名在设备名之后**被看，所以 `CON.txt` 也是控制台；尾部的点和空格也会被剥掉。
+      * `notes.txt:secret` 是 NTFS 的**隐藏副流**，而在别的平台只是一个普通字符 ——两种读法不同。
+        它也是绕过扩展名检查的方法：`report.exe:harmless.txt` 的扩展名是 `txt`。
+      * `\\?\C:\data\..\..\Windows` **关掉了 Windows 本来会做的路径清理**，
+        所以 `..` 是字面意义的一个目录名。两个看起来一样的路径**不指同一个地方**——
+        所以本设计的“用 dunce 规范化”对安全检查是**错的**，它改成了**拒绝**。
+      ★ **而短路径（`PROGRA~1`）和大小写不敏感本来就是 fail-closed**：
+      `is_within` 用 `Path::components()` 逐段比较，所以 `C:\Data` 与 `c:\data` 被判为**不同**——
+      两个方向都是拒绝，也就不会放行任何东西。这一条仍由 `is_within` 负责，不改。
       `dunce` / 保留名（`CON`/`NUL`/`AUX`）/ 8.3 短路径（`PROGRA~1`）/ `\\?\` verbatim 处理。
       只有三处 `cfg!(windows)` 测试字面量。
       ★ 而且有一个**方向相反的**性质：`is_within` 用 `Path::components()` 的 `PartialEq`，
