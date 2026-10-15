@@ -736,6 +736,16 @@ pub struct AuditEntry {
       **完全缺失**。无 `NetworkGuard`、无 `IpPolicy`/`allow_link_local`/`allow_cidrs`。
       整个 workspace **没有任何 HTTP 客户端**（搜 `reqwest`/`hyper::`/`ureq`/`isahc` 只有 `Host::fetch`
       的 trait 声明与测试桩）。`ErrorCode::IpNotAllowed`/`RedirectBlocked` 有码无生产者。
+> ★ **而它当时没有生产调用方 —— 因为守护进程把整组 `platform:*` 一律拒绝了。**
+> `KernelHost::platform` 原来对每一个平台动作都答 `notImplemented`，
+> 而 `synra-platform` 实际上实现了整条受守护的路径（`desktop.rs` / `host.rs` 都调 `check_url`/`check_path`）。
+> ★ **而 `HeadlessPlatform` 的注释早就说明了为什么那不对**：
+> “一个传了 `javascript:` 的插件应该被告知**它的地址被拒了**，
+> 而不是“这个孿主没有浏览器”。前者是作者能修的错误，后者是关于安装的事实。”
+> 现在 `KernelHost::platform` 委派给 `HeadlessPlatform`：先跑守卫，再拒绝，
+> 并把 `PlatformError` 按原因映到 `badArgument`（插件的错）或 `notImplemented`（安装的事实）。
+> ★ 而且 `Policies` 的构造器与访问器也没有调用方 —— 政策永远是默认值（严格的那个）。
+> 这是安全的，但意味着**没有任何地方能改它**；记在这里而不是当成已完成。
       `guard.rs:21` 的 `check_url` 是 `platform:open-url` 的 scheme/host 存在性检查，不做解析。
       ★ 同时也说明：**SSRF 这一类漏洞目前无法被触发，因为还没有东西会去发请求** —— 这是"没有功能"而不是"有漏洞"。
 - [x] 各 RateKind 的令牌桶 —— **C**：`RateLimiter` 确实存在
