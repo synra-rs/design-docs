@@ -640,16 +640,75 @@ export default defineBuildConfig({
 
 ## 8. 实现清单
 
-- [ ] 建仓库骨架：根 `package.json` / `pnpm-workspace.yaml` / `tsconfig.json` / `.gitignore` / CI
-- [ ] 共享构建配置：`scripts/build.common.ts`（`mergeDefaultBuildConfig`，与本机生态一致）
-- [ ] 纯类型包的 `build:done` hook（剥离 `.js`；§7.2）
-- [ ] `packages/protocol`：`sync` 脚本 + 文件头 + 生成物目录
-- [ ] `packages/client`：见 [23 §10](./23-client-library.md)
-- [ ] `packages/synra`：type-only re-export + 被 `@synra/client` 依赖（§3.2）
-- [ ] `packages/testkit`：`createMockClient` / `stub` / `calls`
-- [ ] `scripts/check-shapes.ts` + 形状快照
-- [ ] CI 的 8 条守卫（§6）
-- [ ] 四包版本同步（`fixed` 模式 + `bumpp -r`）
-- [ ] 发布脚本（拓扑排序，可续跑）
-- [ ] fixture 工程：从 `pnpm pack` 产物安装并跑 `tsc --noEmit`
-- [ ] 本地联调脚本（`stub` + app 侧 `overrides`）
+> ★ **本次逐条对过 `synra-js` 的实际内容。最大的问题是第 7 节整节描述了一个仓库从未使用的工具链。**
+>
+> ### §7 写的是 `unbuild`，而这个仓库用的是 `tsc`
+>
+> 证据：
+> * **`unbuild` 从来不是依赖** —— `pnpm-lock.yaml` 里一次都没出现过（所以不是"用过又删了"）。
+> * **没有任何 `build.config.ts`**，而 §7.4 逐包给了一份。
+> * `scripts/` 下没有 `build.common.ts`，也没有 `mergeDefaultBuildConfig`。
+> * 四个包的 `build` 都是 `tsc -b`，纯类型包靠 `tsconfig.json` 里的 `emitDeclarationOnly: true`
+>   达到"不产出 `.js`"，**没有 `build:done` 钩子**。
+>
+> 这不只是措辞过时：§7.2 的标题是"⚠️ **实测事实**：`unbuild` 一定会产出 `.js`"，
+> §7.3 是"实测：三种 dts 产出的差别"，§7.4 给每个包一份 `build.config.ts`，§7.6 讲 `exports` 条件设计 ——
+> **这些"实测"是关于一个不在依赖图里的工具的**，而按 §7.4 去找 `build.config.ts` 的人会一无所获。
+>
+> ★ 值得注意的是：**结论仍然成立，路径不成立**。"纯类型包不能产出 `.js`"是对的，
+> 但保证它的不是 `build:done` 里那句 `rm` 或 `unbuild` 的配置，而是 `emitDeclarationOnly` ——
+> 也就是说，**是编译器而不是构建后处理在保证这件事**。清单第 2、3 条因此不是"没做"，
+> 而是被一个更可靠的做法取代了：少一步就是少一个会忘记跑的地方。
+>
+> ### §2.2 的生成机制也是假的
+>
+> §2.2 画的是 `cargo test -p synra-protocol --features ts-export`（ts-rs 导出）→ `target/ts-export/*.ts`
+> → `pnpm sync` 复制。**那条命令跑不起来**，而且**这一点 `packages/protocol/src/generated/wire.ts`
+> 的文件头自己就写着**：`synra-protocol` 没有 `[features]` 段，也没有 `ts_export` 模块，
+> 导出路径从来没有存在过。真实情况是 `src/generated/*.ts` 是**手写镜像**，
+> `pnpm sync` 只加头注释、`check-shapes.ts` 负责核对。
+> 所以 §2.2 的标题"生成物，不手写"与它引用的文件头互相矛盾 —— 文件头是对的。
+>
+> ### 已经做好、且与本文一致的
+>
+> §2 的四个包、`pnpm-workspace.yaml`、`tsconfig.base.json`、`.github/workflows/ci.yml`、
+> `scripts/{check-shapes,gen-protocol-types,link-dist}.ts`、生成物目录与头注释、
+> `testkit` 的实现（64 条测试）、四包版本一致（本轮补上了守卫）、
+> `types: ["@synra/client"]` 的 fixture 检查（§7 之外的清单第 12 条）。
+>
+> ★ **清单第 12、13 条的"机制"与本文写的不同，但要求都满足**：
+> 本文要求"从 `pnpm pack` 产物安装并跑 `tsc --noEmit`"与"`stub` + app 侧 `overrides`"；
+> 实际用的是 `scripts/link-dist.ts` —— 它把已构建的包按**安装后的样子**铺一份出来，
+> 因为 `types: ["@synra/client"]` 是 TypeScript 按**类型根下的目录**解析的，不是走模块解析，
+> 而 workspace 里的 `node_modules/@synra/client` 是指向源码的符号链接、没有 `dist`。
+> 这个做法比 `pnpm pack` 快，而且测的是同一件事。
+>
+> ★ **仍然缺的两项**：守卫 8（文档代码块能编译）与清单第 11 条（发布脚本：
+> 拓扑排序、可续跑）。后者目前只有 `release: bumpp -r`，它改版本但不管发布顺序。
+
+- [x] 建仓库骨架：根 `package.json` / `pnpm-workspace.yaml` / `tsconfig.json` / `.gitignore` / CI
+      —— 实际是 `tsconfig.base.json` + `tsconfig.json`，其余一致
+- [x] 共享构建配置：`scripts/build.common.ts`（`mergeDefaultBuildConfig`，与本机生态一致）
+      ★ **不存在，而且不需要**：没有任何包用 `unbuild`（见上面的核对），
+      四个包一律 `tsc -b`。这条是被取代而不是被遗漏 —— 没有构建后处理，也就没有共享配置可言
+- [x] 纯类型包的 `build:done` hook（剥离 `.js`；§7.2）
+      ★ **不存在，而且比它更好**：`tsconfig.json` 的 `emitDeclarationOnly: true` 让 `.js` 从来不产生，
+      而不是产出后再删。少一步就是少一个会忘记跑的地方，而 `check-shapes.ts` 检查的是
+      **它确实生效了**（§6 守卫 1）
+- [x] `packages/protocol`：`sync` 脚本 + 文件头 + 生成物目录
+      ★ 文件头是对的（"手写镜像，由脚本核对"），**§2.2 描述的 `ts-rs` 导出路径是假的**
+- [x] `packages/client`：见 [23 §10](./23-client-library.md)
+- [x] `packages/synra`：type-only re-export + 被 `@synra/client` 依赖（§3.2）
+- [x] `packages/testkit`：`createMockClient` / `stub` / `calls`
+- [x] `scripts/check-shapes.ts` + 形状快照
+      ★ 核对方式是**与 Rust 对照**（命名、错误码、帧类型、常量、DTO 覆盖），而不是快照文件；
+      在没有内核仓库时那几项会跳过并说明。这比快照强：快照只能发现"变了"，对照能发现"错了"
+- [ ] CI 的 8 条守卫（§6）—— **1、2、3、4、5、6、7 已实现；8（文档代码块能编译）没有**
+- [x] 四包版本同步（`fixed` 模式 + `bumpp -r`）
+      ★ 本轮补上了守卫（`check-shapes.ts` 的"4 publishable packages share version"）。
+      原来只有 `bumpp -r`，而"记得跑它"不是一条守卫
+- [ ] 发布脚本（拓扑排序，可续跑）—— **没有**。`release` 目前只有 `bumpp -r`，它改版本但不管发布顺序，
+      而 `@synra/client` 依赖 `synra` / `@synra/protocol`，发布顺序错了作者会装到不存在的版本
+- [x] fixture 工程：从 `pnpm pack` 产物安装并跑 `tsc --noEmit`
+      ★ 机制换成 `scripts/link-dist.ts` + `packages/client/type-tests/`，测的是同一件事（见上面的说明）
+- [x] 本地联调脚本（`stub` + app 侧 `overrides`）—— 同上，实际是 `link-dist.ts`
