@@ -231,6 +231,25 @@ pub struct Sampler {
 
 ## 4. 指标
 
+> ### ★ 而这一整组指标的真实状态（第 75 轮核对）
+>
+> 设计写的是一个带命名字段的 `Metrics` 结构；实现出来的是 `RingRecorder` + `SeriesKey`（名字 + 标签）。
+> 两者形状不同，而**真正的问题不是形状**：这一组指标之前**一个生产者都没有** ——
+> `RingRecorder` 写好、测试齐全，而全仓没有任何地方调 `counter_inc`。
+>
+> | 环节 | 状态 |
+> | --- | --- |
+> | 生产者 | **已有**（第 75 轮）：闸门记下 `gate_checks_total`、`gate_denied_total`、`gate_rate_limited_total` |
+> | 传输 | **未做**：需要 `LinkerSession` 和 `Authority` 各自带上记录器，才能从守护进程传到 `HostCalls` |
+> | 读者 | **未做**：`diag_metrics` 只在 `command.rs` 的表里，`synra-control` 的 `Kernel` trait 没有它，守护进程也没有 handler |
+>
+> ★ **而为什么从闸门开始**：它是唯一一个**已经知道这四个答案**的地方 —— 是否通过、
+> 哪个插件、哪个能力，以及没通过时是**能力集还是限流器**说的不。在别处记一次，
+> 都是对这里已经做出的决定的第二种意见。
+>
+> ★ 而标签用 `AuditOutcome::as_str()` 而不是另写一套名字：审计里的一行和指标里的
+> 一个计数因此**不可能对同一件事说不同的话**。
+>
 ### 4.1 指标清单
 
 ```rust
