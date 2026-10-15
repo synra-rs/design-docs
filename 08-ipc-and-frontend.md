@@ -608,7 +608,19 @@ Content-Security-Policy:
 >   一次插入把新测试放在了 `#[test]` 与它的函数之间，于是属性重复、
 >   而原来那个函数**一个属性都没有**。编译器只是很小声地说了一句 warning，
 >   而 `cargo test` 输出里看不出少了一条 —— 直到这次重构让它变成了错误。
-- [ ] ~40 个 Tauri command（见 §2.2）—— **17/39**。
+- [ ] ~40 个 Tauri command（见 §2.2）—— **18/39**。
+      > ★ **18/39：`plugins_audit` 也注册了。** 它原来的理由是“the audit ring has no production
+      > writer yet”—— 写下时是真的：`AuditRing` 有界、有测试、可查询，而**没有人往里写**。
+      > 现在写入者存在（`PluginSet` 为每个实例装 session，调用后把它记下的排进 ring），
+      > 所以命令读的是**真的记录**。
+      > * ★ **两处契约缺口被记下**：`AuditEntryDto` 有 `trace_id`，而 `AuditEntry`
+      >   **没有 trace**（session 没拿到 trace），所以永远是 `None` —— 是**记录**的缺口，不是映射的。
+      >   `AuditEntry::new` 的字段里也确实没有可以当 trace 的东西。
+      > * ★ **而一个“清单”差点被我删错**：`commands/mod.rs` 的 `pub use`
+      >   列表看起来无人使用且缺了七个命令，我删了它——而 `diag/tests.rs` 确实在用
+      >   其中一个。**我的 grep 模式里漏了 `config_set`，而我没有跑测试就提交。**
+      >   已恢复并补全，且在注释里写明它**不是清单**——清单是 `main.rs` 的 `generate_handler!`，
+      >   而核对它的是 `src/ipc/registration.test.ts`。
       > ★ **现在是 17/39：四个 intent 命令已注册**（`commands/intent.rs`，
       > `main.rs` 的 `generate_handler!`）。它们之前卡在的不是接线，而是**编排住在二进制里**：
       > 现在在 `synra_core::dispatch::orchestrate`，两个孿主各自只写一层映射。
