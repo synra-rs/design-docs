@@ -246,6 +246,18 @@ pub struct SessionTimeouts {
 
 **检查**（[21 §5](./21-testing-strategy.md)）：
 - [ ] 恶意插件套件覆盖：死循环、内存炸弹、越权调用、伪造事件、路径逃逸、SSRF
+  > ★ **这个套件仍然不存在**，但本轮在其中一项上找到了真问题。
+  > **「伪造事件」的防御写好了、测试了、并且在自己的文档里声明了它在做什么**：
+  > `EventName::check_emittable_by` 的注释写着"The host calls this on every outbound plugin event.
+  > It is the difference between 'plugins have their own namespace' being true and it being a sentence in a document"——
+  > 而 **孿主从来没调过它**，六个调用点全在它自己的测试模块里。
+  > 于是两件事都是允许的：插件发另一个插件命名空间的事件（`_plugin.notes.*`），
+  > 以及插件发孿主事件（`_synra.device.changed`）。本轮接上了（`event-emit` / `device-send` / `device-broadcast` 三处）。
+  > ★ 而且接上后立刻发现**测试配置用的事件名 `a.b` 根本不合法**（语法只收
+  > `_synra.` / `_plugin.` / `synra.internal.` / `device.` / `file.transfer.` 五个命名空间）——
+  > 在没人校验之前，一个名字是不是事件名没有人问。
+  > * 另一项发现：**SSRF 的代码存在但没有校验器**——`SchemeNotAllowed` / `HostNotAllowed` /
+  >   `IpNotAllowed` 三个码只出现在 `error.rs` 的枚举、可重试表和描述表里，没有任何地方产生它们。
 - [x] host function 的**唯一**注册方式 —— ★ 这两条写的机制不存在：全仓 `grep 'gate_host_fn!'`
       与 `grep 'ungated_host_fn!'` 都是 **0 命中**。
       真正的机制是更强的：`crates/synra-plugin-host/build.rs` 在**每次构建时**从
