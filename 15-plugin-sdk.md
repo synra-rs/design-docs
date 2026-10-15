@@ -746,14 +746,52 @@ synra-plugin keygen --out ~/.synra/keys/dev.key
 
 ## 8. 实现清单
 
-- [ ] `wit/synra-plugin.wit` 完整定义（host + lifecycle + share + actions）
-- [ ] `tools/wit-codegen`：生成 Rust 宿主绑定与 SDK 绑定
-- [ ] `synra-plugin-sdk`：9 个 namespace 薄封装 + `Error`
-- [ ] `#[plugin]` 属性宏（含编译期检查）
-- [ ] `testing` feature：`MockHost` + audit 断言
-- [ ] `tools/synra-plugin-cli`：new / build / verify / sign / pack / publish / dev / test
-- [ ] `verify` 的完整检查项（§2.4 + §3.1）
-- [ ] Rust headless 模板 + Rust hybrid 模板 + TS UI-only 模板
-- [ ] `@synra/client` 类型库（`.d.ts` only，[23](./23-client-library.md)）
-- [ ] 打包格式 `.synra` + registry 发布流程
-- [ ] 迁移文档 + 一个真实的迁移示例（把旧 chat 插件迁过来）
+> ★ 这一节在实现之前写就，长期整节未勾选。逐条核对源码后：**合同、生成器、类型库是真货**；
+> 薄封装、属性宏、打包、发布、模板都没有。**"verify 通过"与"部署会被拒"之间目前有一道缝**（见 755）。
+
+- [x] `wit/synra-plugin.wit` 完整定义（host + lifecycle + share + actions）—— **A**：
+      `wit/synra-plugin.wit:88` host，以及 lifecycle、share、actions，`:352` `world plugin`。
+- [x] `tools/wit-codegen`：生成 Rust 宿主绑定与 SDK 绑定 —— **A**：
+      `tools/wit-codegen/`（`parse/{contract,gate,signature,table}.rs`、`emit.rs`）；
+      `crates/synra-plugin-host/build.rs` 每次构建重新生成 `capability_table.rs` 与 `host_trait.rs`。
+      ★ SDK 侧**另走一条路**：`synra-plugin-sdk/src/lib.rs:67` 用 `wit_bindgen::generate!`，
+      所以"生成器负责 SDK 绑定"只说对了一半。
+- [ ] `synra-plugin-sdk`：9 个 namespace 薄封装 + `Error` —— **未做**。
+      `synra-plugin-sdk/src/lib.rs` **只有** `wit_bindgen` 生成的绑定 + `synra-plugin-api` 三个类型的 re-export；
+      没有 9 个 namespace 薄封装，也没有 `Error` 类型。
+      ★ 文档点名的 **`fs` namespace 在合同里根本不存在** —— 合同没有文件系统接口；
+      真实分层是"裸绑定 + `synra-plugin-api` 边界类型"。
+- [ ] `#[plugin]` 属性宏（含编译期检查）—— **未做**：全仓 `Cargo.toml` grep `proc-macro` **0 命中**，
+      工作区没有任何 proc-macro crate。
+      ★ 而且这里有一个**已知的硬冲突**，不是"还没写"那么简单：
+      `synra-plugin-sdk/tests/guest/world_fixture.rs:17-20` 自己写明 `export!` 需要 `unsafe`，
+      而工作区 `unsafe_code = "forbid"` **不能**用局部 `allow` 放开。
+      要落地要么把宏放进一个独立 crate（像 `synra-testkit-alloc` 那样把例外集中到一处），
+      要么改变对这个 fixture 的处理方式 —— 这是一次设计选择，先得做。
+- [ ] `testing` feature：`MockHost` + audit 断言 —— **未做**：
+      `synra-plugin-sdk/Cargo.toml` 连 `[features]` 段都没有；无 `MockHost`。
+      `host_calls_tests.rs:49` 的 `Stub` 是 crate 内 `#[cfg(test)]`，**插件作者拿不到**。
+- [ ] `tools/synra-plugin-cli`：new / build / verify / sign / pack / publish / dev / test ——
+      **4/9**：`args.rs:35-44` 只有 `New`/`Build`/`Verify`/`Sign`，缺 `pack`/`publish`/`dev`/`test`。
+- [ ] `verify` 的完整检查项（§2.4 + §3.1）—— **一半，而且有一处静默失效**。
+      CLI 有：manifest 校验（`verify/check.rs:75`，`ValidationLevel::Schema`）+ 体积/文件数 + import 名单。
+      ★ `verify/target.rs:38` 的 `wasm_imports` **恒为空向量**（诚实降级为 warn），
+      所以 **import 检查在生产中从不运行**；
+      ★ 更要紧的是：**CLI 里没有"import ⊆ 已声明的 capability"这一 §3.1 的核心检查** ——
+      只有宿主侧 `plugin-host/src/verify/mod.rs:64` 的 `Stage::ImportsWithinCapabilities` 有。
+      后果是作者本地 `verify` 得到的"通过"，并不包含部署时会被拒的那一条 ——
+      一个本地全绿的插件可能在装载期被拒，而 CLI 没有告诉他为什么。
+- [ ] Rust headless 模板 + Rust hybrid 模板 + TS UI-only 模板 —— **C/半个**：
+      `template.rs:36-43` 的 `TemplateKind{Headless,Ui,Hybrid}` 三套确实存在并被测试（`validate_manifest`）。
+      ★ **headless 模板不是组件**：`template.rs:386-403` 产出的是 `cdylib` +
+      `#[no_mangle] extern "C" fn synra_plugin_activate()`，与 WIT 要求的
+      `export!("synra:plugin/lifecycle@1.0.0")` **不匹配** —— 生成的插件装上去，
+      `compile` 会因缺导出被拒。模板能过它自己的测试，因为它测的是 manifest。
+      ★ UI 模板是单个裸 `index.html`，无 TS/Vue/`package.json`/`tsconfig.json`。
+- [x] `@synra/client` 类型库（`.d.ts` only）—— **A**：
+      `synra-js/packages/client/package.json:10-14` 的 `exports` **只有**
+      `"types": "./dist/index.d.ts"`，无 `main`/`module`；`src/global.ts:27` 声明全局。
+- [ ] 打包格式 `.synra` + registry 发布流程 —— **未做**：无 `.synra` 格式、无 `publish` 命令；
+      `sign` 只写 `signature.json`（`run.rs:248`）。
+- [ ] 迁移文档 + 一个真实的迁移示例（把旧 chat 插件迁过来）—— **未做，且前提不成立**：
+      见 §7 的说明，仓库里没有旧插件可以迁。

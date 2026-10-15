@@ -468,16 +468,59 @@ pub struct UpdateInfo {
 
 ## 8. 实现清单
 
-- [ ] `SriDigest`（SRI 解析/计算）+ 与旧 `shasum`（SHA-1）的兼容读取
-- [ ] `canonical_signing_payload` + 跨版本稳定性测试
-- [ ] `signature.json` 的生成（CLI）与校验（宿主）
-- [ ] `PublisherTrustStore`（TOFU + 公钥指纹绑定 + 撤销）
-- [ ] 撤销清单的内置分发与生效（停用已装的被撤销版本）
-- [ ] Registry 客户端（packument 解析、镜像优先级、**校验失败不回退**）
-- [ ] `CatalogQuery` / `CatalogItem`（单一实现，Electron/Capacitor 双份合并掉）
-- [ ] 同步协议 9 步流程 + `_synra.plugin.sync.result`
-- [ ] `SyncConflictPolicy`（默认 `NeverDowngrade`）
-- [ ] `syncSessionId` 的真实使用（跨轮隔离）
-- [ ] `SyncRecord` + 同步历史 UI 数据
-- [ ] `UpdateCheck` + 自动更新门槛表
-- [ ] 离线降级行为 + UI 提示
+> ★ 这一节在实现之前写就，长期整节未勾选。逐条核对源码后：**签名与摘要那一块是真的且有真测试**；
+> **分发/registry 那一块的核心（HTTP 客户端）根本不存在**；同步协议只有一个"接收方义务"表，没有流程。
+> 名字对不上的按真实名字记。
+
+- [x] `SriDigest`（SRI 解析）—— **C，且"兼容读取"被明确排除**：
+      `crates/synra-protocol/src/session.rs:393` 的 `SriDigest`，`TryFrom<String>` 在 `:438`。
+      ★ **无 `compute()`**；★ `DigestAlgorithm`(`:364`) **只有 `Sha256`**，
+      `shasum`/SHA-1 全仓 0 命中 —— 兼容读取被有意排除，不是漏了。
+      ★ CLI 另有一份**私有** `sri_digest()`（`sign.rs:201`），注释说与 `SriDigest` 的 padding 约定不同 ——
+      所以同一个概念现在有两份实现。
+- [x] `canonical_signing_payload` + 跨版本稳定性测试 —— **A/C**：
+      真名 `SigningSubject::canonical_bytes`（`synra-plugin-api/src/publisher.rs:220`）。
+      ★ 测试是真的：`publisher_tests.rs:70`（定序无空白）、`:94`（同内容不同插入序 → 同字节）、
+      `:103`（转义）、`:113`（空 map）—— 跨版本稳定性成立。
+- [x] `signature.json` 的生成（CLI）与校验（宿主）—— **A**：
+      生成 `run.rs:248`；校验 `plugin-host/src/verify/mod.rs`（`Stage::Signature`）
+      + `publisher.rs:363` ed25519 验签；测试 `verify_tests.rs:105-170`/`:529`。
+- [x] `PublisherTrustStore`（TOFU + 公钥指纹绑定 + 撤销）—— **A，但从不持久化**。
+      `publisher.rs:619-710` 的 `PublisherTrustStore{trust/forget/revoke/classify}`，
+      测试 `publisher_tests.rs:276-346`、`verify_tests.rs:184-232`。
+      ★ **纯内存**：所有生产调用点都传 `PublisherTrustStore::new()`（`run.rs:207` 等），
+      也就是**默认谁都不信任、撤销集永远为空**，每次进程启动都回到这个状态。
+- [ ] 撤销清单的内置分发与生效（停用已装的被撤销版本）—— **未做**：
+      无清单文件/格式/内置分发，无"扫描已安装插件并停用被撤销版本"的逻辑。
+      上一条的类型有 `revoke`，但没有东西往里放。
+- [x] Registry 客户端（packument 解析、镜像优先级、**校验失败不回退**）—— **C/一半，且"客户端"那半是 B**。
+      `plugin-host/src/registry.rs:525` `Packument::parse`、`:263-325` 镜像优先级、
+      `:713` `check_integrity`、`:120-140` `allows_fallback`
+      （`IntegrityMismatch` 不可回退 —— 规则正确且有测试 `registry_tests.rs:248-263`）。
+      ★ **没有任何 HTTP 客户端** —— 模块注释自己写明 "the fetching is not here"；
+      全仓没有 `RegistryConfig` 的生产调用者。解析与策略有，取件没有。
+- [x] `CatalogQuery` / `CatalogItem`（单一实现）—— **A**：
+      `synra-ipc/src/dto/plugin.rs:88`/`:112`；TS 侧只有一份生成物
+      `synra-js/packages/protocol/src/generated/ui.ts:232`/`:251`。"Electron/Capacitor 双份合并掉"成立。
+- [ ] 同步协议 9 步流程 + `_synra.plugin.sync.result` —— **C/一半**：
+      事件名存在（`protocol/src/event.rs:363`，入站白名单 `inbound.rs:470`）；
+      7 个接收方义务 `ReceiverDuty::ALL`（`plugin-sync.rs:263-284`，测试断言 `== 7`）。
+      ★ **没有 9 步流程，也没有任何编排者** —— `synra-core/src/plugin_sync.rs` 只被自己和
+      `plugin_sync_tests.rs` 使用，**事件名没有发送方**。
+- [x] `SyncConflictPolicy`（默认 `NeverDowngrade`）—— **C/一半**：
+      真名 `ConflictPolicy`（`plugin_sync.rs:89`），`decide()`(`:176-228`) 实现了 NeverDowngrade 语义，
+      测试 `plugin_sync_tests.rs:33-118`。
+      ★ **"默认"只是文档注释**：没有 `impl Default`，也没有任何配置来源；
+      `decide` 的**唯一调用者是测试**。
+- [x] `syncSessionId` 的真实使用（跨轮隔离）—— **A**：
+      `SyncSessionId`(`plugin_sync.rs:34`)；`SyncSession::absorb`(`:449-455`) 对他轮 chunk 返回
+      `SyncError::WrongSession`；测试 `plugin_sync_tests.rs:157-199`。隔离是真的，而且是结构性的。
+- [x] `SyncRecord` + 同步历史 UI 数据 —— **C/一半**：
+      `SyncRecord`(`plugin_sync.rs:602-611`) 存在**但只有四个字段**（`plugin_id`/`peer`/`action`/`at_ms`），
+      文档要的是 `version`/`direction`/`startedAt`/`finishedAt`/`outcome`/`bytesTransferred`/`traceId`。
+      ★ 无 `Default`、无持久化、无 IPC DTO、无前端消费。
+- [ ] `UpdateCheck` + 自动更新门槛表 —— **未做**：只有 `UpdateInfo` DTO
+      （`dto/plugin.rs:72-83`，含 `needs_new_consent`/`added_capabilities`）；
+      无 `UpdateCheck` 类型、无调度器、无门槛表。grep `auto_update`/`update_policy` **0 命中**。
+- [ ] 离线降级行为 + UI 提示 —— **未做**：`synra-rust-app/src` 里 `offline` 只出现在
+      **设备卡片**（`DevicesPage.vue:145`、`stores/devices.test.ts`），与插件目录/降级无关。
