@@ -607,9 +607,35 @@ Wasm **验证与编译本身**是攻击面（一个精心构造的模块可以�
       **A/C，且端到端不可达**。`src/generated/capability_table.rs:19-55` 有 35 个函数、
       `engine/linker.rs:153-341` 覆盖九种签名。
       ★ 文档列的 10 组里 **`fs` 不存在**（合同没有文件系统接口）。
-      ★ 更重要的：`wasmtime_backend.rs:658` 恒为 `session: None`，而 `linker.rs:70-78` 在
-      session 缺失时对**任何** guest 调用都返回拒绝 —— 所以 35 个 host function 在端到端意义上
+      ★ 更重要的：`wasmtime_backend.rs` 的 `instantiate` 恒为 `session: None`，而 `linker::run`
+      在 session 缺失时对**任何** guest 调用都返回拒绝 —— 所以 35 个 host function 在端到端意义上
       全都不可达，唯一的 `impl Host` 是测试桩（`host_calls_tests.rs:49`）。
+      ★ **这意味着更要紧的一件事：能力闸门在生产里从未运行过。**
+      `instantiate` 之后没人装 session，所以 `run` 在第一道 `let Some(session) = … else` 就返回了 ——
+      闸门（capability 检查）根本没走到，审计也一条没记。
+      闸门是整套能力模型所依赖的机制，而它是**静止的**。
+      ★ **本次完成了前置的两块**（都不改变运行时行为，但缺了它们无法继续）：
+      1. `PluginInstance::set_session(LinkerSession)`，带默认空实现 ——
+         有 host function 要授权的后端重写它；没有的后端（`ScriptedBackend` 从表里答，够不着 guest）
+         不必为此写一个空函数体。
+         不变量仍然是安全方向：**忘了调用它得到的是"插件调不了 host"，不是"插件能不经检查地调"**。
+      2. `LinkerSession` 从 `linker.rs` **搬到了 `engine/session.rs`，且不再受 `wasm-runtime` 门控**。 
+         原先它连带被 gated，于是 `set_session` 在无引擎的构建里**没法写出参数类型**。
+         一个描述"这次调用被允许做什么"的类型，不该和恰好执行它的引擎一起被编译掉。
+         测试 `session_tests.rs` 跑在**默认 feature** 下（281 条里那 4 条），
+         其中 `the_session_type_exists_without_an_engine` 就是钉这件事的。
+      ★ **仍未做的，以及为什么它不是"补一行"**：
+      * `PluginSet` 需要持有一个 `Arc<dyn Host>`，`run_on` 需要为每次调用构造 session
+        （`LinkerSession::new` 要 `Arc<quota::Budget>`，而 `Loaded` 只带 `CapabilitySet`，**没有 budget**）；
+      * 需要一个**生产用的 `impl Host`** —— 27 个方法。`synra-core` 的依赖够（platform/observe/store/net 都在），
+        但其中 `secret_*` 只有 `MemoryBackend`、`fetch` **全仓没有任何 HTTP 客户端**，
+        storage 也没有插件的表：**这三组现在无法诚实实现**，只能拒绝；
+      * 审计要真的有用，session 的条目必须**活得比实例久**（进内核的 ring），
+        而那不是这里的 `Mutex<Vec<AuditEntry>>` 能给的 —— 共享句柄该长什么样，
+        要等有调用方的那一步再定，而不是在这里猜（所以本次**没有**加 `with_audit` 这类没有调用方的构造器）。
+      * 端到端的验证还被夹具卡住：两条真跑 wasm 的测试都是 `#[ignore]`，
+        原因是手写 `.wat` 与 canonical ABI 对不上，出路是 `bindgen!` 生成的夹具 ——
+        而那需要 `wasm32-wasip2` 与 `wasm-tools`（环境依赖，见本节末尾）。
 - [x] `CompileCache`：键含 wasm hash + backend + wasmtime 版本 —— **A/C**：
       `engine/cache.rs:65-91` 的 `CacheKey{artifact_digest, backend, engine_version, target}`。
       ★ `CompileCache` 只被自己的测试调用；没有任何后端 override `precompile`/`load_precompiled`
