@@ -597,7 +597,17 @@ Content-Security-Policy:
       >   只能把大约 250 行抄一遍 —— 而那正是设计反对的事。
       > * ★ 它除了 `synra_control::Refusal` 之外**没有任何守护进程依赖**，所以“搬进库”是一次
       >   干净的移动（换一个域内错误类型，两个孿主各自映射到 `Refusal` / `IpcError`），
-      >   而不是一次重写。已记在这里作为下一步。
+      >   而不是一次重写。
+> * ★ **已完成（已提交）**：编排现在在 `synra-core/src/dispatch/orchestrate.rs`，
+>   对外是 `dispatch` / `snapshot` / `decide` / `cancel` / `Router`，错误类型是 `RouteError`（带
+>   `synra_protocol::ErrorCode` + 一句人话）。守护进程的 `runtime/intent.rs` 只剩下一层映射：
+>   `RouteError` → `Refusal`，一行。桌面 shell 可以用同一套代码把它映射到 `IpcError`，
+>   而不必把 250 行抄一遍。
+> * ★ **而且这次移动顺手暴露了一个死掉的守卫**：`host_calls_tests.rs` 里的
+>   `every_action_shaped_name_is_one_the_contract_declares` **从写下那一刻起就没有跑过**——
+>   一次插入把新测试放在了 `#[test]` 与它的函数之间，于是属性重复、
+>   而原来那个函数**一个属性都没有**。编译器只是很小声地说了一句 warning，
+>   而 `cargo test` 输出里看不出少了一条 —— 直到这次重构让它变成了错误。
 - [ ] ~40 个 Tauri command（见 §2.2）—— **13/39**。
       > ★ 与之无关但同样是"看得见、跑不了"的一处：**CLI 的 `plugin` 子命令里，四个里只有一个能做任何事。**
       > `plugin_request`（`synra-cli/src/session.rs`）对除 `list` 外的每个 action 都返回 `None`，
