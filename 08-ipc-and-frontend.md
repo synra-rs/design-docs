@@ -586,11 +586,22 @@ Content-Security-Policy:
       `:144` `SuggestedAction`，转换是 `:221` 的固有方法 `IpcError::from_synra_error(&SynraError)`。
       ★ **`From<core::Error>` 不存在**：全仓 0 处 `impl From<..> for IpcError`，
       且 `synra-ipc/Cargo.toml` 只依赖 protocol/capability/observe —— `synra_core::Error` 根本不在作用域里。
-- [ ] ~40 个 Tauri command（见 §2.2）—— **12/39**。
+- [ ] ~40 个 Tauri command（见 §2.2）—— **13/39**。
       39 个名字确实存在，但只在 `crates/synra-ipc/src/command.rs` 的 `commands!` 表里；
-      `src-tauri/src/main.rs:153-166` 只注册了 12 个（identity 2、devices 4、plugins 3、config 2、diag 1）。
-      未实现的 27 个逐条列在 `synra-rust-app/src/ipc/registration.test.ts`
+      `src-tauri/src/main.rs` 注册了 13 个（identity 2、devices 4、plugins 3、config 2、diag 2）。
+      未实现的 26 个逐条列在 `synra-rust-app/src/ipc/registration.test.ts`
       的 `NOT_YET_REGISTERED` 里，**每条都带原因**（区分"等接线"与"决定不做"）。
+      ★ 本次新增的是 `diag_logs_tail`：它原本在"未实现"清单里，理由是
+      "no log ring is behind AppState" —— 那条理由**过期了**（shell 现在有自己的日志，
+      见 [18 §9](./18-observability.md)），于是命令从清单移到了注册表。
+      这正是那些理由的用处：一份没有原因的未做清单会烂成没人能据以行动的东西。
+      它读的是 **shell 自己的**日志（`AppState::start_logging` 写的），与 CLI 通过控制协议读的
+      **内核**日志是两个进程的两份文件 —— 一个把两者混起来的命令会给用户看错的那份，而且看不出来。
+      测试 `the_log_tail_reads_the_shells_own_log_including_the_debug_lines`
+      断言两件不同的事：行**回来了**，以及 **debug 行也回来了**（安静过滤会只返回 INFO，
+      而调用方正是为了看细节才跑这个诊断命令的）。
+      另加 `the_log_tail_is_empty_rather_than_an_error_when_nothing_has_been_written`：
+      全新安装还没写过日志，把它报成失败会让一个正常的安装看起来是坏的。
       ★ 两处原本守不住这件事的检查，本次都处理了：
       `command.rs` 里那条测试比的是"注册表 vs 同文件的手写列表"（两份同源拷贝互相比对），
       它同名断言的那句话——"文档里有而这里没有 = 前端会调而 shell 没有"——它**看不见**；
