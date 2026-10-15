@@ -386,6 +386,13 @@ impl Supervisor {
 >   2. **远程 target 不能当地执行。** `confirm` 之所以返回 `request_id`，
 >      是因为常规下发是**发给另一台设备的信件**。实现在 target 不是本机时**坦白拒绝**
 >      （`Unsupported`），而不是在用户**分享来源**的那台机器上跑他的动作。
+>      ★ **它的信使已经存在，只是没人派。** `synra_protocol::event` 定义了
+>      `INTENT_INVOKE` / `INTENT_RESULT` / `INTENT_CANCEL`（`event.rs:352-356`），它们进了
+>      `ALL`、进了 `AckPolicy::Await`的表、`inbound.rs:459` 的 `is_kernel` 也把它们当内核事件——
+>      而**全仓没有任何一处发或收**（命中全在定义、表和测试里）。
+>      ★ 所以远程下发**不是契约缺失，是实现缺失**：四件事要做——
+>      发信、收信后本地跑插件、回 `INTENT_RESULT`、按 `request_id` 做幂等；
+>      而且它还需要 transport 线程拿到 `board` 与 `plugins`（参见下一条）。
 >   3. **`execute` 拿不到被分享的东西** —— ★ **已修复**：`Proposal` 新增 `args`，
 >      由插件从 `can-handle` 拿到的 item 里拄出它自己需要的，原样传给 `execute`。见 [09](./09-plugin-system.md) 的 `share` 契约注释。
 >      ★ 而它能藏一轮的原因值得记：**`ScriptedBackend` 的索引键是 `work.to_string()`，
