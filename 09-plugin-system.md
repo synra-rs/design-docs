@@ -571,7 +571,26 @@ pub struct CallBudget {
 > ★ **而它顺手暴露了一件事**：存储层**没有任何删除插件行的方法**
 > （无 `remove_plugin`），所以级联只能在 SQL 层面断言。卸载路径仍然不存在。
 >
-> **还差的一半**：五个宿主函数仍然拒绝，配额（`max_storage_bytes`）还没有人在 `storage-set` 上执行。
+> ★ **两半都完了（已提交）。** daemon 的 `KernelHost` 实现了四个操作加
+> `storage_used`，`storage-set` 在写之前检配额。
+> * ★ **配额只有一个来源，而不是两个。** trait 原来的方法是
+>   `storage_quota() -> (used, allowed)`，但 **allowed 不是宿主能知道的**：它属于配额，而配额就是
+>   `HostCalls` 里那个 `CallBudget` 的来源。两边各报一个数就是**两个来源**，而它们会在
+>   第一次有人收紧配额时分歧。现在宿主只回答 **usage**，上限由 budget 提供。
+> * ★ **而这修正了一个只能证明“数字原样返回”的测试**：
+>   `a_storage_quota_is_a_pair_of_numbers_a_plugin_can_read` 断言的 `[128,1024]` 是 **stub 自己的两个常量**。
+>   两个真正的数字取代了它，断言现在是关于**每一半各自从哪里来**。
+> * ★ **写入巿径是 `used - replaced + new`，不是 `used + new`**：用更短的值重写一个键
+>   是在**收紧**存储，不看被替换掉什么的检查会拒绝一次让情况变好的写入。
+>   阴性对照：改成 `used + new`，该测试以
+>   `would store 17 bytes, and its limit is 12` 失败。
+> * ★ **而它用了一个自己的错误码**：`CallError::QUOTA_EXCEEDED = "quotaExceeded"`。
+>   设计叫来就发明了 `PluginQuotaExceeded` 这个名字，而它之前只能归到 `rateLimited`
+>   —— 那会告诉插件“你太快了，等一下”，而它真正该做的是存少一点。
+> * 证据：**55 suites / 2798 passed**，clippy、5 guard 均绿。
+>
+> ★ **而它暴露了一个假的测试与一个真的缺口**：该测试断言的是
+> 它自己的双重都在断言自己的双重都在断言自己的 stub。另外，app 的 `DesktopHost` 仍然对五个全部拒绝。
 ### 6.2 配额
 
 ```rust
