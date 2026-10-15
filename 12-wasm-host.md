@@ -539,18 +539,70 @@ Wasm **验证与编译本身**是攻击面（一个精心构造的模块可以�
 
 ## 10. 实现清单
 
-- [ ] `backend/mod.rs`：`WasmBackend` trait + `BackendKind`
-- [ ] `backend/wasmtime.rs`：Engine 配置（§3 的安全基线）+ 组件模型链接
-- [ ] `backend/wasmi.rs`：轻量后端（体积敏感场景）
-- [ ] `WasiGrant`：默认拒绝，只开 clocks/random
-- [ ] `WasmExecutor`：专用线程池 + `Semaphore` 并发上限
-- [ ] `EpochTicker`：作为受监督任务；默认 10ms
-- [ ] `CallBudget` + `PluginInstance::call`：fuel + epoch + memory 三层
-- [ ] `catch_unwind` 包住所有 Wasm 调用 + panic hook 接入 tracing
-- [ ] `gate_host_fn!` / `ungated_host_fn!` 宏（[12](./10-capability-and-sandbox.md) §3.1）
-- [ ] 9 组 host functions（env/log/event/device/storage/network/fs/transfer/platform/action）
-- [ ] `CompileCache`：键含 wasm hash + backend + wasmtime 版本
-- [ ] 编译任务超时与输入大小限制
-- [ ] `PluginPool` + 空闲回收 + 池指标
-- [ ] `PluginHealth` 状态机 + 降级/停用策略
-- [ ] 测试：死循环（fuel）、阻塞 host（epoch）、内存炸弹、trap 恢复、并发隔离（[22](./21-testing-strategy.md) §5）
+> ★ 这一节在实现之前写就，长期整节未勾选。以下每一条都重新核对过源码；核对不到的保持未勾选，
+> 并在原处写明"真实的机制是什么"或"缺的是哪一半"。名字对不上的按真实名字记，另加 `C`。
+
+- [x] `WasmBackend` trait + `BackendKind` —— **C**：不在 `backend/mod.rs`，真实位置是
+      `engine/types.rs:15`（`BackendKind`）与 `engine/types.rs:44`（`WasmBackend` trait）。
+- [x] Engine 配置（§3 的安全基线）+ 组件模型链接 —— **A**：`engine/wasmtime_backend.rs:54`
+      `MAX_WASM_STACK = 512 KiB`、`:60` `MEMORY_RESERVATION = 64 MiB`、`:63` 增长上限 `2 MiB`、
+      `:186` `impl ResourceLimiter`、`:144-149` linker 定义。
+- [ ] `backend/wasmi.rs`：轻量后端 —— **未做**，全仓无 `wasmi` 依赖。
+      `tools/matrix` 自己也写着"no `wasmi` dependency exists"。
+- [ ] `WasiGrant`：默认拒绝，只开 clocks/random —— **未做，且前提不成立**：
+      `wit/synra-plugin.wit` 里**根本没有 WASI import**，所以没有可以收窄的时钟/随机能力面。
+- [x] `WasmExecutor`：专用线程池 + 并发上限 —— **A/C**：不是 `Semaphore`，是
+      `engine/executor.rs:219` 的 `ThreadPool`（`sync_channel` 有界队列）+ `:44` `MAX_THREADS = 64`，
+      满了返回 `:198` `Saturated` 而不是增长。
+      ★ **但它没有被用在真实调用路径上**：`synra-core/src/dispatch/plugins.rs` 的
+      `instance.call()` 直接在调用线程上跑。整节"专用线程池"的防护在生产里不存在。
+- [x] `EpochTicker`：默认 10ms —— **A/C**：`engine/executor.rs:38` `EPOCH_PERIOD = 10ms`、
+      `:101` `EpochTicker`、`:161` `Drop`、`:361` `enforces_timeouts()`。
+      ★ 但它不是"受监督任务"：`apps/synra-daemon` 里搜不到任何 ticker/epoch 监督代码。
+- [ ] `CallBudget` + `PluginInstance::call`：fuel + epoch + memory 三层 ——
+      **两层真的生效，第二层物理上永远不会触发**。
+      `CallBudget{fuel, timeout, max_memory_growth}` 存在，`wasmtime_backend.rs:271-303` 也依次 apply 了三层。
+      但 `Engine::increment_epoch()` 在全仓 **0 命中** —— 本 crate 自己的 `Epoch` 原子量与 wasmtime
+      engine 的 epoch 计数器**没有任何连接**。
+      后果：一个**阻塞在 host call 里**的 guest（不消耗指令，所以 fuel 不减少）永远不会被中断，
+      而"墙钟超时是唯一能停下阻塞在 host 调用里的 guest 的那一层"正是它的存在理由。
+- [x] `catch_unwind` 包住 Wasm 调用 —— **已补上**。原先全仓 `catch_unwind` 0 命中，
+      而 `Cargo.toml` 的 `[profile.release] panic = "unwind"` 注释给的理由恰恰是
+      "插件 panic 必须能被 catch_unwind 捕获" —— 为一个不存在的机制做的配置。
+      现在边界在 `synra-core/src/dispatch/plugins.rs` 的 `run_on`：
+      捕获、**丢弃该实例**（panic 穿过的 store 状态无法信任）、返回 `CallOutcome::Trap`。
+      测试与负控制见 `dispatch/tests.rs` 的
+      `a_plugin_that_panics_the_host_does_not_stop_the_kernel`（去掉 catch 即失败）。
+      ★ 未做的一半：**panic hook 接入 tracing** —— `synra-observe` 里没有 tracing 初始化（见 [18](./18-observability.md)）。
+- [ ] `gate_host_fn!` / `ungated_host_fn!` 宏 —— **未做，且这两个宏从未存在**。
+      真实机制更强：`build.rs` 从 `wit/synra-plugin.wit` 的 `@ungated` / `@capability("…")` 注释
+      **每次构建重新生成** `src/generated/capability_table.rs`。
+      见 [10](./10-capability-and-sandbox.md) 与 [11](./11-design-principles.md) 的同名条目。
+- [x] host functions（env/log/event/device/storage/network/transfer/platform/action）——
+      **A/C，且端到端不可达**。`src/generated/capability_table.rs:19-55` 有 35 个函数、
+      `engine/linker.rs:153-341` 覆盖九种签名。
+      ★ 文档列的 10 组里 **`fs` 不存在**（合同没有文件系统接口）。
+      ★ 更重要的：`wasmtime_backend.rs:658` 恒为 `session: None`，而 `linker.rs:70-78` 在
+      session 缺失时对**任何** guest 调用都返回拒绝 —— 所以 35 个 host function 在端到端意义上
+      全都不可达，唯一的 `impl Host` 是测试桩（`host_calls_tests.rs:49`）。
+- [x] `CompileCache`：键含 wasm hash + backend + wasmtime 版本 —— **A/C**：
+      `engine/cache.rs:65-91` 的 `CacheKey{artifact_digest, backend, engine_version, target}`。
+      ★ `CompileCache` 只被自己的测试调用；没有任何后端 override `precompile`/`load_precompiled`
+      （`types.rs:629/639` 的默认实现恒返回 `BackendUnavailable`），所以 `.cwasm` 永远不会被写出来。
+- [ ] 编译任务超时与输入大小限制 —— **未做**：`wasmtime_backend.rs:566-572` 的 `compile`
+      只检查"是不是空的"。CLI 侧有 `MAX_WASM_BYTES`、registry 侧有 `MAX_PACKUMENT_BYTES`，宿主侧没有。
+- [x] `InstancePool` + 空闲回收 + 池指标 —— **A/C**：真名 `pool::InstancePool`
+      （不是 `PluginPool`），`pool/instance.rs:278` `evict_idle(now_ms)`、`:317` `PoolReport`。
+      ★ `evict_idle` 只被测试调用，没有任何扫描器；`synra-observe` 里也**没有池指标**。
+- [x] 健康状态机 + 降级/停用策略 —— **A/C**：真名 `quota::Health`
+      （不是 `PluginHealth`/`HealthState`），`quota/budget.rs:25` 四档 + `:16/:19` 阈值 +
+      `:152-159` 降级配额，`quota/tests.rs:290-364` 有完整阶梯测试。
+      ★ **触发源不对**：降级由**速率限制拒绝**驱动，不是 `CallOutcome::Trap` / `MemoryExceeded`。
+      也就是说"5 次 trap → 降级"这条路径没有实现 —— 一个反复 trap 的插件**永远不会**被降级。
+- [ ] 测试：死循环（fuel）、阻塞 host（epoch）、内存炸弹、trap 恢复、并发隔离 ——
+      ★ **五项里 0 项**由一个真跑 wasm 的测试覆盖：
+      fuel 的唯一真用例 `wasmtime_tests.rs:306` 被 `#[ignore]`；
+      epoch **完全无测试**（`:334` 只断言"deadline 被写进去了"）；
+      内存炸弹无 guest 测试（`:354` 只断言 ceiling 已安装）；
+      trap 恢复只有 `ScriptedBackend` 桩；并发隔离测的是线程池，不跑 wasm。
+      本 crate 里唯一执行真 wasm 的两个测试都被 `#[ignore]`（`wasmtime_tests.rs:270, 306`）。
