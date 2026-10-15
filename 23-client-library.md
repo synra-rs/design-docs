@@ -36,10 +36,21 @@
 >
 > ★ **另外两项没做（模板侧）**：`synra-plugin new` 生成的工程里**没有 `ui/` TypeScript 工程**。
 > 现在的模板（`tools/synra-plugin-cli/src/template.rs`）写的是 `manifest.json`、`Cargo.toml`、
-> `src/lib.rs`、`README.md`、`.gitignore`，以及一份 UI 的 HTML 文档 ——
+> `src/lib.rs`、`README.md`、`.gitignore`，以及一份 `ui/index.html` ——
+> 界面是**内联 `<script type="module">` 的纯 HTML**，没有 `.ts` 入口。
 > 所以"`ui/tsconfig.json` 默认含 `types: ["@synra/client"]`"和
 > "`ui/package.json` 的 devDependencies 含 `@synra/client`"都无从谈起。
-> 这两条是真正待做的开发项，已记录在下面的清单里。
+>
+> ★ **而且这两项现在不该盲目补上，理由是它们会做出一个装不起来的脚手架：**
+> `ui/package.json` 里写 `"@synra/client": "^0.1.0"` 意味着作者 `pnpm install` 要能从 registry 拿到它，
+> 而 `@synra/client` 目前在 `synra-js` 里是 workspace 包、**尚未发布**。
+> 更根本的是：一个只有 `tsconfig.json`、没有任何 `.ts` 输入的工程，
+> `tsc` 会直接报 "No inputs were found" —— 所以补这两条真正意味着
+> **把 UI 模板从"内联脚本的 HTML"改成"有 TS 入口 + 构建步骤的工程"**，
+> 那是一次模板重设计（还牵动 manifest 的 `runtime.ui` 入口声明与 `verify` 的产物检查），
+> 不是加两个文件。
+> 依赖发布是**需要用户/线上操作**的事，按本次的目标先不做，在此记明。
+> 真正待做的顺序是：先发布 `@synra/client` → 再把 UI 模板改成 TS 工程 → 最后这两条自然成立。
 
 > 本文定义插件 UI 侧的**类型库** `@synra/client`：它属于 **`synra-js` JS monorepo**（[25](./25-js-monorepo.md)），
 > 是一个 **`.d.ts` only 包**——编译后**只有类型声明，没有任何 `.js`**。
@@ -802,6 +813,9 @@ async function openOnLaptop(url: string) {
 
 - [x] [13 §5.2](./13-plugin-authoring.md) 指向本文与 [25](./25-js-monorepo.md)
 - [ ] `synra-plugin new` 生成的 `ui/tsconfig.json` 默认含 `"types": ["@synra/client"]`
-      ★ **没做**：模板根本不生成 `ui/` TypeScript 工程（见本节开头的说明）
+      ★ **没做，且现在不该单独做**：模板的界面是内联脚本的 `ui/index.html`，没有 `.ts` 入口；
+      一个没有输入的 `tsconfig.json` 会让 `tsc` 报 "No inputs were found"。
+      真正的做法是把 UI 模板改成 TS 工程，见本节开头
 - [ ] `ui/package.json` 的 `devDependencies` 含 `@synra/client`（+ 可选 `@synra/testkit`）
-      ★ **没做**，同一条原因
+      ★ **没做，阻塞在发布上**：`@synra/client` 还是 workspace 包、尚未发布，
+      写进 `devDependencies` 会让生成的工程 `install` 失败 —— 那比没有这条更糟
