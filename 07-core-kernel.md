@@ -382,7 +382,11 @@ impl Supervisor {
 >   2. **远程 target 不能当地执行。** `confirm` 之所以返回 `request_id`，
 >      是因为常规下发是**发给另一台设备的信件**。实现在 target 不是本机时**坦白拒绝**
 >      （`Unsupported`），而不是在用户**分享来源**的那台机器上跑他的动作。
->   3. **`execute` 拿不到被分享的东西**——见 [09](./09-plugin-system.md) 的 `share` 契约注释。
+>   3. **`execute` 拿不到被分享的东西** —— ★ **已修复**：`Proposal` 新增 `args`，
+>      由插件从 `can-handle` 拿到的 item 里拄出它自己需要的，原样传给 `execute`。见 [09](./09-plugin-system.md) 的 `share` 契约注释。
+>      ★ 而它能藏一轮的原因值得记：**`ScriptedBackend` 的索引键是 `work.to_string()`，
+>      而 `Work` 的 `Display` 是 `interface.function` —— 每一次 `execute` 都落在同一个键上，配置看不见自己的输入。**
+>      已改为把 payload 纳入键（`key_for`）；现在把 `args` 改回 `null` 会让**两个**测试变红，而修之前只有一个。
 > * ★ **仍然没做的**：路由只到"候选人产生"为止。
 >   `intent_decide`（用户选择 / 确认 / 取消）与真正调用插件都还没有，
 >   而且这是刻意的："这个能处理吗"这个问题的副作用不该包含跑第三方代码。
