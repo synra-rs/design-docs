@@ -556,6 +556,21 @@ Wasm **验证与编译本身**是攻击面（一个精心构造的模块可以�
       满了返回 `:198` `Saturated` 而不是增长。
       ★ **但它没有被用在真实调用路径上**：`synra-core/src/dispatch/plugins.rs` 的
       `instance.call()` 直接在调用线程上跑。整节"专用线程池"的防护在生产里不存在。
+- [ ] ★ `Enforcement::first_gap` —— **整层设计的安全论点，没有任何生产调用者**。
+      `engine/mod.rs:23` 把"后端无法强制某项限制时由调用方拒绝"写成这一层的安全论证，
+      `types.rs:434` 也如实实现了 `first_gap`（返回第一个无法兑现的限制名，而不是一个布尔）。
+      但全仓 `grep first_gap` 只命中：`mod.rs` 的注释、`types.rs` 的定义、以及三个测试。
+      **没有任何地方在调用前查过它。**
+      ★ 而且这一条**不能简单地在 `PluginSet::call` 里补上**，原因值得记下来：
+      生产预算来自 `synra-core/src/dispatch/matching.rs:202` 的 `budget()`，它**总是**设
+      `timeout: Some(..)`；而 `ScriptedBackend::enforcement()` 如实报告 `epoch: false`
+      （它没有引擎）。两者一相遇，`first_gap` 返回 `Some("a wall-clock limit")`，
+      于是**每一个用测试替身的调用都会被拒** —— 一整套 dispatch 测试会红。
+      也就是说现在这个形状下，"如实报告自己做不到什么"与"真的按报告拒绝"是互斥的：
+      测试替身必须在某一侧让步，而两边都有测试在守着（`the_backend_is_honest_about_what_it_cannot_enforce`
+      守前者）。
+      真正要接线，需要先回答"替身算不算一个能兑现墙钟的后端" —— 这是一个设计决定，不是补一行 `if`。
+      所以这里保持未勾选，并把理由写下来，而不是为了让勾变绿去改一个测试。
 - [x] `EpochTicker`：默认 10ms —— **A/C**：`engine/executor.rs:38` `EPOCH_PERIOD = 10ms`、
       `:101` `EpochTicker`、`:161` `Drop`、`:361` `enforces_timeouts()`。
       ★ 但它不是"受监督任务"：`apps/synra-daemon` 里搜不到任何 ticker/epoch 监督代码。
