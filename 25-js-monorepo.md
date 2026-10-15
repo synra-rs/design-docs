@@ -62,6 +62,41 @@ synra-js/
 **"有运行时？"这一列是关键**：前三个是纯类型（零运行时），只有 `@synra/testkit` 有实现。
 CI 对前三个有"不允许产出 `.js`"的守卫（§6）。
 
+> ★ **本次核对发现：这一列说的没错，而代码违反过它 —— 已经修好。**
+>
+> 守卫原先只查两件事：`package.json` 里没有运行时入口、`dist/` 里没有 `.js`。
+> 两件都通过，**而 `packages/protocol/src/index.ts` 照样从入口导出了 13 个值**：
+> `isDelta`、`MAX_COUNTED_GAP`、`SequenceTracker`、`FrameKind`、`FRAME_HEADER_LEN`、
+> `MAX_FRAME_LEN`、`MAX_CHUNK_LEN`、`MAX_PAYLOAD_LEN`、`FRAME_LENGTH_OVERHEAD`、
+> `DEFAULT_TCP_PORT`、`DISCOVERY_PORT`、`MDNS_SERVICE`、`PROTOCOL_VERSION`。
+>
+> 后果不是文档不整齐，而是**一个作者照着类型写 `import { SequenceTracker } from '@synra/protocol'`
+> 会类型检查通过、运行时解析不到** —— `undefined` 或者一个打包错误，没有任何地方提前提醒。
+> "零运行时"这句话在类型层面是假的。
+>
+> ★ **而这个包自己的测试早就知道。** `packages/protocol/test/events.test.ts` 的注释写着：
+> "`@synra/protocol` 是一个**纯类型**包，所以它按设计没有运行时入口，按名字 import 会解析失败"
+> —— 然后它从源码路径导入。**测试知道这些名字拿不到，入口却照样把它们许诺出去。**
+>
+> ★ **修复分两步，因为第一版只做对了一半：**
+> 1. **守卫改成检查公开面**，而不是整个 `dist`：消费方只能通过 `exports` 指的那个文件到达这个包，
+>    所以看的是 `dist/index.d.ts` 里的 `export { ... }`（不带 `type`）。
+>    仓库开了 `verbatimModuleSyntax`，所以"类型还是值"由编译器强制区分，不是靠自觉。
+>    按整个 `dist` 查会把"内部模块有个值、入口只带出类型"这种无害情况也判成失败，逼人去加白名单。
+> 2. **`protocol` 不再导出值**，`SequenceTracker` / `isDelta` / `MAX_COUNTED_GAP` 搬到
+>    `synra-rust-app/src/ipc/sequence.ts`，连同它们的测试。
+>    理由是这一列本身：`protocol` 是纯类型，而**宿主**是真有运行时的应用程序。
+>
+> ★ **第一步只改 `protocol` 时，类型检查立刻抓到了一个我没找到的消费者**：
+> 应用的 `src/ipc/dispatcher.ts:30` 正是 `import { isDelta, SequenceTracker } from '@synra/protocol'`。
+> 我先前的排查只搜了常量名（`MAX_FRAME_LEN` 等），**没有搜 `isDelta` / `SequenceTracker`**，
+> 于是得出了"没有任何东西导入它们"的错误结论。**是 `vue-tsc` 纠正了我，不是我纠正了自己** ——
+> 这也说明把这件事交给编译器而不是靠 grep 是对的。
+> （`dispatcher.ts` 的 `EventDispatcher` 至今**没有生产调用者**，所以这个坏导入从来没在运行时暴露过。）
+>
+> ★ 顺带更正 `SequenceTracker` 的注释：它写着"只持有最后一个序号，**不含运行时**"，
+> 而这句话出现在一个**类的定义**上方。所有者换了之后那句话才成立。
+
 ### 2.2 `@synra/protocol`：生成物，不手写
 
 ```
