@@ -460,6 +460,20 @@ pub struct UpdateInfo {
 > 会写出 `CON.json`，而在 Windows 上这不是文件：名字在查文件系统**之前**就被解析成设备，
 > 写入去了控制台。现在所有缓存文件都带 `packument-` 前缀，没有任何插件名能产生设备名。
 >
+> ★ **而第 80 轮把它接到了命令上**：`Request::CatalogSearch` + `Kernel::catalog_search`
+> + 守护进程的 `runtime::catalog::search` + `synra plugin search <package>`。
+> 之前 `plugins_catalog_search` 只在 `command.rs` 的表里 —— **又一个声明了而没人实现的命令**。
+> ★ 而它回答里**带着这份目录从哪来**：`origin` 是 `registry`（带镜像）或
+> `cache`（带年龄与 `stale`），因为“最新版是 1.2.3”这句话在刚回答的注册表和八天前的缓存里
+> 是**两件事**；而没有仿站回答且什么都没缓存时它返回 `DeviceOffline`，不是空列表。
+>
+> ★ **而这一轮顺手抓到了一个真的依赖崩溃**：`ureq-proto` 0.6.4 在响应头过多时
+> 会把东西 push 进一个 **已满的 `ArrayVec<_, 16>`**（`util.rs:178`，其注释写的就是“满了就 panic”）。
+> 它是这么被发现的：**解析不了的主机干净地返回错误，而能解析的主机走到了 bug** ——
+> 这正是 `synra-fetch` 自己的测试从来没见过的原因：它们全部走 `127.0.0.1:<port>` 的本进程档位。
+> 现在 `Client::fetch` 把它包起来**变成一条拒绝**，并且拒绝里就写着“客户端 panic 了”：
+> 一句“网络失败”会把下一个读者送去查网络，而**服务端能送回多少个头不是插件能选的**。
+>
 ## 7. 离线与降级
 
 | 场景                       | 行为                                                     |
