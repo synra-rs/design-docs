@@ -680,8 +680,15 @@ Wasm **验证与编译本身**是攻击面（一个精心构造的模块可以�
       `engine/cache.rs:65-91` 的 `CacheKey{artifact_digest, backend, engine_version, target}`。
       ★ `CompileCache` 只被自己的测试调用；没有任何后端 override `precompile`/`load_precompiled`
       （`types.rs:629/639` 的默认实现恒返回 `BackendUnavailable`），所以 `.cwasm` 永远不会被写出来。
-- [ ] 编译任务超时与输入大小限制 —— **未做**：`wasmtime_backend.rs:566-572` 的 `compile`
-      只检查"是不是空的"。CLI 侧有 `MAX_WASM_BYTES`、registry 侧有 `MAX_PACKUMENT_BYTES`，宿主侧没有。
+- [~] 编译任务超时与输入大小限制 —— ★ **大小限制已有**（第 113 轮），**超时仍未做**：
+      `MAX_COMPONENT_BYTES = 16 MiB`（`engine/wasmtime_backend.rs`，由 `engine` 再导出），在 `compile` 里
+      **在引擎看到任何字节之前**检查。它与 CLI 的 `MAX_WASM_BYTES` **同值**，而不是重新选一个数字：
+      两处同值是一种味道，两处不同值则是一个 bug，后者更糟。
+      ★ 而它乍看像重复：CLI 拦的是**命令行传入**，registry 拦的是**远程包**，
+      而宿主拦的是**任何到达它的路** —— manifest 指向的文件、被改过的缓存。Wasmtime 的解析器不是资源限制器。
+      ★ 测试断言的是**拒绝的措辞而非拒绝本身**：16 MiB 的零不是组件，引擎也会拒绝它，
+      所以只有报文同时写出两个数字（16777217 / 16777216）才能证明这是**本层**拦下的。
+      ★ **而超时那一半确实还没有**：一个超大但合法的组件仍会让 `Component::new` 跑到它自己结束。
 - [x] `InstancePool` + 空闲回收 + 池指标 —— **A/C**：真名 `pool::InstancePool`
       （不是 `PluginPool`），`pool/instance.rs:278` `evict_idle(now_ms)`、`:317` `PoolReport`。
       ★ `evict_idle` 只被测试调用，没有任何扫描器；`synra-observe` 里也**没有池指标**。
