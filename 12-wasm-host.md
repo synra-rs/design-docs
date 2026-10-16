@@ -695,8 +695,14 @@ Wasm **验证与编译本身**是攻击面（一个精心构造的模块可以�
 - [x] 健康状态机 + 降级/停用策略 —— **A/C**：真名 `quota::Health`
       （不是 `PluginHealth`/`HealthState`），`quota/budget.rs:25` 四档 + `:16/:19` 阈值 +
       `:152-159` 降级配额，`quota/tests.rs:290-364` 有完整阶梯测试。
-      ★ **触发源不对**：降级由**速率限制拒绝**驱动，不是 `CallOutcome::Trap` / `MemoryExceeded`。
-      也就是说"5 次 trap → 降级"这条路径没有实现 —— 一个反复 trap 的插件**永远不会**被降级。
+            ★ **而第 114 轮把它接上了**：`Budget::record_misbehaviour(now_ms)` 与 `record_refusal` 共用
+      同一个台阶（`note_bad_call`），而 `PluginSet::call` 在客体 misbehaviour 后调它。
+      ★ **而回归测试的形状值得一说**：它与拒绝那条阶梯用**同一组配件**（`PERSISTENT_REFUSALS` 次/窗口、
+      `in_window`），所以两条路径看得出是**一个机制**；另一条测试取反对照：单次 misbehaviour
+      **不**改变 health —— 阶梯只对**持续**坏的窗口起作用。
+      ★ **而另一个缺口记在这里**：`PluginSet` **没有读 health 的入口**，daemon 的 `status`
+      报的是**数据库里那行**，不是实时的阶梯状态。阶梯的**效果**是真的（降级后配额变小、
+      faulted 后 `consume` 拒绝），但它的**状态**目前无人可读 —— 下一步是把它接到 `status`。
 - [ ] 测试：死循环（fuel）、阻塞 host（epoch）、内存炸弹、trap 恢复、并发隔离 ——
       ★ **五项里 0 项**由一个真跑 wasm 的测试覆盖：
       fuel 的唯一真用例 `wasmtime_tests.rs:306` 被 `#[ignore]`；
