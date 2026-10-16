@@ -168,15 +168,26 @@ pub struct SessionTimeouts {
       `sweep_expired(now_ms)` 负责清退。
       等待侧的 `session/send/awaiting.rs` 不持有状态，它收一个 `deadline: Instant` 参数，
       每个循环都拿 `Instant::now() >= deadline` 判一次。
-- [ ] ★ `SessionTimeouts` 是**悬空的**（这条文档没写，但它是上面两条的前提）
+- [~] ★ `SessionTimeouts` —— **下面这段判断有一半是过时的**（第 83 轮核对）。
       `synra-protocol/src/session.rs` 的模块注释写着"每个会话都有超时，它们都在一个地方：
-      `SessionTimeouts`"。全仓 `grep SessionTimeouts` **11 处命中，全部在 `session.rs` 内部**：
-      定义、`Default`、`validate()`，以及 L934-960 的自测。
-      也就是说这个"唯一权威的超时配置"**没有任何生产代码读取**。
-      实际发生的事是另一套：会话层把 `deadline` 当参数由调用方传入。
-      ★ 这和 A2 的 `ack_policy` 是**同一个形状** —— 一个被测试得很好的策略类型，
-      加上"只有一个实现"这种容易绿的检查，看起来完备，实际上没有接线。
-      两次撞见同一类问题，所以值得单独记：**"只有一个实现"不等于"有人在用"**。
+      `SessionTimeouts`"。**但全仓 grep 现在有 9 个宿主侧调用点**：
+      `synra-core/src/listener.rs:271`、`synra-core/src/inbound.rs:623`、
+      `apps/synra-daemon/src/serve.rs:238`、`apps/synra-daemon/src/runtime/commands.rs:497,515`，
+      以及四个测试。也就是说这个"唯一权威的超时配置"**确实被生产代码读取了** ——
+      下面那句"11 处命中，全部在 `session.rs` 内部"写于守护进程连接那一半被实现之前。
+      `SessionTimeouts`、`Default`、`validate()` 与 L934-960 的自测仍然在 `session.rs` 里，
+      但那不再是全部。
+- [ ] ★ 而 `ack_policy`（A2）**确实仍然悬空**，只是原因比"没人调它"更深：
+      全仓搜 `AckPolicy`/`ack_policy`，`event.rs` 之外**只有一条文档注释**。
+      原因是**根本没有发送路径可供询问**：`synra-net` 整个 crate
+      （`Backoff` / `Liveness` / `WriteQueue`）**在两个工作区里一个消费者都没有**，
+      而 `PeerLink::send` 直接 `write_all` 到 socket。
+      要接 `AckPolicy`，先要有一条走 `synra-net` 的写入路径 ——
+      那是一个架构决定（写入线程），不是一行 `if`。
+      ★ 而第 83 轮顺手修掉了同一处的真缺陷：`PeerLink` 设了**读**超时而**没有写**超时，
+      于是一个不再读的对端不产生任何错误，只是**调用线程永远不返回**
+      （TCP 不会把一个满窗口报成错误），而 `synra-core/src/peer/link.rs` 早就从同一个
+      `flags.timeout` 设了写超时。两个实现里的一个现在追上了另一个。
 - [x] 测试：对端完全不回应时，本端在超时后回到确定状态 ——
       `pairing/desk.rs:474` `a_waiter_whose_window_closed_is_told_the_request_expired`：
       配对窗口关掉后，等待方收到的是"请求已过期"，不是挂住。
