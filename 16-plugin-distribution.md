@@ -628,6 +628,20 @@ pub struct UpdateInfo {
   ★ 仍然没有的：IPC DTO、前端消费，以及真正写这些行的编排者。
   ★ **第 137 轮做了一个查证，结果值得写下来**：daemon **没有 transfer 的接收侧** ——
   它只有发送（`commands.rs` 的 `send_file`），入站路径处理的是**意图**（`runtime/intent.rs` 的 `dispatch`）。
+  ★ **而第 138 轮把这句话纠正了：说过头了。** 接收侧**存在于 core** 的 `inbound.rs` ——
+  流式写盘、逐块校验、`Decision::Finished { path, byte_length }`，daemon 只是 `pub use` 它。
+  真实缺口比那句话**小也更精确**：
+  ★ **`Decision::Finished` 不带「这是一个插件包」的信息。** 唯一的消费者（`listener.rs:331`）
+  只 `println!` 一句 `received N bytes into <path>` —— 于是一个插件包和一张截图在代码里**没有区别**。
+  而 `proposed_name` 的注释自己承认了这一点：*「plugin bundle 还不是这个内核会安装的东西」*。
+  ★ **下一轮的形状已经读清**（读清了再写，这是第 136→137 轮验证过的做法）：
+  `Receiving`（`session/receive.rs:65`，只有 `receiver` 与 `trace_id` 两个字段，手写 `Debug`）
+  应当在 `accept` 时从 `TransferMeta::PluginBundle` 记住 `Option<PluginId>`，
+  `Decision::Finished` 带上它，消费者才能区分这两件事。改的是三个文件、一条测试。
+  ★ **还有一件必须承认的事**：第 137 轮的 `SyncInbox` 与真实接收路径**形状不同** ——
+  真实路径是**流式写盘**，不是「整包在内存的块里」。所以 `SyncInbox` / `ReceiverCheck` 更像是 ⑧ 的
+  **清单化**（把六件事说出来、按序要求），而不是能插进流式接收的东西。要不要把它们接上去，
+  还是让流式路径自己履行那六条义务，是一个**该明确决定**的设计问题，不是一句「还没接线」。
   所以第 130 轮那个 `ReceiverCheck` 不是「缺一个触发者」，而是**连入站事件都没有**。
   ★ **以及 ④–⑦ 的库层补上了**：`SyncInbox`（`plugin_sync.rs`）
   —— 会话知道哪一块到了、检查序列知道整包要验什么，而**字节**没有地方放。
