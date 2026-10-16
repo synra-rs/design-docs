@@ -909,3 +909,23 @@ pub session: SyncSessionId,   // Which round.
 ★ **而「回一个结果」还差最后一件**：`on_finished` 回调**不返回值**，所以接收端装了什么
 （那个决定发生在 daemon 那一侧，第 151 轮）到不了持有 link 的这一侧。
 改它的签名是下一轮的事 —— 而那是唯一还缺的东西。
+
+## 第 168 轮：一个回复不需要那个请求
+
+★ 上一轮说「只差 `on_finished` 的返回值」。而改它要先看清楚一件事：**回复由谁造、用什么造。**
+`messaging::sync_result` 要一个 `&Envelope`，而 listener 手里没有 —— 请求的字节被那次传输消费掉了，
+活下来的是它已经留下的东西（`request_id`、对端、trace、ttl）。
+
+★ 于是给那组事实起了个名字：`ReplyContext`，以及 `Envelope::reply_parts(context, event, at, payload)`。
+`reply_to` 改为复用同一条路 —— **一条路，而不是一个规则加一个例外**。
+`ReplyContext::of(request, local)` 的 `local` 是参数而不是从请求里读的字段，而这正是它是函数的原因：
+**谁在回答从来不在问题里**。第一版漏了它，那会让一个回复以**提问方**的名义发出。
+
+★ **而我差点改错一处正确的东西。** 看 `reply_to` 时我以为它是个 bug（`request_id: RequestId::new()`），
+准备「修」它 —— 而紧接着的一行是 `reply_to: Some(request.request_id)`：每个信封有自己的标识，
+而回复用 `reply_to` 指出它回应谁。**这是本会话第三次险些修掉一个正确的东西**，
+而三次都是靠读完那一整块才停手的。
+
+★ **这一轮的执行很糟：四次失败。** 一次把新结构插进了 `impl Envelope` 里（第六次踩同一个坑），
+一次被那个重置工作树的进程清掉了写入，两次让 `messaging.rs` 的签名与函数体不一致 ——
+最后靠**回退那一个文件**、只留下 protocol 的新增才收住。交付是好的，过程是浪费的。
