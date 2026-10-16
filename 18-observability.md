@@ -763,6 +763,14 @@ pub fn install_panic_hook(paths: &Paths, version: &str) {
       我曾两次写出内容完全正常的提交标题，而 `git show --stat` 显示改动**根本不在里面**。
       现在的做法是：**改动、编译、测试、提交放在同一条命令里**，并在提交后立刻 `git show --stat` 核对。
       ★ 本行的状态：门三项 + 直方图两项 + 传输两项 + 发现三项 + 网络三项（发送、链路、接收）。
+      ★ **第 160 轮把三个计数收成同一个写法**（`Host::count_frame_sent` / `count_frame_received` /
+      `count_link_opened`）。这不是整洁问题：上一轮我刚在方法文档里写下
+      *「`metrics` 是 `pub(super)`，而『一帧怎么记』该有一个答案，而不是每个看得见它的模块各有一份」* ——
+      而当时**发送**那一处仍然是调用点自己去够字段的。**注释说一套、代码做另一套**，
+      是这份文档一直在清理的东西，只是这次的作者是我。
+      ★ 而 `links_closed_total{reason}` 这一轮**没做**，因为查下来 host 模块里
+      **没有关闭链路的函数** —— 一个没有自然落点的指标不该被按在某个顺手的地方。
+      ★ 本行的状态不变：门三项 + 直方图两项 + 传输两项 + 发现三项 + 网络三项。
       缺的是 `bytes_*`、`reconnect_attempts_total`、`links_close_total{reason}` 等。
       ★ **第 144 轮接了传输组的两项**：`transfer_bytes` 与 `transfer_duration_ms{kind=attachment}`，
       在 `send_file` 的成功返回处（`self.metrics` 已在手，与意图那两项同一个落点）。
