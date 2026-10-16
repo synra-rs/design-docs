@@ -1083,3 +1083,27 @@ clippy 的 `type_complexity` 是对的，而它的答案与第 166 轮的 `SyncR
 即使 `clone()` 的结果是 owned 的；要把它挪到闭包**外**。
 ② 而更省的一条是**用它旁边已经有的那个 owned 值**（`data_dir`）—— 而它对 `listener::serve` 只能**借用**，
 不能移走。
+
+## 第 177 轮：`performed` 为什么是空的 —— 答案与撤掉
+
+★ 第 176 轮留下一个问题，而这一轮查清了它。**那三项检查不是独立的，它们是七项序列里的第 4、6、7 项**：
+
+| 检查 | 要求先完成 |
+|---|---|
+| `check_room` | `ArchiveLimits`、`Manifest` |
+| `decide_activation` | `SessionComplete` |
+| `keep_local_grants` | `LocalActivation` |
+
+而 daemon 一项前置都没做，所以**三项全部被拒** —— 而「一个被拒绝的步骤不留痕迹」（第 130 轮的设计）
+正是 `performed` 空着的原因。**那个 outcome 没有声称做过任何检查，而那是对的。**
+
+★ 于是第 176 轮接上的那三项是**死代码**：它们永远返回 `OutOfOrder`，只让每个包多跑一次磁盘探针。
+这一轮撤掉了它们。
+
+★ 而**那个问题被钉成了一条测试**（`the_receiver_checks_cannot_be_run_out_of_order`）：
+在序列之外调用这三项，得到的是 `OutOfOrder` 而不是「做过」；而三次拒绝之后 `performed` 仍然是空的。
+把 `require` 改成总是 `Ok` 就会失败。
+
+★ **而它再次印证了第 141 与第 175 轮的结论**：⑧ 的那七项接不上，不是因为没人写调用者，
+而是因为**序列的第 1 项就要归档与 `SyncSession`，而传输路径没有它们**。
+这是一个设计决定（统一块记账、定义包格式），不是接线工作。
