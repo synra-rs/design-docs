@@ -728,6 +728,18 @@ pub fn install_panic_hook(paths: &Paths, version: &str) {
       而两条路径各记一条。
       ★ 本行的状态：门三项 + 直方图两项（host 调用、意图）+ 传输两项 + **发现三项**；
       缺的是网络那一组（`links_open`、`frames_*`、`bytes_*`、`reconnect_attempts_total`…）。
+      ★ **第 157 轮接了网络组的第一项**：`frames_sent_total{event}`，落点是 `Host::send`。
+      而 `Host` 因此多了一个**可选的记录器**（`with_metrics`）—— 与插件宿主同一个理由：
+      *一个不记账的 host 是 host，不是坏的*，而一次**因为指标写不进去**而失败的发送，
+      会是两端都看不见、也处理不了的理由拒绝掉的消息。
+      ★ **记在发送之后，而不是之前** —— 这不是细节：被链路拒绝的帧从未离开，
+      把它算进去会让这台设备说它讲了比实际更多的话。
+      ★ **而这一项之所以值得接**：`Host` 原本只有一个手工的 `sent: u64`（注释写着「for a report」），
+      它回答「说了多少」却说不出「说了什么」—— 而后者才是排查时要问的。
+      ★ 测试直接加在**既有的端到端测试**（`an_envelope_travels_between_two_connected_hosts`）里，
+      它本来就走完了 dial → 握手 → session → envelope，并且已经断言了 `sent() == 1`。
+      ★ 本行的状态：门三项 + 直方图两项 + 传输两项 + 发现三项 + **网络一项**；
+      缺的是 `links_open`、`bytes_*`、`reconnect_attempts_total` 等。
       ★ **第 144 轮接了传输组的两项**：`transfer_bytes` 与 `transfer_duration_ms{kind=attachment}`，
       在 `send_file` 的成功返回处（`self.metrics` 已在手，与意图那两项同一个落点）。
       ★ **而 `transfers_total{outcome}` 故意没接，理由值得写下来**：`send_file` 有多条 early return
