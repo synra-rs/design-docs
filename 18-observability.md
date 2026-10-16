@@ -708,6 +708,15 @@ pub fn install_panic_hook(paths: &Paths, version: &str) {
       弱断言更需要证明它能失败。
       ★ 于是本行的状态是：门的三项 + 一个直方图已接入；缺的仍是清单上的**其余项**
       （网络、发现、意图、传输…）。
+      ★ **第 143 轮接了意图组的两项**（`daemon` 侧的 `intent_dispatch`，那里 `self.metrics` 已在手）：
+      `intents_total{outcome=ok|refused}` 与 `intent_no_handler_total`。
+      ★ **而第一版测试失败了，失败本身有价值**：它假设「空插件集 → 路由失败」，但一个空插件集
+      **也会成功地把意图建立起来**。所以「路由成功」与「有人回答」是两件事 ——
+      这正是清单里 `intent_no_handler_total` 存在的理由，而 `intents_total{outcome=ok}` 会把两者算成一件。
+      一个没人能处理的意图和一个被处理了的意图，对用户是两种处境。
+      ★ 计时那两项（`intent_duration_ms` / `intent_match_duration_ms`）仍未接：它们要墙钟，
+      而这个方法的 `now_ms` 是**逻辑**时间。
+      ★ 本行的状态：门三项 + 一个直方图 + 意图两项；缺的仍是网络、发现、传输那几组。
       `RingRecorder` 只出现在 `synra-observe` 自己的测试里。§4.1 的指标名中只有
       `frames_sent_total`/`links_open` 出现过，且只是 `metrics/tests.rs` 的测试夹具。
 - [ ] 设置页的"性能"面板（实时指标）—— **缺失**：`synra-rust-app/src/pages` 只有
