@@ -767,7 +767,21 @@ fn event_routing_does_not_allocate() {
       WAT 的骨架跑通了 —— import instance、`core func (canon lower ...)`、
       `(with "host" (instance ...))`、以及**为什么内存必须自己一个模块**（降低一个带
       `string` 参数的导入必须指定 memory，而那块内存属于客体，所以不能在它里）。
-      ★ **而卡住的地方是 WIT 的 `outcome`**：真实契约是
+      ★ **而第 101 轮把它缩到了一行，并且推翻了上一轮的猜测**：
+      用一组取反对照把它逼到了一个结论 —— **字符串参数本身没问题**：
+      `(func (param "url" string))`（无返回值）能通过验证，报的是后面那个类型不匹配；
+      而**任何返回 `outcome`（variant）的导入都会被 wasmtime 的校验器拒绝**，报
+      `instance not valid to be used as import`。
+      ★ **而它在三种写法下都在同一个偏移（0x5e）上报同一句话**：
+      内联写在 `result` 里、写在 instance 类型内部、以及把 instance 写成命名 `(type $host_t (instance ...))`。
+      这三种都失败，而且**失败与 core 层无关**：
+      把 core instance 里的降低函数换成普通 core 函数（仍保留 variant 导入）依然报同一句。
+      ★ **而这不像是 wasmtime 的缺陷**：真实工具链不把类型写在文本里，而是用
+      `wasm-tools component embed` 把 WIT 类型**嵌进组件的类型段**，再由 `component new` 生成组件。
+      手写路径下这一步无法表达，而 `wasm-tools` 不在离线缓存里。
+      ★ 所以下一步不是“再换一种写法”，而是二选一：引入 `wasm-tools`；
+      或者把对照放在**已有的组件配件**上——即用 `wasm-runtime` 真档位测试里已有的
+      组件产物，而不是手写一个。
       `platform-open-url: func(url: string) -> outcome`，而 `outcome` 是一个 `variant`（`ok(string)` / `err(error)`，
       `error` 是一个带 `option<string>` 的 record）。客体导入的类型必须与 linker 定义的一致，
       而**类型写成一个命名 `$out` 引用时 wasm-tools 报
