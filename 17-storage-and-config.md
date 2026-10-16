@@ -709,7 +709,15 @@ plugins-manifest.json   # 已装插件清单（id + version + source），用于
 - [ ] 插件 secure storage（XChaCha20-Poly1305 + 每插件 DEK）—— **完全缺失**：
       全仓 0 处 `chacha`/`aead`/`DEK`；`plugin_secrets` 表不在任何迁移里。
 - [ ] `GcTask` + 清理策略 + GC 报告 —— ★ **两个类型仍缺失，但"清理策略"已经不是了**：
-      `GcReport` 全仓 0 命中；`GcTask` 只有 **1** 命中且是一句注释（`apps/synra-daemon/src/serve.rs:36`）。
+      ★ **而第 110 轮两个类型都写了**：`crates/synra-daemon/src/runtime/intents.rs` 的
+      `GcReport`（带 `failures`）与 `GcTask`（调度作为一个值），`serve.rs` 的 `collect_loop` 改取 `GcTask`。
+      ★ **而这一行本身就是证据**：拿掉声明后不到一轮，`doc-claims` 守卫就报了
+      `GcReport` “文档说 0、代码有 7” —— 而它不过是在做它该做的事。
+      旧的一句保留在这里，因为它记录了之前的状态 —— **当时**：`GcReport` 全仓 0 命中；
+      `GcTask` 只有 **1** 命中且是一句注释。
+      ★ **而“当时”两个字就是关键**：不写它，`doc-claims` 会把这句历史当成
+      当下的声明去数，于是报告一个**准确叙述过去**的句子是错的。工具对此的规则是
+      看数字前面有没有 `原状`/`当时`/`修前`。（`apps/synra-daemon/src/serve.rs:36`）。
       而 `runtime::intents::sweep` 已经在跑（每小时一次，带 `Retention { intents_ms, audit_ms }`），
       第 92 轮还有一条**只允许它动自己那三张表**的测试。**缺的是那两个类型与一份可读的报告，不是清理本身。**
       ★ **写入那一半本轮做了：`SynraDb::backup_to` + `synra db backup <path>`。**
