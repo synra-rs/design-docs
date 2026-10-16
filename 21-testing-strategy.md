@@ -384,6 +384,22 @@ async fn session_times_out_when_peer_is_silent() {
 > | 28 宿主 panic | ✓ | `catch_unwind` 的测试 |
 > | 29 `can_handle` 产生副作用 | ✓ | `HostCalls::pure()` + 纯会话拒绝副作用的测试 |
 >
+> ★ **而第 95 轮把它做成了最强形式：真的客体，穿过 Kernel**：
+> `crates/synra-core/src/dispatch/tests.rs` 的 `a_real_guest_that_loops_is_stopped_without_costing_the_others`。
+> 前一条证的是**内核对结果的处理**，引擎自己的测试证的是**引擎会产生这些结果**，
+> 但没有人把一个**真客体穿过 Kernel** 跑过 —— 而那才是用户拥有的性质。
+> 现在一个真的 `(loop (br))` 被装进 `PluginSet`，引擎真的数指令并真的停下它，
+> 而旁边那个真插件**连续两次**照常工作。
+> ★ **而它当场抓到了一个真的 bug**：预算里 `timeout: None` 的调用
+> 会保留**实例化时为防 start 函数跑飞而设的 `set_epoch_deadline(1)`**，
+> 于是执行器下一次 epoch 推进就中断它，`classify` 报出 `Timeout { after: 0ns }` ——
+> **一个根本没有时限的预算被判为超时**。现在 `None` 会把 deadline 真正卸下。
+> ★ **而它解释了一个旧的“偶发”**：第 75/76 轮记录过一次无法复现的失败，
+> 当时只能写“只出现在全工作区跑的时候”。原因就是它：中断需要 epoch 恰好在调用飞行时推进，
+> 而那只在并行负载下自己发生。新测试故意**先**推进 epoch 再调用，所以不是竞态。
+> ★ **而“卸下”该用什么值也是跑出来的**：`u64::MAX` 在 wasmtime 内部
+> **直接 panic**（`attempt to add with overflow`，store.rs），因为它把 deadline 加到当前 epoch 上。
+> 改用 `1 << 40`（约三百年，且不会溢出）。
 > ★ **而第 94 轮把那句关键的“内核仍可用 + 其它插件仍可用”补上了**：
 > `crates/synra-core/src/dispatch/tests.rs` 的
 > `every_way_a_plugin_can_misbehave_leaves_the_others_working`。
