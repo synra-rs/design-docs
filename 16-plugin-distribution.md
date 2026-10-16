@@ -586,6 +586,17 @@ pub struct UpdateInfo {
       `SyncError::WrongSession`；测试 `plugin_sync_tests.rs:157-199`。隔离是真的，而且是结构性的。
 - [x] `SyncRecord` + 同步历史 UI 数据 —— **C/一半**：
       `SyncRecord`(`plugin_sync.rs:602-611`) 存在**但只有四个字段**（`plugin_id`/`peer`/`action`/`at_ms`），
+  ★ **第 133 轮把字段补齐了**：`SyncRecord` 现在有 `id`（新类型 `SyncId`）、`version`、
+  `direction`（新类型 `SyncDirection`）、`started_at_ms`、`finished_at_ms`、`verdict`、
+  `bytes_transferred`、`trace_id`，加上既有的 `plugin_id`/`peer`/`action`。
+  ★ **两个刻意的偏离，都记在这里**：文档写 `SystemTime`，实现用**有符号毫秒** —— 仓库里每个时间戳
+  都是这个形状，而这条记录还要与它们比较、要能进 SQLite；文档写 `SyncOutcome`，实现叫 `SyncVerdict`，
+  因为 `SyncOutcome` 在这个模块里已经是一个**不同**的东西（接收端做过哪些义务的清单）。一个是意图，一个是命名冲突。
+  ★ **三态而不是布尔**：`Succeeded` / `Skipped { reason }` / `Failed { error }` ——
+  跳过意味着双方已经一致、不需要任何人做什么，失败意味着有人得看一眼。合成一个 `ok: false` 会把两件事说成一件。
+  ★ **`finished` 返回 `Result`**：一条记录只能有一个结局，收两次尾会**静默覆盖**第一次 ——
+  「先失败后成功」读起来就是成功。这是它返回 `Result` 而不是 `self` 的全部理由，也有测试。
+  ★ 仍然没有的：持久化、IPC DTO、前端消费，以及真正创建这些记录的编排者。
       文档要的是 `version`/`direction`/`startedAt`/`finishedAt`/`outcome`/`bytesTransferred`/`traceId`。
       ★ 无 `Default`、无持久化、无 IPC DTO、无前端消费。
 - [x] 自动更新门槛表（下面那张表）—— **已实现**（第 77 轮）：
