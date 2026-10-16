@@ -103,12 +103,39 @@ R4 不许假设框架）。而在前端生态里 `ui` 就等于"组件库"（`sh
 | ------ | ------ | -------- |
 | `@synra/theme` | 任何东西（零依赖） | `tokens` 纯数据、分段 CSS 文本、主题约定（`dark` 类） |
 | `@synra/theme/unocss` | 宿主界面、插件界面 | `presetSynra()` / `synraConfig()`（theme + preflights + 结构性 shortcuts + blocklist） |
+| `@synra/theme/antd` | 宿主界面（组件层）、用 antd 的插件作者 | 把 token 映射成 antd v5 的 theme token（`colorPrimary` / `colorBgContainer` / `borderRadius` / `fontFamily` …），**并关掉 antd 自带的阴影与实心浮起面**（R51–R53） |
 | `@synra/theme/vitepress` | 官网 | `--vp-c-brand-*` 的映射（亮/暗各一支紫，§15 R48） |
 | `@synra/theme/css` | 内联反闪屏、任何只要变量的地方 | 分段 CSS 文本（reset 段 / tokens 段，§15 R47） |
 
 **这个形状是整件事里最耐扩展的一点**：以后要接一个新的 UI 库（某组件库、某 CSS-in-JS），
 **加一个子路径，不加一个包**（R50）——否则插件作者要面对 N 个包，而"同一套 token"会被拆成
 N 份需要互相对齐的映射。
+
+> ★ **2026-10-16 业主决定：宿主使用 antd 作为组件层，配置收进 `@synra/theme/antd`。**
+>
+> 这是 R50 的第一个真实实例，也是它存在的理由的第一次兑现。三件事因此定下来：
+>
+> ① **包名仍然是 `theme`，不改叫 `ui`。** §1.3 上面那句"会推翻它的唯一条件"给的就是判据：
+> 只有当我们**自己出组件**时 `theme` 才低估了它。这次是**绑定** —— antd 的组件由宿主与插件各自安装
+> （插件本来也分享不到宿主的，见 [09 §5.5](./09-plugin-system.md)），`@synra/theme/antd` 只做
+> **token → antd theme token 的映射**。包根依然**没有组件、没有运行时依赖**（R2）。
+>
+> ② **`antd` 在 `@synra/theme` 里是 optional peer，与 `unocss` 同一个形状。** 官网只吃 token 层，
+> 不会为 antd 付一次装包；而"哪一层能碰哪个外部依赖"这条守卫（§13.2 守卫 7/10）**从一条变成两条**：
+> 除 `src/unocss/**` 以外不许 import `unocss`，除 `src/antd/**` 以外不许 import `antd`。
+>
+> ③ **它回答了一个悬了很久的问题：`28` 与 `09` 曾经互相矛盾。** `09 §5.5` 把"令牌名与 antd v5 一一对应"
+> 写成了插件契约，而 `28` 后来把 visual 语言整个换掉了、也没用组件库 —— 两份文档对"宿主长什么样"的
+> 假设不同。现在两者重新对齐，但对齐的方式要写清：**命名以 `@synra/theme` 为准（`--synra-screen` /
+> `--synra-ink` / `--synra-primary-ink` 这类语义名，已发布且对比度是算出来的），
+> 而"antd 的名字"由适配器导出的映射表提供** —— 用 antd 的插件作者照样"查 antd 文档就能对上"，
+> 不必学第二套词（`09 §5.5` 的意图保留，字面改掉，见那一节的 ★）。
+>
+> **代价，如实写**：① 宿主多了一个运行时不小的依赖（antd），而**插件仍然拿不到它** —— 它买的是宿主的
+> 开发效率与无障碍质量下限，不是插件的一致性；② antd 自带一整套视觉语言（默认阴影、实心浮起面、
+> 自己的圆角与字号），**而我们刚刚逐条退役了那套语言**（R21/R26/R29）—— 所以适配器不是"配个主色"，
+> 它必须把 antd 的外观拉到我们的材质与颜色上，否则这层绑定会把 §1.4 的设计方向整体推翻
+> （R51–R53 就是为此而写）。
 
 **代价与收益**：`synra-js` 因此多了一个**有运行时**的包（另一个是 `@synra/testkit`），
 而它的版本线**不与那四个类型包相同**（R1）。收益是**没有第六个仓库、也没有第六个跨仓库接触点**——
@@ -254,6 +281,53 @@ Vue 侧要的糖另开子入口（`@synra/theme/vue`），且只在宿主与官�
 > ⚠️ 唯一例外：适配器需要**特定框架的运行时依赖**、且那个依赖大到不该让所有人付（例如某个组件库本身）。
 > 那时仍先问一次"能不能只加子路径 + 把那个库声明成 optional peer"——**两个包只在子路径做不到时才允许出现**，
 > 并且要在本文件里记下为什么做不到。
+
+### R51 · antd 是宿主的组件层，外观来自 token（MUST）
+
+宿主的交互控件——按钮、输入、选择、表格、对话框、菜单、提示——**用 antd**，不手写。
+但**每一处外观都必须能追到 token**：
+
+- `ConfigProvider` 的 theme **只能**来自 `@synra/theme/antd`；应用里**不许**再写一个 theme 对象；
+- **不许**为了"调一下"而在组件上写 `style=`、`:deep()` 或自带 `box-shadow` 的类，把字面值重新引进来（R6）；
+- **R21 / R26 / R29 照旧管着"组合出来的画面"**：用了 antd 不等于可以摆一屏同构的 `Card`、不等于可以用
+  `Statistic` 的 title 当全大写小标签、不等于每个可点的面都要 `hoverable` + 过渡。
+
+理由：自己写控件的代价不在"长什么样"，在**行为与无障碍**——焦点陷阱、滚动锁、键盘导航、
+`aria-*` 的联动、虚拟滚动，这些每一项都有公认的正确答案，而自己实现一遍的失败方式全都落在
+**R35/R36 那两条 MUST 上**（键盘可达全部交互、状态不靠色相单独表达）。用组件库买的是这部分。
+
+**而这一条不是"把设计外包给 antd"**：组件库回答"这个控件怎么用"，不回答"这一屏该长什么样"。
+后者仍然由 §1.4 与 R21–R29 决定 —— 所以下面两条把它接回 token 与材质。
+
+### R52 · 适配器只做映射，不是第二套 token（MUST）
+
+`@synra/theme/antd` 的输入是包根的 `tokens`，输出是 antd v5 的 theme token：
+
+- **不许有独立取值的字面量**（一个 `#` / `rgb(` / `hsl(` 都不行）。它是映射，不是第二份真相源（R6）；
+- `antd` 在该包里是 **optional peer**，与 `unocss` 同一形状：包根仍然零依赖，官网不会为它付装包；
+- **只有 `src/antd/**` 可以 import `antd`**（§13.2 守卫 7/10 从一条变两条）；
+- 它**导出映射表**（`--synra-primary-ink ⇄ colorPrimaryText` 这类），供用 antd 写插件的作者对照 ——
+  这是 [09 §5.5](./09-plugin-system.md)"查 antd 文档就能对上"那句的落点。
+
+**有损的地方要写出来，不许默默砍档**。已知三处：
+
+| 我们的 token | antd 的对应 | 处理 |
+| ------------ | ----------- | ---- |
+| 圆角**三档**（`control` / `surface` / `pill`） | antd 基本只有一档 `borderRadius` | 映射到 `borderRadius` + `components.*.borderRadius` 的分项，**不许**把三档砍成一档 |
+| 中性色**只带一个色相**（全部偏紫，§1.4） | antd 的中性色是蓝灰 | 逐个覆盖（`colorBgContainer` / `colorBorder` / `colorText*`），否则一处分隔线就能把"一块材料"拆成两种材质 |
+| `--synra-line`（1.22:1，纯装饰）与 `--synra-line-strong`（4.62:1，承担语义） | antd 的 `colorBorder` 一个键 | 分别映射到 `colorSplit` 与 `colorBorder` —— 这正是 R24 算出两个 token 的原因 |
+
+### R53 · 浮起层用我们的材质，不用 antd 的阴影（MUST）
+
+antd 的 `Modal` / `Drawer` / `Dropdown` / `Tooltip` / `Popover` 全部落在 R43 的"**浮起的层**"里，因此：
+
+- 它们的面是 `--synra-glass` + `--synra-blur`（并带 `@supports (backdrop-filter: …)` 回退到
+  `--synra-glass-base`），**不是** antd 默认的实心 `colorBgElevated`；
+- **antd 自带的 `boxShadow` 必须关掉**（Modal / Dropdown / Card / Button 的默认阴影）。
+  理由就是 R45：我们的"浮起"由**玻璃 + 下面那层不动**表达，而 antd 的"浮起"由阴影表达 ——
+  两套同时在场，读起来不是更强的层级，而是两种材质；
+- `--synra-glow` 仍然只在 R45 的三处。antd 主按钮的**按下/激活态**是其中一处，**静止态不许有光晕** ——
+  而 antd 默认给主按钮的正是静止态阴影，所以这条不是"顺手"，是必须在适配器里显式关掉的一项。
 
 ---
 
@@ -546,6 +620,10 @@ glow 只允许出现在**三处**：
 3. 主按钮的按下/激活态。
 
 **禁止**把发光当静止阴影用（卡片、面板、图标底、选中项的静态外观一律不行）。
+
+> ★ **这条规则在"改用 antd"之后多了一次具体兑现**：antd 默认**给主按钮和浮起层加静止态阴影**
+> （`boxShadow` / `boxShadowSecondary`），而那正是本规则禁止的形态。所以适配器（R52）必须显式关掉它们，
+> 而不是"配个主色就算了" —— 详见 R53。**发光在这个界面里是状态，而 antd 的阴影是皮肤；两者不能共存。**
 
 理由：① 两处发光等于没有重点，暗色界面上的光晕会互相抵消；
 ② 大半径的彩色 `box-shadow` 在 Android WebView / WebKitGTK 上是真的掉帧；
@@ -878,7 +956,7 @@ UnoCSS 是**构建期**的，插件的 CSS 编译进它自己的产物。于是�
 
 **已完成**：
 
-- [x] `packages/theme`：包骨架 + 四个入口（`.` / `./css` / `./unocss` / `./vitepress`），
+- [x] `packages/theme`：包骨架 + 四个入口（`.` / `./css` / `./unocss` / `./vitepress`）——★ **第五个 `./antd` 见下面"未完成"**（R52）
       `unocss` 走 `peerDependenciesMeta.optional`（R2）
 - [x] token 真相源：14 个颜色 + 材质（玻璃/发光/模糊/焦点环）+ 层级 + 圆角 + 时长 + 字族（含 CJK 回退）+ 断点
 - [x] 分段 CSS：`css('app' | 'tokens' | 'none')`，而 `tokens` 档**没有元素选择器**（R47）
@@ -890,19 +968,36 @@ UnoCSS 是**构建期**的，插件的 CSS 编译进它自己的产物。于是�
 
 **未完成**（宿主与官网）：
 
-- [ ] `synra-app`：装 `unocss` + `@synra/theme`，写 `uno.config.ts`（`synraConfig()` 来自 `@synra/theme/unocss`）
-- [ ] `synra-app`：`pnpm-workspace.yaml` 的 `overrides` 加一行 `'@synra/theme': link:../synra-js/packages/theme`
-- [ ] `synra-app`：`index.html`——七变量退役为三件事；删掉 `font: 14px/1.5`
-- [ ] `synra-app`：`App.vue` / 四个 page 的 scoped CSS 迁到 utility，`<style>` 只留 R37 允许的那些
-- [ ] `synra-app`：`tauri.conf.json` 的 `minWidth` 改 1024（R12）
-- [ ] `synra-app`：`vite.config.ts` 显式设 `build.cssTarget`（R15）
-- [ ] `synra-app`：`eslint.config.ts` 开 `unocss: true`，装 `@unocss/eslint-plugin`
+- [x] `synra-app`：装 `unocss` + `@synra/theme`，写 `uno.config.ts`（`synraConfig()` 来自 `@synra/theme/unocss`）
+      ★ 接入时**发现两处静默失败**，都已修：① 主题把时长与缓动映射到 `transitionDuration` /
+      `transitionTimingFunction`，而 `@unocss/preset-mini@66` 读的是 `theme.duration` / `theme.easing` ——
+      于是 `duration-*` / `ease-*` **从来不会生成**（R30 会退化成每个组件自己写字面 `150ms`）；
+      ② `@unocss/vite` **没有把样式注入产物**（构建产物里零 UnoCSS 输出），改成显式 `import 'uno.css'` 才对。
+      两件事都是"看起来在跑、其实什么都没做"，发现方式是逐个类名生成 CSS 核对
+- [x] `synra-app`：`pnpm-workspace.yaml` 的 `overrides` 加一行 `'@synra/theme': link:../synra-js/packages/theme`
+- [x] `synra-app`：`index.html`——七变量退役为三件事；删掉 `font: 14px/1.5`
+- [x] `synra-app`：**壳层**（`App.vue`）迁到 utility：三档导航形态、焦点环、状态不只靠颜色、
+      hover 只在真 hover 设备上、**一个 `<style>` 块都没有**
+- [x] `synra-app`：`tauri.conf.json` 的 `minWidth` 改 1024（R12）
+- [x] `synra-app`：`vite.config.ts` 显式设 `build.cssTarget`（R15）★ **它的效果还没验到**：
+      目前没有浮起层，`backdrop-filter` 尚未进产物；等第一个对话框落地时核对 `-webkit-` 前缀
+- [x] `synra-app`：`eslint.config.ts` 开 `unocss: { strict: true }`（blocklist 来自 `synraConfig()`）
+- [ ] `synra-app`：**四个页面**迁到 utility（`--panel` / `--border` / `--muted` 等退役变量还有 35 处）——
+      含 R26（面不是卡）、R28（空状态是邀请）、R27（那条线）、R29、R21
+- [ ] **`@synra/theme/antd` 适配器**（R52）：token → antd theme token 的映射 + 导出的映射表 +
+      `antd` 作为 optional peer + "只有 `src/antd/**` 能 import antd" 的守卫（§13.2 守卫 7/10 从一条变两条）
+- [ ] `synra-app`：装 antd，`ConfigProvider` 的 theme **只**取自适配器（R51）；应用里不出现第二个 theme 对象
+- [ ] `synra-app`：浮起层（Modal / Drawer / Dropdown / Tooltip / Popover）换成 `--synra-glass` + `@supports`
+      回退，并**关掉 antd 的默认阴影**（R53）—— 顺带验 `-webkit-backdrop-filter`
 - [ ] `synra-app/scripts/check-shapes.ts`：新增守卫 2 / 3 / 4 / 8 / 11（各配负控制）
 - [ ] 材质落地到组件：`floating` 的 `@supports` 回退、发光只出现在允许的三处（R43、R45）
 - [ ] 字体：字族栈已定（IBM Plex Sans + Mono，R18），**而字体文件与 `@font-face` 那一半没做**
       （R17：宿主负责把它放进产物；许可文件随产物）
 - [ ] 文案：messages 模块 + 词汇表（R31、R32）
 - [ ] 错误面渲染 `actions`（R33）
+- [ ] **`synra-rust-core` 的 `NOTES/2026-02-ui-design-tokens.md` 要与实现对齐**：它是
+      [09 §5.5](./09-plugin-system.md) 引用的"完整变量清单"，而那份清单是 antd 命名时代的产物 ——
+      现在是语义命名 + 适配器映射表（R52）
 - [x] `synra-rs/docs` 的 `plugins/ui.md` 的 Styling 一节：已按 §12 里**今天就已经成立**的部分重写
       （页面可以加载什么、主题、文字方向；中英两侧，`pnpm check` 三条守卫通过）
 - [ ] 同上的 **install 说明在 `@synra/theme` 发布之后**才补进那一页——
@@ -929,6 +1024,7 @@ UnoCSS 是**构建期**的，插件的 CSS 编译进它自己的产物。于是�
 | Q-1 字体家族 | **IBM Plex Sans + IBM Plex Mono**（"合适且免费可商用"→ SIL OFL 1.1，允许随包再分发） | §1.4、R18 |
 | （新）包名与位置 | **`@synra/theme`**，回到 `synra-js/packages/theme`；**不叫 `ui`**（`ui` 承诺组件，而这个包不许有组件），也不做第六个仓库；外部 UI 一律走子路径 | §1.3、§2 R1/R2/R50 |
 | Q-7 官网跟不跟 | **跟，而且直接共用这个库**；`--synra-term-*` 退役、preflight 分两段、亮/暗各一支紫 | §1.2、§15 R47–R49 |
+| Q-8 要不要组件库 | **要，用 antd**；**配置收进 `@synra/theme/antd`**（R50 的第一个实例），包名仍叫 `theme`（绑定 ≠ 出组件），`antd` 是 optional peer | §1.3、§2 R51–R53 |
 
 仍是 🔴 的：
 

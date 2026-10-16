@@ -275,7 +275,7 @@ docs/
 | **25** | ★ [**JS 包 monorepo**](./25-js-monorepo.md)             | `synra-js` | `synra` / `@synra/client` / `@synra/protocol` / `@synra/testkit` 的仓库形态、发布、版本、CI 守卫 |
 | **26** | ★ [**核心稳定性、封装与性能**](./26-core-stability-and-perf.md) | `synra-core` | 三条贯穿性要求的**可检查规则**：稳定层义务、封装四律、热路径零分配、数据结构选型 |
 | **27** | ★ [**官网与文档站**](./27-website.md)                | `docs` | 站点结构、双语策略、Netlify 部署、**schema 托管与冻结**、写作规范 |
-| **28** | ★ [**App UI 规范**](./28-app-ui.md)                  | `synra-app` + `synra-js` + `docs` | **三个消费者**（宿主 / 插件 / 官网）的同一套 token 与 **50 条规则**：`@synra/theme` 的四入口形状、断点、字体、色彩与材质、文案、无障碍下限、强制执行与守不住的部分 |
+| **28** | ★ [**App UI 规范**](./28-app-ui.md)                  | `synra-app` + `synra-js` + `docs` | **三个消费者**（宿主 / 插件 / 官网）的同一套 token 与 **53 条规则**：`@synra/theme` 的多入口形状（`./unocss` / `./antd` / `./vitepress` / `./css`）、断点、字体、色彩与材质、组件层（antd）的绑定方式、文案、无障碍下限、强制执行与守不住的部分 |
 
 > **归属列用的是真实仓库名**（`synra-core` / `synra-app` / `synra-js` / `docs`）。本仓库（`design-docs`）本身是设计文档的家，不再单列一列。
 >

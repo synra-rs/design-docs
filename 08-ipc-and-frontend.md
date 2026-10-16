@@ -396,7 +396,8 @@ export const useDevicesStore = defineStore('devices', () => {
 | -------- | ------------------------------------------- | -------------------------------------- |
 | 构建     | **Vite**（保留，Tauri 官方模板）              | 不用 Vite+（Rust 侧已接管工具链职责）    |
 | 框架     | Vue 3 + `vue-router` + Pinia                 | 保留（组件层可复用）                    |
-| 样式     | UnoCSS（配置与全部样式规则见 [28](./28-app-ui.md)） | 保留；`@synra/unocss` 提供宿主与插件共用的 token |
+| 组件     | **antd**，配置**只能**来自 `@synra/theme/antd` | 2026-10-16 定；[28 §2 R51–R53](./28-app-ui.md)。`antd` 在 `@synra/theme` 里是 **optional peer**，官网不为它付装包 |
+| 样式     | UnoCSS（配置与全部样式规则见 [28](./28-app-ui.md)） | 保留；`@synra/theme/unocss` 提供宿主与插件共用的 token（★ 这条原来写的是旧包名 `@synra/unocss`） |
 | 测试     | Vitest（组件/单元）+ Playwright（E2E，可选）   | 保留 + 增加                            |
 | 类型     | TypeScript（版本随生态）                      | 生成物来源是 Rust                       |
 
