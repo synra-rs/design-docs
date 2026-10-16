@@ -958,3 +958,25 @@ listener 在别的模块，看不见。所以那要么是 `Host` 上的一个访
 **里面没有「安装」**。而 daemon 只做了安装 —— 所以一个诚实的 `SyncOutcome` 里，
 `performed` 是**空的**，`is_fully_checked()` 是 `false`。
 **那不是缺陷，那是事实**：这个内核还没有运行过 ⑧ 的那七项检查，而一个声称做过的 outcome 会让 ⑨ 说谎。
+
+## 第 171 轮：接收端真的回了一个结果
+
+★ 第 133 轮的 `messaging::sync_result` 从那时起没有生产调用者，而这一轮它有了：
+接收端在检查并安装之后，把结果发回给发起端。第 134 轮的 `SyncTable::apply_result` 等的也是它。
+
+★ **而做的过程中发现第 148 轮的一个错误。** 那一轮我把回调放在 `handle` **返回之后**执行 ——
+那时连接已经结束、`link` 已经 drop，所以**结果永远发不出去**。
+回调现在移进了 `handle_within` 内部：**回复属于问它的那条连接**。
+
+★ **`performed` 是空的，而那是事实。** 它列的是 ⑧ 的七项检查义务
+（`PackageDigest`、`Signature`、`Manifest`、`ArchiveLimits`、`SessionComplete`、`LocalActivation`、`LocalGrants`），
+而这个内核**一项都还没有跑** —— 它做的是安装。`activated: true` 是真的
+（安装时启用了，第 151 轮），而 `is_fully_checked()` 会是 `false`。
+**一个声称检查过的 outcome 会让 ⑨ 写下一件没发生的事**，而那是这份文档一直在挡的东西。
+
+★ **`FinishedCallback` 是一个类型别名**，而不是三处各写一遍那个读不出来的签名 ——
+clippy 的 `type_complexity` 是对的，而它的答案与第 166 轮的 `SyncRound` 是同一个：**给那个东西起名字**。
+
+★ **这一轮执行得不好：六次失败、十七次调用。** 脚本在中途 assert 中止（于是后半段的改动从未写入）、
+缩进不匹配让三处调用点漏掉、同一处被插了两次。**根因是我把一个改动拆成了太多步** ——
+而第 169 轮已经证明：一次做完、一次编译，是最好的形状。
