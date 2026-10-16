@@ -122,7 +122,7 @@ N 份需要互相对齐的映射。
 >
 > ② **`antd` 在 `@synra/theme` 里是 optional peer，与 `unocss` 同一个形状。** 官网只吃 token 层，
 > 不会为 antd 付一次装包；而"哪一层能碰哪个外部依赖"这条守卫（§13.2 守卫 7/10）**从一条变成两条**：
-> 除 `src/unocss/**` 以外不许 import `unocss`，除 `src/antd/**` 以外不许 import `antd`。
+> 除 `src/unocss/**` 以外不许 import `unocss`，除 `src/antd/**` 以外不许 import `ant-design-vue`。
 >
 > ③ **它回答了一个悬了很久的问题：`28` 与 `09` 曾经互相矛盾。** `09 §5.5` 把"令牌名与 antd v5 一一对应"
 > 写成了插件契约，而 `28` 后来把 visual 语言整个换掉了、也没用组件库 —— 两份文档对"宿主长什么样"的

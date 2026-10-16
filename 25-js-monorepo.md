@@ -82,7 +82,7 @@ CI 对前三个有"不允许产出 `.js`"的守卫（§6）。
 > | | 允许 import 它的目录 | 它在 `package.json` 里的位置 |
 > | - | -------------------- | ---------------------------- |
 > | `unocss` | `packages/theme/src/unocss/**` | `peerDependencies` + `peerDependenciesMeta.optional`，**不在** `dependencies` |
-> | `antd` | `packages/theme/src/antd/**` | 同上 |
+> | `ant-design-vue` | `packages/theme/src/antd/**` | 同上（★ 包名是 `ant-design-vue` 而不是 `antd`：宿主是 Vue 3，React 那条线是另一个包、另一个大版本号 —— 见 [28 §1.3](./28-app-ui.md)） |
 >
 > **这条泛化本身就是价值**：如果哪天要接第三个外部 UI（R50），它不需要新守卫，只需要往这张表里加一行 ——
 > 而"哪一层能碰哪个外部依赖"这个问题始终只有一个答案。
@@ -387,8 +387,8 @@ synra-app ────────────────────┘
 | 6 | **一组四个**包版本一致（`synra` / `@synra/client` / `@synra/protocol` / `@synra/testkit`）；`@synra/theme` **独立版本线** | 读前四个 `package.json` 的 `version` 比较；`theme` 单独一条线（§4.1 的 ★） |
 | 7 | `types: ["@synra/client"]` 可用                         | `scripts/link-dist.ts` 铺出安装布局 + `tsc -p packages/client/type-tests/tsconfig.json` |
 | 8 | 文档里的类型片段能编译                                    | 把 [23](./23-client-library.md) 里的代码块抽出来做类型检查（防文档漂移）★ **第 122 轮核实：已实现** —— `scripts/check-doc-snippets.ts`，挂在根 `package.json` 的 `docs:types`，实跑输出 `· doc-snippets: the complete authoring example in 23 §8 compiles` |
-| 9 | **`theme` 的包根零依赖 / 每个子路径的外部依赖都是 optional peer** | 包根本身不出现 `from 'unocss'` 或 `from 'antd'`；两者都在 `peerDependenciesMeta` 中 `optional: true`，且**不在** `dependencies`（[28 §2 R2/R52](./28-app-ui.md)）。★ `unocss` 这一半**已实现**；`antd` 那一半**随适配器落地**（[28 §16.1](./28-app-ui.md)），现在写在这里是为了让名字先有位置 |
-| 10 | **只有对应的那一层能 import 对应的外部依赖**               | 除 `packages/theme/src/unocss/**` 以外不许 import `unocss`，除 `src/antd/**` 以外不许 import `antd`；负控制：在 `src/css/` 里加一行 import → 必须报红。★ 与守卫 9 同样是"一条规则跑两遍"，名单见本节上面的 ★ |
+| 9 | **`theme` 的包根零依赖 / 每个子路径的外部依赖都是 optional peer** | 包根本身不出现 `from 'unocss'` 或 `from 'ant-design-vue'`；两者都在 `peerDependenciesMeta` 中 `optional: true`，且**不在** `dependencies`（[28 §2 R2/R52](./28-app-ui.md)）。★ `unocss` 这一半**已实现**；`ant-design-vue` 那一半**随适配器落地**（[28 §16.1](./28-app-ui.md)），现在写在这里是为了让名字先有位置 |
+| 10 | **只有对应的那一层能 import 对应的外部依赖**               | 除 `packages/theme/src/unocss/**` 以外不许 import `unocss`，除 `src/antd/**` 以外不许 import `ant-design-vue`；负控制：在 `src/css/` 里加一行 import → 必须报红。★ 与守卫 9 同样是"一条规则跑两遍"，名单见本节上面的 ★ |
 | 11 | **标签与版本一致**（发布前，不在 `check` 里）                 | `scripts/check-release-tag.ts`：`GITHUB_REF_NAME` 去掉 `v` 之后必须等于**每个**会发布的包的版本。空标签、空工作区、任何一个包对不上都是失败（3 条正/负向测试在 `check-release-tag.test.ts`） |
 | 12 | **每个声明的入口都真的存在**                               | `check-shapes.ts`：`main` / `module` / `types` / `exports.*` 里写的每一个路径都要在包目录里存在。★ **它第一次跑就抓到了 `@synra/testkit`**，见下面的 ★ |
 | 13 | **每个包都带协议文本，且与根上逐字节相同**                 | `check-shapes.ts`：根 `LICENSE` 必须存在，且五个包目录下的那份与它一致。★ **五份拷贝是 npm 的形态决定的**（它只自动包含**包目录下**的 LICENSE，不会去仓库根拿），所以它们会漂移 —— 除非有人盯着 |
