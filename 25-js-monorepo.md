@@ -341,12 +341,13 @@ synra-app ────────────────────┘
 | 2 | `synra` 与 `@synra/client` **没有值导出**                | ★ **入口**（`dist/index.d.ts`）里不得出现不带 `type` 的 `export { ... }`。仓库开了 `verbatimModuleSyntax`，所以"类型还是值"由编译器强制区分 |
 | 3 | **形状一致性**                                          | `scripts/check-shapes.ts`：命名约定 / 错误码 / 帧类型 / 常量 / DTO 字段**逐项与 Rust 对照**（内核仓库不在旁边时跳过并说明） |
 | 4 | 生成物未被手改                                          | `pnpm sync && git diff --exit-code packages/protocol`      |
-| 5 | 生成物与 core 一致                                      | 同守卫 3 的那次对照（CI 会把 `synra-core` checkout 到 `synra-rust-core`） |
+| 5 | 生成物与 core 一致                                      | 同守卫 3 的那次对照（CI 把 `synra-core` checkout 到 `synra-rust-core`——**仓库里面**，理由见 §6.1 的 ★） |
 | 6 | **一组四个**包版本一致（`synra` / `@synra/client` / `@synra/protocol` / `@synra/testkit`）；`@synra/theme` **独立版本线** | 读前四个 `package.json` 的 `version` 比较；`theme` 单独一条线（§4.1 的 ★） |
 | 7 | `types: ["@synra/client"]` 可用                         | `scripts/link-dist.ts` 铺出安装布局 + `tsc -p packages/client/type-tests/tsconfig.json` |
 | 8 | 文档里的类型片段能编译                                    | 把 [23](./23-client-library.md) 里的代码块抽出来做类型检查（防文档漂移）★ **第 122 轮核实：已实现** —— `scripts/check-doc-snippets.ts`，挂在根 `package.json` 的 `docs:types`，实跑输出 `· doc-snippets: the complete authoring example in 23 §8 compiles` |
 | 9 | **`theme` 的包根零依赖 / `unocss` 是 optional peer**      | 包根本身不出现 `from 'unocss'`；`package.json` 里 `unocss` 在 `peerDependenciesMeta` 中 `optional: true`，且**不在** `dependencies`（[28 §2 R2](./28-app-ui.md)） |
 | 10 | **只有 `./unocss` 那一层能 import `unocss`**               | 除 `packages/theme/src/unocss/**` 以外，任何文件出现 `from 'unocss'` 即失败；负控制：在 `src/css/` 里加一行 import → 必须报红 |
+| 11 | **标签与版本一致**（发布前，不在 `check` 里）                 | `scripts/check-release-tag.ts`：`GITHUB_REF_NAME` 去掉 `v` 之后必须等于**每个**会发布的包的版本。空标签、空工作区、任何一个包对不上都是失败（3 条正/负向测试在 `check-release-tag.test.ts`） |
 
 > ★ **守卫 9 与 10 是"两层"这个设计的承重墙**，它们是同一个决定的两种失败方式：
 > 包根依赖 `unocss`（9 失败）会让**官网**为一个它不用的工具付一次体积；而 `unocss` 的 import
@@ -389,6 +390,46 @@ synra-app ────────────────────┘
 | 2 | 注入对象暴露的键集合 ⊆ `SynraClient` 的键集合                 |
 | 3 | 未实现的能力必须在**明确拒绝**（`unsupported`）并缺席 `supported` |
 | 4 | 禁止在本仓库重复声明 `SynraResponse` / `SynraError`           |
+
+### 6.1 发布流水线：一个文件，只有标签触发
+
+`.github/workflows/release.yaml` 是**唯一**的 workflow，触发源**只有** `push: tags: ['v*']`。
+
+```
+tag v*  →  标签与版本一致  →  取内核（可缺）  →  install(frozen)
+        →  check  →  test  →  lint  →  build
+        →  publish:workspace --publish --provenance
+```
+
+> ★ **这里曾经有一步"生成物未被手改"，它被删掉了 —— 因为它不可能通过。**
+>
+> 那一步是 `pnpm --filter @synra/protocol sync` + `git diff`，从旧 `ci.yml` 搬过来的。两条理由各自都足够：
+> ① `sync` 现在**不是生成器**：它按设计打印说明并 `exit 1`（§2.2 记录的"那条导出路径不存在"），
+> 所以它在 `set -e` 下当场失败；② "重新生成再 diff"在生成器不存在时是不可能的。
+>
+> 真正的检查在 `check` 里：`shapes` 拿镜像与内核**逐字段对照** —— 那正是 `sync` 的说明让人去跑的那一个。
+> **而它之所以能被发现，是因为这一步在 CI 里跑过一次**：本地 `pnpm run check` 不碰它。
+
+| 决定 | 理由 |
+| ---- | ---- |
+| **只有一个文件** | 检查与发布共用同一串步骤，不必维护两份会分叉的步骤列表 |
+| **只有标签触发** | 一次发布 = 一个标签。**代价写清楚：PR 与 push 到 main 都不再有任何检查**，坏提交要到打标签时才发现，而那时它已经在 main 上了。要恢复就再加一个 `ci.yaml`，不是往这里加 `pull_request`——那会让两件事共用一次运行，而它们的权限要求不同（发布要 `id-token: write`） |
+| **`pnpm/action-setup` 不写 `version`** | 版本由 `package.json#packageManager` 单一来源决定；两处都写会得到 `Multiple versions of pnpm specified` 而直接失败 |
+| **OIDC 而不是 `NPM_TOKEN`** | `permissions: id-token: write` 走 npm Trusted Publisher，仓库里没有长期 token。⚠️ **npm 后台的 "Workflow filename" 必须写成 `release.yaml`**（不是 `.yml`），否则 OIDC 校验被拒，而报错是 401、看起来像 token 过期 |
+| **标签守卫排在最前** | 它是这里唯一一条"发出去就收不回来"的规则：到了 registry 的版本只能 deprecate |
+| **`--provenance` 只在 CI 给** | 它需要 OIDC 提供方；本机带上会失败，而本地 `--publish` 是"发到一半失败后继续"的口子（§8 的 `--from`），必须留着 |
+
+> ★ **顺带修掉一个"检查了很多、其实一项都没查"的洞。**
+>
+> 守卫 3/5 是拿 TypeScript 与 Rust **逐项对照**的，而它们一直在找**仓库旁边**的内核
+> （`resolve(jsRoot, '..')`）。旧 `ci.yml` 用 `actions/checkout` 把内核放到 `path: synra-rust-core`——
+> 那是**仓库里面**，因为 checkout 拒绝把文件放到工作区之外。所以 CI 里那句
+> "the Rust protocol crate was not found … the checks that compare against Rust were skipped"
+> 每次都在打印，而绿色的摘要和"从未对照过"的摘要在输出里长得一样。
+>
+> 现在 `check-shapes.ts` 的 `kernelCandidates()` 按顺序找三个位置（`SYNRA_CORE_ROOT` → 旁边 → 里面），
+> 三条测试钉住它（含"里面有"这一条，也就是 CI 的布局）。**本地布局本来就能跑，所以这个洞只在 CI 里存在**——
+> 这也是它活了这么久的原因。
 
 ---
 
@@ -603,7 +644,7 @@ export default defineBuildConfig({
 | `types`                          | `./dist/index.d.ts`                             | 支撑 `types: ["pkg"]` 与 `import type` 两种用法                  |
 | `exports["."].types`             | 同上                                            | 现代解析器（`moduleResolution: bundler`）走 `exports`             |
 | `exports["."].default`           | 见下                                             | 见 §7.6                                                       |
-| `files`                          | `["dist"]`                                      | 发布物只有 `dist/`（里面已被 hook 保证只有 `.d.ts`）                |
+| `files`                          | `["dist", "!dist/.tsbuildinfo"]`                 | 发布物只有 `dist/`，而**构建缓存要排除**：`tsc -b` 把它写在 `dist/.tsbuildinfo` 里，而 npm 的 `files` 白名单会把它一起打进去。实测：`@synra/theme` 的包因此从 44.9 kB 降到 28.7 kB（解包 140 kB → 76 kB），而**五个包都中过这一枪**。取反模式在 npm 与 pnpm 的打包器下都生效（用 `pnpm pack` 出的真实 tarball 验过） |
 | `publishConfig.access`           | `"public"`                                      | scoped 包默认 private，必须显式声明                              |
 | `dependencies`                   | `workspace:^`                                   | pnpm workspace 协议；发布时自动替换为具体版本号                    |
 | `peerDependencies`               | 纯类型包**不需要**                                | 见下方说明                                                     |
@@ -767,8 +808,8 @@ export default defineBuildConfig({
 >
 > ### 已经做好、且与本文一致的
 >
-> §2 的四个包、`pnpm-workspace.yaml`、`tsconfig.base.json`、`.github/workflows/ci.yml`、
-> `scripts/{check-shapes,gen-protocol-types,link-dist}.ts`、生成物目录与头注释、
+> §2 的四个包、`pnpm-workspace.yaml`、`tsconfig.base.json`、`.github/workflows/`（当时是 `ci.yml`，
+> 现在是 §6.1 的 `release.yaml`）、`scripts/{check-shapes,gen-protocol-types,link-dist}.ts`、生成物目录与头注释、
 > `testkit` 的实现（64 条测试）、四包版本一致（本轮补上了守卫）、
 > `types: ["@synra/client"]` 的 fixture 检查（§7 之外的清单第 12 条）。
 >
@@ -825,8 +866,27 @@ export default defineBuildConfig({
 - [x] `scripts/check-shapes.ts` + 形状快照
       ★ 核对方式是**与 Rust 对照**（命名、错误码、帧类型、常量、DTO 覆盖），而不是快照文件；
       在没有内核仓库时那几项会跳过并说明。这比快照强：快照只能发现"变了"，对照能发现"错了"
-- [ ] CI 的 **10** 条守卫（§6）—— **1、2、3、4、5、6、7 已实现；8（文档代码块能编译）没有；
-      9、10 随 `@synra/theme` 一起新增**
+- [x] CI 的 **11** 条守卫（§6）—— **1、2、3、4、5、6、7、9、10、11 已实现**（9/10 随 `@synra/theme` 落地，
+      11 是发布前的标签守卫）；**8（文档代码块能编译）没有**
+      ★ **而"守卫 9/10 落地"这件事顺带暴露了一个更值得记的洞**：`scripts/` 里的代码**不在任何构建工程里**
+      （每包的 `tsconfig.json` 只收自己的 `src/`），而 eslint 不做类型检查 —— 所以那里的类型错误
+      **没有任何东西会发现**。`tsconfig.lint.json`（那个"给 eslint 读"的工程）里躺着两条：
+      `gen-protocol-types.ts` 少了 `node:fs` 的 import（**一跑就 ReferenceError**），
+      以及 `publish.ts` 两个 throw 漏了 `OrderError` 的第二个参数（于是 `error.involved` 是 `undefined`）。
+      第一条会让发布流水线在"生成物"那一步崩掉；两条都已修。
+      ★ **教训**：`tsc -b` 绿不等于仓库里的 TypeScript 是干净的 —— 它只检查它被指到的那些文件。
+- [x] **发布流水线：一个 `release.yaml`，只有 `v*` 标签触发**（§6.1）
+      ★ 旧的 `ci.yml` 已删除，它那串检查（check / test / lint / 内核对照）全部并进这一个文件；
+      **"生成物未被手改"那一步没有并过来 —— 它不可能通过**（理由见 §6.1 的 ★）
+      ★ **顺带修好一个洞**：守卫 3/5 在 CI 里从来没跑过（内核 checkout 到了仓库里面，而脚本只找旁边），见 §6.1 的 ★
+- [ ] **`synra` 的依赖声明与它的公开面不一致**（本轮彩排时发现，尚未决定怎么处理）：
+      `packages/synra/src/index.ts` 是 `export type * from '@synra/client'` / `'@synra/protocol'`，
+      所以它的 `.d.ts` 里有这两个外部 import；而 manifest 把它们放在 **`devDependencies`** 里
+      （`publishConfig` 之外的唯一一处）。后果：**单独 `npm i synra` 的消费者拿到的是解析不了的类型**，
+      而 §3.3 的表格把"想显式安装也可以"列为一个选项。
+      修法各有代价，需要一次决定：① 写进 `dependencies`/`peerDependencies` → 与 `@synra/client`
+      形成**环**，而 `publishOrder()` 遇环是**拒绝**（这是它明确的设计）；② 把 `synra` 的声明做成自包含
+      （需要打包器，而本仓库用的是 `tsc -b`）；③ 承认它只能作为传递依赖，改掉文档里那个选项
 - [x] 四包版本同步（`fixed` 模式 + `bumpp -r`）
       ★ 本轮补上了守卫（`check-shapes.ts` 的"4 publishable packages share version"）。
       原来只有 `bumpp -r`，而"记得跑它"不是一条守卫

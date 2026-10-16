@@ -205,11 +205,19 @@ import { vitepressBrand } from '@synra/theme/vitepress'
 
 ### R3 · shortcuts 只放结构原语（MUST）
 
-**允许**：`stack` / `row` / `panel` / `focus-ring` / `screen` 一类描述**结构与行为**的形状。
+**允许**：`screen` / `stack` / `row` / `panel` / `floating` / `focusable` 一类描述**结构与行为**的形状。
 **不允许**：`card` / `btn-primary` / `badge` / `input` 一类**成品的视觉组件**。
 
 理由：一旦 preset 里有 `card`，所有消费者都会长成同一张卡——那是把"统一"做成了"撞脸"。
 统一该管的是"不许漂移"，不是"够不够独特"；独特性来自 §1.4 那少数一次性决策，不来自组件的复刻。
+
+> ⚠️ **短名字不许以"变体名 + 连字符"开头。** 这一条是踩出来的：焦点环原来叫 `focus-ring`，
+> 而 UnoCSS 把它解析成 **`focus` 变体 + `ring` 工具类**（`.focus-ring:focus{--un-ring-width:3px}`），
+> 于是那个 shortcut 被静默遮蔽 —— 生成的是 `:focus`（鼠标点一下也亮环）、环宽也不对，
+> **而名字看起来完全正常**。现在它叫 `focusable`。
+>
+> 判据不看名字（"哪些前缀危险"是一张永远不全的名单），看**展开结果**：一个 shortcut 的 body
+> 展开出的每一条声明，都必须出现在"用 shortcut 名展开"的 CSS 里（§13.2 守卫 9）。
 
 ### R4 · 不许假设框架，不许绑 `#app`（MUST）
 
@@ -378,6 +386,12 @@ tokens (TS) ──┬──► theme.colors / theme.spacing / …   → 生成 u
 而失败的样子是"字体悄悄变了"，不是报错。
 
 两种机制，**推荐 A**：
+
+> ★ **实现时发现机制 A 根本不需要 `presetWebFonts`。** 它要做的唯一一件事是生成 `font-family`
+> 工具类，而那是 `theme.fontFamily`（同一份 token）本来就会生成的 —— 装它是一次空转。
+> 所以现在 `presetSynra` 只带字族栈（含 CJK 回退），**而 `@font-face` 与字体文件那一半仍然是宿主的
+> 责任**（那一半没做，见 §16.1）。机制 B 才需要那个 preset：它负责下载与改写 URL。
+> **不变量不变**：运行期一次网络请求都不许有。
 
 | | 机制 | 怎么做 | 代价 |
 | - | ---- | ------ | ---- |
@@ -689,11 +703,17 @@ UnoCSS 是**构建期**的，插件的 CSS 编译进它自己的产物。于是�
 
 ### R41 · 图标必须构建期（MUST）
 
-`presetIcons({ cdn: false })` + `@iconify-json/*` 作为 devDependency。
+**不设 `presetIcons` 的 `cdn` 选项** —— 这就是"不取 CDN"，+ `@iconify-json/*` 作为 devDependency。
 
 理由：插件页 `connect-src 'none'`，运行期取图标**必然失败**，而失败的样子是一排空方块——
 它看起来像图标库坏了，而不是像网络被拒。**注意**：这一条与 §1.4 引用的参考工程相反
 （那边写的是 `cdn: 'https://esm.sh/'`），那个写法在 Synra 的两个 CSP 下都不能用。
+
+> ★ **本节原来写的是 `cdn: false`，而那个写法在 `@unocss/preset-icons@66` 里是类型错误。**
+> 那个版本的选项是 `cdn?: string` —— 只有一个 URL，**没有"关掉"的布尔值**（`false` 是更早版本的配方）。
+> 实现时被 `tsc` 纠正过来：**"不取 CDN"的表达方式是不设它**，所以现在的守卫断言的是
+> "preset 自己的 options 里没有 `cdn` 这个键"（§13.2 守卫 10）。
+> 这也是为什么"照抄一份能跑的配置"不够 —— 选项的形状会变，而抄来的那份不会跟着变。
 
 ### R42 · 诚实条款：第三方守不住（MUST 写明）
 
@@ -736,16 +756,30 @@ UnoCSS 是**构建期**的，插件的 CSS 编译进它自己的产物。于是�
 它**在这个仓库里**（R1），所以守卫落在两处：包自己的测试（构建期行为），
 与 [25 §6](./25-js-monorepo.md) 的 `scripts/check-shapes.ts`（清单、依赖关系与"哪一层能碰到什么"）。
 
-| # | 守卫 | 落在哪 | 保证哪条 |
-| - | ---- | ------ | -------- |
-| 1 | preflight 发出的变量名集合 **==** theme 的颜色键集合 | 包测试 | R6（单一真相源） |
-| 2 | 成对颜色的 WCAG 比值 | 包测试 | R24、R44 |
-| 3 | 每个玻璃面都成对声明了 `--synra-glass-base` | 包测试 | R44 |
-| 4 | `--synra-blur` / `--synra-glow` 各只有一个值 | 包测试 | R46 |
-| 5 | blocklist 的负控制：`uppercase` / `text-[#fff]` 必须报错 | 包测试 | R6、R21 |
-| 6 | **包根零依赖**：入口的 `.d.ts` 不 import `unocss`；`unocss` 在 `peerDependenciesMeta` 里是 `optional` | `check-shapes.ts` | R2 |
-| 7 | **只有 `./unocss` 那层能碰 `unocss`**：除 `src/unocss/**` 外不许有文件 import 它 | `check-shapes.ts` | R2、R50 |
-| 8 | token 变量名集合与 `./css` 输出的一致（两个入口不能各有一套） | 包测试 | R2、R6 |
+| # | 守卫 | 落在哪 | 保证哪条 | 实现 |
+| - | ---- | ------ | -------- | ---- |
+| 1 | preflight 发出的变量名集合 **==** `colors` 的键集合（加一个颜色就自动多一个变量） | 包测试 | R6 | ✅ `tokens.test.ts` |
+| 2 | 成对前景/背景的 WCAG 比值（正文 4.5、大字与控件 3），玻璃面按**基底**算 | 包测试 | R24、R44 | ✅ `tokens.test.ts` |
+| 3 | 玻璃必须成对声明 `--synra-glass` 与 `--synra-glass-base`，且基底是一个真的不透明色 | 包测试 | R44 | ✅ `tokens.test.ts` |
+| 4 | `--synra-blur` / `--synra-glow` 各只有一个值 | 包测试 | R46 | ✅ `tokens.test.ts` |
+| 5 | 禁用名单**正向与负向**都有：`uppercase` / `ml-4` / `text-[#fff]` / `z-[99]` 被拦，而 `ms-4` / `bg-surface` / `focusable` 不被拦；每条都带 message | 包测试 | R6、R10、R21、R30 | ✅ `unocss.test.ts` |
+| 6 | **包根零依赖**：manifest 里没有 `dependencies`，`unocss` 是 optional peer，入口不 import 它 | `check-shapes.ts` | R2 | ✅ |
+| 7 | **只有 `./unocss` 那层能碰 `unocss`**：除 `src/unocss/**` 外不许有文件 import 它（三种形态：`from`、副作用 `import 'unocss'`、动态 `import()`） | `check-shapes.ts` | R2、R50 | ✅ |
+| 8 | token 变量名集合与 `./css` 输出的一致（两个入口不能各有一套） | 包测试 | R2、R6 | ✅ `tokens.test.ts` |
+| 9 | **shortcut 没有被遮蔽**：body 展开出的每一条声明都出现在"用名字展开"的 CSS 里 | 包测试 | R3 | ✅ `unocss.test.ts` |
+| 10 | 图标 preset 的 options 里没有 `cdn`（也没有任何 `http`） | 包测试 | R41 | ✅ `unocss.test.ts` |
+| 11 | preflight 三档：`app` 有 reset、`tokens` **无元素选择器**、`none` 是空串 | 包测试 | R47 | ✅ `unocss.test.ts` |
+| 12 | 真跑一次 UnoCSS 生成器：工具类读的是变量、而 **Tailwind 的 reset 没有漏进来**（`border-width: 0` 不出现） | 包测试 | R6、R47 | ✅ `unocss.test.ts` |
+| 13 | 官网映射：亮/暗各用能读的那一支紫，并在**各自的底色**上过 4.5:1 | 包测试 | R48 | ✅ `vitepress.test.ts` |
+| 14 | token 的**预算**：变量名集合与 shortcut 名字集合都是写死的列表，加一个要改测试 | 包测试 | R9 | ✅ 两个测试文件 |
+
+> ★ **守卫 9 的判据是踩出来的**：第一版写的是"哪些前缀危险"的名单，而 `focus-ring` 这个名字
+> （`focus` 变体 + `ring` 工具类）证明了那种名单永远不全。改成看**展开结果**之后，它同时抓得住
+> 变体遮蔽、内建规则遮蔽与错拼（负控制实测：把 `focus-ring` 加回去，它报
+> "少了 `outline:2px solid transparent`"）。
+>
+> ★ **守卫 7 的第一版漏了一种形态**：模式写的是 `from 'unocss'`，于是**副作用导入** `import 'unocss'`
+> 从它下面走过去了 —— 而那个形态恰恰是最容易被顺手写下的。负控制抓出来的，现在三种都覆盖。
 
 ### 13.3 守不住的（写明，不假装）
 
@@ -832,14 +866,26 @@ UnoCSS 是**构建期**的，插件的 CSS 编译进它自己的产物。于是�
 
 ## 16. 实现清单与待讨论
 
-### 16.1 实现清单（本文写下时，一条都没做）
+### 16.1 实现清单
 
-- [ ] **`synra-js/packages/theme`（§1.3、R1）**：包骨架，`exports` 四个入口
-      （`.` / `./unocss` / `./vitepress` / `./css`）；`unocss` 走 `peerDependenciesMeta.optional`（R2）
-- [ ] `synra-js` 的既有文件要跟着动（全在 [25](./25-js-monorepo.md)）：§2 的目录树与包表、
-      §4.1 的版本线（拆两组）、§4.2 的发布表、§6 守卫 6、§7.5 的插件模板
-- [ ] `@synra/theme` 的 §13.2 八条守卫（重点：变量名集合 == theme 颜色键、成对对比度、
-      玻璃面必须有基底、blur/glow 各唯一、**包根零依赖**、**只有 `./unocss` 能碰 `unocss`**）
+> ★ **这一节不再全部是空的**：`@synra/theme` 本身已经落地（四个入口、14 条守卫、10 个提交），
+> 而**宿主与官网的接入仍未开始**。下面按"已做 / 未做"分开，因为混在一起会让"还差多少"变成一个
+> 需要逐行读的问题。
+
+**已完成**（`synra-js`，10 个提交，全部已推送）：
+
+- [x] `packages/theme`：包骨架 + 四个入口（`.` / `./css` / `./unocss` / `./vitepress`），
+      `unocss` 走 `peerDependenciesMeta.optional`（R2）
+- [x] token 真相源：14 个颜色 + 材质（玻璃/发光/模糊/焦点环）+ 层级 + 圆角 + 时长 + 字族（含 CJK 回退）+ 断点
+- [x] 分段 CSS：`css('app' | 'tokens' | 'none')`，而 `tokens` 档**没有元素选择器**（R47）
+- [x] `presetSynra()` / `synraConfig()` / `synraBlocklist` / 结构性 shortcuts（R3、R5、R6、R10、R21、R30）
+- [x] `vitepressBrand`：亮/暗各一支紫，各自的底色上都过 4.5:1（R48）
+- [x] §13.2 的 **14 条守卫**，每条都做过负控制（含两条因此被改强的：shortcut 遮蔽、副作用的 unocss import）
+- [x] `check-shapes.ts` 的两条层守卫 + 版本线拆两组 + 发布物的构建缓存（R1、R2）
+- [x] `@synra/theme` 的发布物实测：37 项、四个入口都能被 Node ESM 直接 import
+
+**未完成**（宿主与官网）：
+
 - [ ] `synra-app`：装 `unocss` + `@synra/theme`，写 `uno.config.ts`（`synraConfig()` 来自 `@synra/theme/unocss`）
 - [ ] `synra-app`：`pnpm-workspace.yaml` 的 `overrides` 加一行 `'@synra/theme': link:../synra-js/packages/theme`
 - [ ] `synra-app`：`index.html`——七变量退役为三件事；删掉 `font: 14px/1.5`
@@ -848,10 +894,9 @@ UnoCSS 是**构建期**的，插件的 CSS 编译进它自己的产物。于是�
 - [ ] `synra-app`：`vite.config.ts` 显式设 `build.cssTarget`（R15）
 - [ ] `synra-app`：`eslint.config.ts` 开 `unocss: true`，装 `@unocss/eslint-plugin`
 - [ ] `synra-app/scripts/check-shapes.ts`：新增守卫 2 / 3 / 4 / 8 / 11（各配负控制）
-- [ ] 材质：`--synra-glass` / `--synra-glass-base` / `--synra-glow` / `--synra-blur`，
-      以及 `@supports` 回退（R43、R44、R46）
-- [ ] 字体：**家族已定**（IBM Plex Sans + IBM Plex Mono，R18），落地机制 A 或 B，许可文件随产物；
-      sans 栈带 CJK 回退（R17、R18）
+- [ ] 材质落地到组件：`floating` 的 `@supports` 回退、发光只出现在允许的三处（R43、R45）
+- [ ] 字体：字族栈已定（IBM Plex Sans + Mono，R18），**而字体文件与 `@font-face` 那一半没做**
+      （R17：宿主负责把它放进产物；许可文件随产物）
 - [ ] 文案：messages 模块 + 词汇表（R31、R32）
 - [ ] 错误面渲染 `actions`（R33）
 - [x] `synra-rs/docs` 的 `plugins/ui.md` 的 Styling 一节：已按 §12 里**今天就已经成立**的部分重写
