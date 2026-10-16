@@ -45,10 +45,16 @@ D:/Projects/synra-rust/          # ← 设计期的临时容器（各仓库最�
 D:/Projects/
 ├─ synra-core/     →  github.com/synra-rs/synra-core      内核（Cargo workspace）
 ├─ synra-app/      →  github.com/synra-rs/synra-app       Tauri 应用（桌面 + 移动）
-├─ synra-js/   →  github.com/synra-rs/synra-js   插件 UI 的类型库（TS 包 monorepo）
+├─ synra-js/   →  github.com/synra-rs/synra-js   插件 UI 的类型库 + 样式真相源（TS 包 monorepo）
 ├─ design-docs/    →  github.com/synra-rs/design-docs    ★ 本仓库：设计文档（内部）
 └─ docs/           →  github.com/synra-rs/docs            官网 + 用户文档 + schema（对外）
 ```
+
+> ⚠️ **这里曾经短暂地是六个**：样式真相源一度独立成 `synra-unocss` 仓库，后来业主要求它同时给
+> **三个消费者**（宿主、插件作者、官网）用，而其中官网只取 token 层——于是它落回 `synra-js` 的
+> `packages/theme`，包名 `@synra/theme`，**外部 UI 的适配一律走子路径**（[28 §1.3、§2 R2](./28-app-ui.md)）。
+> 记在这里是因为"六个"这个念头很自然：**它被否决的理由不是麻烦，是消费者拿到的东西不同**
+> （`./unocss`、`./vitepress`、`./css` 是三个入口，而不是三个包）。
 
 ### 1.1 `design-docs` 与 `docs` 是**两个不同的仓库**
 
@@ -77,7 +83,7 @@ D:/Projects/
 
 | #  | 决策                                                         | 落点 |
 | -- | ------------------------------------------------------------ | ---- |
-| 1  | **拆五个仓库**：core / app / client / design-docs / docs         | §3、[ADR-016](./20-adr.md) |
+| 1  | **拆五个仓库**：core / app / js / design-docs / docs             | §3、[ADR-016](./20-adr.md) |
 | 2  | **插件只做双轨**（headless Wasm + UI WebView），不做"纯 UI 插件"   | [09 §2](./09-plugin-system.md)、[13 §1](./13-plugin-authoring.md)、[ADR-002](./20-adr.md) |
 | 3  | **不做集群 / 选主**，保持对等直连                                | [ADR-011](./20-adr.md)、[19 §7](./19-roadmap.md) |
 | 4  | **前端用标准 Vite + pnpm + Vitest**                            | [ADR-012](./20-adr.md) |
@@ -86,6 +92,7 @@ D:/Projects/
 | 7  | **核心要稳 / 封装要精致 / 性能内建于设计**                        | [26](./26-core-stability-and-perf.md) |
 | 8  | **官网 = 用户文档 = schema 托管**，同一个仓库（`docs`），VitePress + Netlify | [27](./27-website.md) |
 | 9  | **域名 `synra-app.dev`**；包标识符 **`dev.synra-app.app`**        | [22 Q-11](./22-risks.md) |
+| 10 | **App UI 只有一份样式真相源**：`@synra/theme`（在 `synra-js/packages/theme`）——包根是零依赖的 token，外部 UI 走子路径（`./unocss` / `./vitepress` / `./css`），三个消费者都从它取 | [28](./28-app-ui.md) |
 
 ---
 
@@ -138,23 +145,32 @@ synra-app/
    └─ src/inject/                   #   ★ 注入 window.synra（必须 satisfies SynraClient）
 ```
 
-### 3.3 `synra-js` — 插件 UI 的类型库
+### 3.3 `synra-js` — 插件 UI 的类型库与样式
 
 ```
 synra-js/packages/
 ├─ synra/          # 类型汇总入口（作者一般不装，靠传递依赖解析）
 ├─ client/         # @synra/client —— .d.ts only（零运行时）
 ├─ protocol/       # @synra/protocol —— 线协议类型（Rust 生成）
+├─ theme/          # ★ @synra/theme —— 样式真相源：包根零依赖 token + ./unocss ./vitepress ./css
 └─ testkit/        # @synra/testkit —— 插件作者的 mock 运行时
 ```
 
-详见 [23](./23-client-library.md) 与 [25](./25-js-monorepo.md)。
+详见 [23](./23-client-library.md)、[25](./25-js-monorepo.md) 与 [28](./28-app-ui.md)。
+
+> ★ **`@synra/theme` 是一个"层"，所以它是子路径而不是包**：宿主界面、插件界面、官网都要同一套 token，
+> 但**它们要的东西不一样**——宿主与插件要 UnoCSS 的 preset，官网要 VitePress 的品牌映射，
+> 内联反闪屏只要 CSS 变量。于是包根保持**零依赖**，`unocss` 只挂在 `./unocss` 子路径上、并且是
+> **optional peer**（[28 §2 R2、R50](./28-app-ui.md)）。
+>
+> ⚠️ 这也意味着它的**版本线不与那四个类型包相同**（[25 §4.1](./25-js-monorepo.md)）：
+> 让"改一支紫的明度"触发一次协议包的版本号滚动，对插件作者是纯噪音。
 
 ### 3.4 `design-docs` — 设计文档（本仓库）
 
 ```
 design-docs/
-├─ README.md · 01-charter.md · … · 27-website.md   # 27 篇（见 §4 分流表）
+├─ README.md · 01-charter.md · … · 28-app-ui.md   # 28 篇（见 §4 分流表）
 └─ 无构建：纯 Markdown，不上站点（理由见 §1.1）
 ```
 
@@ -186,6 +202,17 @@ docs/
 | **设计文档不能对用户发布** | 里面有"还没定 / 决定不做 / 这个限制的代价"，发出去会被当成承诺（§1.1、[27 §3](./27-website.md)） |
 | **schema 与用户文档同源** | schema 与描述它的页面必须一起改，放两个仓库必然漂移（[27 §2](./27-website.md)）    |
 
+> ⚠️ **这一节曾经有过第 8 条理由（"样式真相源两端都要装，所以它该独立成仓库"），它已被删除。**
+> 业主要求样式同时给**三个**消费者用（宿主、插件作者、官网），而三个要的东西不一样——
+> 于是它落回 `synra-js` 的 `packages/theme`，用**子路径**分开（[28 §1.3、§2 R2/R50](./28-app-ui.md)）。
+> 一条"该拆仓库"的理由因此不成立：**要分开的是入口，不是仓库。**
+>
+> ⚠️ **而"发布节奏解耦"这一条多了一个例外，写在这里而不是藏起来**：官网自
+> [28 §15](./28-app-ui.md) 起消费 `@synra/theme`（用 `preflight: 'tokens'`），
+> 所以**站点的构建依赖一个已发布的包版本**。它仍然不阻塞别人发布，
+> 但"改一个 token，全站与应用同时变色"不再是自动的——官网要等一次版本升级。
+> 这是业主要"官网也一起用那个库"的代价，换来的是**一条守不住的规则消失了**（[28 §13.3](./28-app-ui.md)）。
+
 ### 3.7 跨仓库的接口
 
 | # | 接触点                              | 形态                                                       |
@@ -195,8 +222,9 @@ docs/
 | 3 | 插件 UI 的形状契约（`@synra/client`）  | **`.d.ts` only**；app 的注入脚本按它实现（[23](./23-client-library.md)） |
 | 4 | 插件契约（WIT）                      | `wit/synra-plugin.wit` → 插件 SDK 与宿主实现                  |
 | 5 | **JSON Schema（公开 URL）**           | `docs` 仓库的 `public/schema/**` → `https://synra-app.dev/schema/…`，被插件 manifest 的 `$schema` 引用 |
+| 6 | **样式真相源（`@synra/theme`）**       | **构建期**依赖，四个入口：包根（零依赖 token）、`./unocss`、`./vitepress`、`./css`。宿主与官网用 `overrides: link:`，插件作者用版本依赖；**官网只取 token 层**（`preflight: 'tokens'`，[28 §2 R2、§15 R47](./28-app-ui.md)） |
 
-**没有第六个。** 应用不得直接依赖 `synra-net` / `synra-store` / `synra-plugin-host` 的内部类型。
+**没有第七个。** 应用不得直接依赖 `synra-net` / `synra-store` / `synra-plugin-host` 的内部类型。
 
 **跨仓库引用约定**：写「仓库名 + 路径」的**纯文本**，并给 GitHub 链接（本地相对路径在跨仓库时不存在）。
 
@@ -204,7 +232,7 @@ docs/
 | ------------------------ | ----------------------- | ---- |
 | 任一仓库                  | `synra-core`             | ``synra-rs/synra-core`` 的 `crates/synra-protocol/` |
 | 任一仓库                  | `synra-app`              | ``synra-rs/synra-app`` 的 `src-tauri/src/inject/` |
-| 任一仓库                  | `synra-js`           | ``synra-rs/synra-js`` 的 `packages/client/` |
+| 任一仓库                  | `synra-js`           | ``synra-rs/synra-js`` 的 `packages/client/`（样式在 `packages/theme/`） |
 | 任一仓库                  | `design-docs`（本仓库）   | 本地相对链接（`./` 或 `../`） |
 | 设计文档 → 用户文档        | `docs`                   | ``synra-rs/docs`` 的 `guide/installation.md` |
 | 用户文档 → 设计文档        | `design-docs`            | ❌ **不要链**（用户不该读内部设计，[27 §3](./27-website.md)） |
@@ -247,8 +275,13 @@ docs/
 | **25** | ★ [**JS 包 monorepo**](./25-js-monorepo.md)             | `synra-js` | `synra` / `@synra/client` / `@synra/protocol` / `@synra/testkit` 的仓库形态、发布、版本、CI 守卫 |
 | **26** | ★ [**核心稳定性、封装与性能**](./26-core-stability-and-perf.md) | `synra-core` | 三条贯穿性要求的**可检查规则**：稳定层义务、封装四律、热路径零分配、数据结构选型 |
 | **27** | ★ [**官网与文档站**](./27-website.md)                | `docs` | 站点结构、双语策略、Netlify 部署、**schema 托管与冻结**、写作规范 |
+| **28** | ★ [**App UI 规范**](./28-app-ui.md)                  | `synra-app` + `synra-js` + `docs` | **三个消费者**（宿主 / 插件 / 官网）的同一套 token 与 **50 条规则**：`@synra/theme` 的四入口形状、断点、字体、色彩与材质、文案、无障碍下限、强制执行与守不住的部分 |
 
 > **归属列用的是真实仓库名**（`synra-core` / `synra-app` / `synra-js` / `docs`）。本仓库（`design-docs`）本身是设计文档的家，不再单列一列。
+>
+> ⚠️ **28 是唯一一篇跨三个仓库的文档**：宿主界面在 `synra-app`，token 的真相源在 `synra-js` 的
+> `packages/theme`（§3.3，因为插件作者在仓库外，拿不到 `synra-app` 里的东西），而**官网也是它的消费者**
+> （`docs`，只取 token 层）。见 [28 §1.1–§1.3、§15](./28-app-ui.md)。
 
 ### 4.1 需要**拆成两份**的内容
 
@@ -282,7 +315,8 @@ docs/
 | UI 插件对抗（CSP / 跨 origin）       | `synra-app`   | [21 §5.2](./21-testing-strategy.md)    |
 | 前端行为回归                        | `synra-app`   | [21 §7](./21-testing-strategy.md)      |
 | 桌面 E2E（`tauri-driver`）          | `synra-app`   | [21 §10](./21-testing-strategy.md)     |
-| **类型库形状一致性 / 零运行时**        | `synra-js`    | [25 §6](./25-js-monorepo.md)（8 条守卫） |
+| **类型库形状一致性 / 零运行时**        | `synra-js`    | [25 §6](./25-js-monorepo.md)（10 条守卫） |
+| **UI 样式与 token 一致性**             | `synra-app` + `synra-js` + `docs` | [28 §13](./28-app-ui.md)（11 + 8 条守卫，3 条守不住的） |
 | **站点：双语言结构 / 死链 / schema**   | `docs`        | [27 §7](./27-website.md)（10 条守卫）   |
 
 ---
@@ -293,6 +327,7 @@ docs/
 - **想理解系统长什么样** → 03 → 05 → 06
 - **要写 core 代码** → 03 → 06 → 07 → 04
 - **要写 app / 前端** → 05 → 08 → 13
+- **要写 App UI（宿主或插件）** → 08 → 28 → 23
 - **要写插件作者文档** → 13 → 15 → 12
 - **负责插件系统** → 09 → 10 → 12 → 13 → 14 → 15 → 16
 - **负责排期 / 评审** → 19 → 22 → 20 → 11

@@ -380,9 +380,15 @@ export const useDevicesStore = defineStore('devices', () => {
 
 **策略**：
 1. 使用 **Baseline Widely Available** 的 CSS/JS 特性（避免 `:has()` 等新特性作为必需）；
-2. CSS 用 UnoCSS + 显式 `targets`（不用最激进的 preset）；
+2. CSS 用 UnoCSS，配置与规则见 [28](./28-app-ui.md)；**CSS 输出兼容性靠 Vite 的 `build.cssTarget`**（见下方注）；
 3. 运行时探测（`WebviewKind`）用于**渐进增强**，不用于**基本功能**；
 4. CI 至少在 WebView2 + WebKitGTK（Docker）+ WKWebView（macOS runner）上跑视觉/功能回归。
+
+> ★ **本条原写的是"UnoCSS + 显式 `targets`"，而 UnoCSS 里没有这个旋钮。**
+> `presetWind3` 的选项继承自 `preset-mini`（`important` / `dark` / `preflight` 一类），没有 `targets`；
+> 而 `synra-app` 的 `vite.config.ts` 当时只设了 `target: 'es2022'`，没有 `cssTarget`。
+> 也就是说这条要求的**意图是真的（别输出新 CSS 给弱的 WebView），指的那个机制不存在**。
+> 落点改为 Vite 的 `build.cssTarget`，规则编号 [28 §4 R15](./28-app-ui.md)。
 
 ### 6.2 前端工具链
 
@@ -390,7 +396,7 @@ export const useDevicesStore = defineStore('devices', () => {
 | -------- | ------------------------------------------- | -------------------------------------- |
 | 构建     | **Vite**（保留，Tauri 官方模板）              | 不用 Vite+（Rust 侧已接管工具链职责）    |
 | 框架     | Vue 3 + `vue-router` + Pinia                 | 保留（组件层可复用）                    |
-| 样式     | UnoCSS                                       | 保留                                    |
+| 样式     | UnoCSS（配置与全部样式规则见 [28](./28-app-ui.md)） | 保留；`@synra/unocss` 提供宿主与插件共用的 token |
 | 测试     | Vitest（组件/单元）+ Playwright（E2E，可选）   | 保留 + 增加                            |
 | 类型     | TypeScript（版本随生态）                      | 生成物来源是 Rust                       |
 

@@ -43,6 +43,7 @@ synra-js/
 │  ├─ synra/                    # ★ 汇总入口（consignment，见 §3）
 │  ├─ client/                   # @synra/client —— 类型库（.d.ts only）
 │  ├─ protocol/                 # @synra/protocol —— 线协议类型（Rust 生成）
+│  ├─ theme/                    # ★ @synra/theme —— 样式真相源：包根 token + ./unocss ./vitepress ./css（[28](./28-app-ui.md)）
 │  └─ testkit/                  # @synra/testkit —— 插件作者的本地 mock 运行时
 ├─ scripts/
 │  ├─ gen-protocol-types.ts     # 从 core 仓库拉生成物 → packages/protocol
@@ -58,9 +59,17 @@ synra-js/
 | **`@synra/client`**  | ❌          | 插件作者的 `devDependencies`   | 注入对象契约 + `declare global` + 错误与 HTTP 形状            |
 | **`@synra/protocol`**| ❌          | `@synra/client`、宿主、其它工具 | 线协议数据类型（**从 Rust 生成**）                            |
 | **`@synra/testkit`** | ✅          | 插件作者的 `devDependencies`   | `createMockClient()`：开发期/单测用的假 `synra`               |
+| **`@synra/theme`**   | ✅          | 插件作者的 `devDependencies`、`synra-app`、`docs` | 样式真相源：包根 token（**零依赖**）+ 子路径适配 `./unocss` / `./vitepress` / `./css`（[28 §2 R2](./28-app-ui.md)） |
 
-**"有运行时？"这一列是关键**：前三个是纯类型（零运行时），只有 `@synra/testkit` 有实现。
+**"有运行时？"这一列是关键**：前三个是纯类型（零运行时），有实现的是 `@synra/testkit`（注入对象的替身）
+与 `@synra/theme`（构建期工具与映射函数——**没有消费者会 import 它的运行期代码**）。
 CI 对前三个有"不允许产出 `.js`"的守卫（§6）。
+
+> ★ **`@synra/theme` 的包根必须是零依赖的**，而这不是洁癖（[28 §2 R2](./28-app-ui.md)）：
+> 官网、内联反闪屏、以及任何"只要颜色不要工具类"的消费者都从包根取东西。所以 `unocss` 只能挂在
+> **`./unocss` 子路径**上，且必须声明成 `peerDependenciesMeta.optional`——写成 `dependencies`
+> 就等于让包根也依赖它，**每个非 UnoCSS 消费者都要为 UnoCSS 付一次装包与体积**。
+> 这条有守卫（§6 守卫 9），另一条守卫管"只有 `./unocss` 那层能 import `unocss`"。
 
 > ★ **本次核对发现：这一列说的没错，而代码违反过它 —— 已经修好。**
 >
@@ -275,6 +284,13 @@ export type { DeviceId, TransferId, DeviceTarget } from '@synra/protocol'
 
 `@synra/testkit` **也跟同一版本**（它是 client 的替身，语义上必须对齐）。
 
+> ★ **`@synra/theme` 不在这条版本线上**（[28 §2 R1](./28-app-ui.md)）。
+> 同版本的唯一理由是"它们互相 re-export，版本错位会产生'类型来自不同代次'的错误"——
+> 而它与那四个包之间**没有依赖边**（这是可以检查的，§6 守卫 6）。
+> 把两者绑在一起，会让"改一支紫的明度"触发一次协议包的版本号滚动——
+> 而协议包的版本号是插件作者用来判断"我的类型要不要跟着升"的东西，**它不该被一次配色改动搅动**。
+> 代价说清楚：§6 的版本守卫从"四个包同版本"改成**两组**，并新增两条依赖关系守卫。
+
 ### 4.2 发布
 
 | 包                  | `publishConfig.access` | 发布顺序（依赖优先）                |
@@ -283,8 +299,12 @@ export type { DeviceId, TransferId, DeviceTarget } from '@synra/protocol'
 | `@synra/client`      | `public`               | 2                                  |
 | `synra`              | `public`               | 3                                  |
 | `@synra/testkit`     | `public`               | 4                                  |
+| `@synra/theme`       | `public`               | **与上面四个无依赖关系**（§4.1 的 ★），所以 `publishOrder()` 按目录顺序把它排在任意位置——这是对的：它一条内部依赖边都没有，排在哪都不影响安装 |
 
 发布**不允许**跳过任何一步（发布脚本按拓扑排序执行，失败即中止；重跑可续）。
+
+> ★ **它排在最后只是目录顺序的巧合，不是依赖要求**：`@synra/theme` 不依赖那四个，那四个也不依赖它。
+> 所以第 4.2 节那个"拓扑排序"对它其实无事可做——**这也是"独立版本线"的直接结果**。
 
 ---
 
@@ -317,14 +337,21 @@ synra-app ────────────────────┘
 
 | # | 守卫                                                  | 怎么实现                                                |
 | - | ----------------------------------------------------- | ------------------------------------------------------- |
-| 1 | **类型包零运行时**                                      | `dist/` 下出现 `.js`/`.mjs` 即失败；另加 `package.json` 里不得有 `main`/`module`/`exports.import` |
+| 1 | **类型包零运行时**                                      | `dist/` 下出现 `.js`/`.mjs` 即失败；另加 `package.json` 里不得有 `main`/`module`/`exports.import`。★ **名单是三个纯类型包，`@synra/theme` 不在名单里**（它有运行时，而且必须有） |
 | 2 | `synra` 与 `@synra/client` **没有值导出**                | ★ **入口**（`dist/index.d.ts`）里不得出现不带 `type` 的 `export { ... }`。仓库开了 `verbatimModuleSyntax`，所以"类型还是值"由编译器强制区分 |
 | 3 | **形状一致性**                                          | `scripts/check-shapes.ts`：命名约定 / 错误码 / 帧类型 / 常量 / DTO 字段**逐项与 Rust 对照**（内核仓库不在旁边时跳过并说明） |
 | 4 | 生成物未被手改                                          | `pnpm sync && git diff --exit-code packages/protocol`      |
 | 5 | 生成物与 core 一致                                      | 同守卫 3 的那次对照（CI 会把 `synra-core` checkout 到 `synra-rust-core`） |
-| 6 | **四个**包版本一致                                       | 读四个 `package.json` 的 `version` 比较                       |
+| 6 | **一组四个**包版本一致（`synra` / `@synra/client` / `@synra/protocol` / `@synra/testkit`）；`@synra/theme` **独立版本线** | 读前四个 `package.json` 的 `version` 比较；`theme` 单独一条线（§4.1 的 ★） |
 | 7 | `types: ["@synra/client"]` 可用                         | `scripts/link-dist.ts` 铺出安装布局 + `tsc -p packages/client/type-tests/tsconfig.json` |
 | 8 | 文档里的类型片段能编译                                    | 把 [23](./23-client-library.md) 里的代码块抽出来做类型检查（防文档漂移）★ **第 122 轮核实：已实现** —— `scripts/check-doc-snippets.ts`，挂在根 `package.json` 的 `docs:types`，实跑输出 `· doc-snippets: the complete authoring example in 23 §8 compiles` |
+| 9 | **`theme` 的包根零依赖 / `unocss` 是 optional peer**      | 包根本身不出现 `from 'unocss'`；`package.json` 里 `unocss` 在 `peerDependenciesMeta` 中 `optional: true`，且**不在** `dependencies`（[28 §2 R2](./28-app-ui.md)） |
+| 10 | **只有 `./unocss` 那一层能 import `unocss`**               | 除 `packages/theme/src/unocss/**` 以外，任何文件出现 `from 'unocss'` 即失败；负控制：在 `src/css/` 里加一行 import → 必须报红 |
+
+> ★ **守卫 9 与 10 是"两层"这个设计的承重墙**，它们是同一个决定的两种失败方式：
+> 包根依赖 `unocss`（9 失败）会让**官网**为一个它不用的工具付一次体积；而 `unocss` 的 import
+> 散落到 `./css` 或 `./vitepress`（10 失败）会让"子路径"名存实亡——那时分离只存在于目录结构上，
+> 消费者看到的仍然是一个必须装 `unocss` 的包。**一条管"谁被拖累"，一条管"分离是不是真的"。**
 
 > ★ **本次核对修正了三处，它们都会让照做的人做错：**
 > * **守卫 2** 原本写的是"检查 `dist/*.d.ts` 里没有 `export declare const/function/class`"。
@@ -531,7 +558,7 @@ export default defineBuildConfig({
 ```jsonc
 {
   "name": "@synra/client",
-  "version": "1.0.0",                     // ★ 四个包同版本（§4.1）
+  "version": "1.0.0",                     // ★ 这四个包同版本（§4.1；`@synra/theme` 独立一条线，不在此列）
   "type": "module",
   "description": "Types for the Synra plugin UI runtime. Declaration files only — no runtime code.",
   "license": "MIT",
@@ -653,6 +680,8 @@ export default defineBuildConfig({
   "devDependencies": {
     "@synra/client": "^1.0.0",       // ★ 只装这一个；synra 由传递依赖提供
     "@synra/testkit": "^1.0.0",      // 本地开发/单测的假 synra
+    "@synra/theme": "^1.0.0",        // ★ 样式真相源（独立版本线，见 §4.1）；preset 从它取
+    "unocss": "^66",                 // @synra/theme 的 optional peer；区间以它的 peerDependencies 为准
     "vite": "^7",
     "vue-tsc": "^3"
   }
@@ -661,6 +690,12 @@ export default defineBuildConfig({
 
 > 作者**不需要**装 `@synra/protocol` / `synra`——前者被 `@synra/client` 内联，
 > 后者是传递依赖（[23 §2.4](./23-client-library.md)）。
+>
+> ★ **`@synra/theme` 是 devDependency，而它的产出进产物**：它是**构建期**工具（preset 与映射函数），
+> 不会被运行期 import；但它生成的 CSS、以及**字体文件**会进插件产物（[28 §5 R17、R18](./28-app-ui.md)）。
+> 这两件事不矛盾，却很容易被"devDependency 不进产物"这条经验读错，所以写在这里。
+> **注意 import 的是子路径**：`import { synraConfig } from '@synra/theme/unocss'`——
+> 包根是零依赖的 token 层，`unocss` 只在子路径上（§2.1 的 ★、守卫 9/10）。
 
 ### 7.6 `exports` 的条件设计（纯类型包）
 
@@ -690,6 +725,8 @@ export default defineBuildConfig({
 | ------------------------------------- | -------------------------------------------------------------------- |
 | `synra-js` 内部改包                | `pnpm -r stub` → 各包 `dist` 指向 `src`，无需重建                        |
 | app 仓库要用未发布的改动                  | app 的 `pnpm-workspace.yaml` 用 `overrides` + `link:` 指向本地目录（见本机 `pnpm-local-overrides` 的做法） |
+| `synra-app` 要用 `@synra/theme` 的未发布改动 | 同上，`overrides` 里加一行 `'@synra/theme': link:../synra-js/packages/theme` —— `synra-app` 的 `pnpm-workspace.yaml` 已有 `@synra/client` / `@synra/protocol` 两行先例（同一目录下），且那份注释解释了为什么用 `link:` 而不是 `packages:` 通配 |
+| `docs` 要用 `@synra/theme` 的未发布改动 | 同上一行的写法（指向同一个目录）。**这是官网成为消费者之后的必然结果**（[28 §15](./28-app-ui.md)）：本地必须 `link:`，否则改一个 token 要发一次包才看得见效果 |
 | 验证"作者装上去能不能用"                 | CI 的 fixture 工程（§6 守卫 7）从**打包产物**（`pnpm pack`）安装，而不是链源码 |
 
 > ⚠️ **fixture 必须用 `pnpm pack` 的产物**，否则测不到 `files` 字段与 `exports` 条件是否正确——
@@ -788,10 +825,15 @@ export default defineBuildConfig({
 - [x] `scripts/check-shapes.ts` + 形状快照
       ★ 核对方式是**与 Rust 对照**（命名、错误码、帧类型、常量、DTO 覆盖），而不是快照文件；
       在没有内核仓库时那几项会跳过并说明。这比快照强：快照只能发现"变了"，对照能发现"错了"
-- [ ] CI 的 8 条守卫（§6）—— **1、2、3、4、5、6、7 已实现；8（文档代码块能编译）没有**
+- [ ] CI 的 **10** 条守卫（§6）—— **1、2、3、4、5、6、7 已实现；8（文档代码块能编译）没有；
+      9、10 随 `@synra/theme` 一起新增**
 - [x] 四包版本同步（`fixed` 模式 + `bumpp -r`）
       ★ 本轮补上了守卫（`check-shapes.ts` 的"4 publishable packages share version"）。
       原来只有 `bumpp -r`，而"记得跑它"不是一条守卫
+      ★ **而 `@synra/theme` 让这条守卫从"四个包"变成"一组四个"**（§4.1 的 ★）：
+      它进这个仓库、但**不进这条版本线**——因为它与那四个包之间没有依赖边。
+      于是 §6 多了两条守卫（9：包根零依赖 / optional peer；10：只有 `./unocss` 能 import `unocss`），
+      而这两条**不是为版本号服务的**，是为"两层"这个形状服务的（§6 的 ★）。
 - [~] 发布脚本（拓扑排序，可续跑）—— **排序已有**（第 91 轮），**续跑还没有**。
       `scripts/publish.ts`（`publishOrder()` + `readWorkspace()`），`pnpm run publish:workspace`。
       ★ **而默认不发布**：不加 `--publish` 只打印顺序，因为发布**不可撤回**（到了注册表
@@ -810,3 +852,7 @@ export default defineBuildConfig({
 - [x] fixture 工程：从 `pnpm pack` 产物安装并跑 `tsc --noEmit`
       ★ 机制换成 `scripts/link-dist.ts` + `packages/client/type-tests/`，测的是同一件事（见上面的说明）
 - [x] 本地联调脚本（`stub` + app 侧 `overrides`）—— 同上，实际是 `link-dist.ts`
+- [ ] **`packages/theme`（`@synra/theme`）**：`exports` 四个入口（`.` / `./unocss` / `./vitepress` / `./css`）+
+      包根 token 数据 + 两条自检测试（preflight 发出的变量名集合 == theme 的颜色键；成对颜色的 WCAG 比值）。
+      规则见 [28 §2、§13.2](./28-app-ui.md)；本文这边要动的是 §2.1 的表、§4.1 的版本线、§4.2 的发布表、
+      §6 守卫 6 与新增的 9/10、§7.5 的插件模板、§7.7 的本地联调

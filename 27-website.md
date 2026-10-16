@@ -445,6 +445,20 @@ docs/public/schema/manifest/v1.json    （手写的 JSON Schema，带 descriptio
 
 **容器标题必填**（原因见 §6）。
 
+> ★ **这条规则在 [28 §15](./28-app-ui.md) 之后收窄了一点：现在允许 UnoCSS。**
+> 起因是业主的要求——官网要和应用用同一套颜色，最好直接共用那个库。于是 `docs` 的
+> `.vitepress/config.mts` 加一个 `UnoCSS()` 插件，并且**只取 token 层**
+> （`synraConfig({ preflight: 'tokens' })`）。
+>
+> **它不是被违反，是被收窄**，因为"别加自定义样式"原本要防的东西还在防着：
+> ① VitePress 的默认主题仍是排版与组件的来源，我们**不替换它**；
+> ② preset 里那段 CSS reset **明确不注入**——否则这里就会被它打散（[28 §15 R47](./28-app-ui.md)）；
+> ③ `--vp-c-brand-*` 是 VitePress 自己的变量，我们只是**给它赋值**（[28 §15 R48](./28-app-ui.md)），
+> 没有新建一套品牌样式表。
+>
+> **代价**：站点构建从此依赖一个已发布的 `@synra/theme` 版本（[README §3.6](./README.md) 的"发布节奏解耦"
+> 因此多了一个例外）。
+
 ### 8.3 不要动的东西
 
 重排版式时不能改含义：
