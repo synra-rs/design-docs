@@ -1532,6 +1532,17 @@ pub enum TrustLevel {
         在两个工作区里 0 处使用（`Backoff` 的命中全是 `synra-core` 自己的 supervisor 枚举变体），
         因为字节层的链路要排队就得先有**写入线程** —— 又是一个缝的决定。
         代价是 `AckPolicy` 无处可问：全仓搜 `AckPolicy`，`event.rs` 之外只有一条文档注释。
+      ★ **而第 86 轮把这条缝长出来了**：`synra_core::link::LinkStream`
+      （`Read + Write + Send + Debug`）加 `link::memory::MemoryStream`，`PeerLink` 改持 `Box<dyn LinkStream>`。
+      ★ **而它为什么能在不改调用方的前提下加上**：`new(stream: impl LinkStream + 'static)`，
+      而 `TcpStream` 实现了它 —— 所以守护进程、listener、测试都不必改。
+      ★ **而方法返回的是 `LinkError` 而不是 `std::io::Error`**，这是为了绕开 `api-guard`
+      的规则（对外部 crate 错误类型的承诺就是对它版本的承诺）。
+      ★ 三个行为是故意做成像 socket 的，因为不会阻塞的流测不出 socket 的问题：
+      **有界缓冲**（满了就等待然后失败）、**超时返回 `WouldBlock`**（于是 `is_a_timeout` 把它认成
+      “安静”而不是“断开”）、**一端 drop 后另一端读到 EOF**。
+      ★ **而它自己就是证据**：两个 `PeerLink` 在内存上交换了一个真的 envelope（带帧、
+      带 target/from 校验）。下一步才是把它接到 `synra-testkit` 的两个 `Kernel` 上。
       * 两条合起来说明：**这条缝不只是"能不能换成内存链路"**，它同时决定了
         ①同一套失败语义能不能只写一遍，②`synra-net` 里那些已经写好、测好的决策能不能被用上。
         在它长出来之前，每修一处链路问题都是在两个实现之间做人工同步 —— 第 84 轮就是第二次。
