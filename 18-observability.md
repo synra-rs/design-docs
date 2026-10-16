@@ -688,6 +688,16 @@ pub fn install_panic_hook(paths: &Paths, version: &str) {
       ★ 文档选定的 **`metrics` facade 从未使用**：`Cargo.toml` 声明了依赖，0 处
       `metrics::counter!`/`gauge!`/`histogram!`。**自研 recorder 有，facade 没有。**
 - [ ] §4.1 的指标清单全部接入 —— **零接入**：没有任何生产代码记录指标；
+      ★ **而第 141 轮核实：「零接入」这个词不成立。** `host_calls.rs` 里有 4 处生产记录：
+      `gate_checks_total{result=allowed|denied|rate_limited}`、`gate_denied_total{capability}`、
+      `gate_rate_limited_total{plugin}`（`self.count(...)`，`host_calls.rs:470-479`），
+      管道从 `PluginSet::with_metrics` → `session` → `HostCallSession::with_metrics` 一路是通的，
+      而 `host_calls.rs:337` 的注释解释了为什么从门开始：*「它是唯一已经知道答案的地方 ——
+      是权限集说了不，还是限流器说了不」*。
+      ★ 所以本行仍不勾，但缺的不是「一个都没有」，而是**清单上的其余项**（网络、发现、意图、传输…）。
+      一个说「零接入」的行会让人从零开始做一遍已经做完的那部分。
+      ★ **而本轮差点就这么做了**：我先查了 §4.1 清单、再查 recorder API、再查注入点，
+      第三次之后才问最直接的那个问题 ——「全仓有没有人在记指标」。**那个问题应该第一个问。**
       `RingRecorder` 只出现在 `synra-observe` 自己的测试里。§4.1 的指标名中只有
       `frames_sent_total`/`links_open` 出现过，且只是 `metrics/tests.rs` 的测试夹具。
 - [ ] 设置页的"性能"面板（实时指标）—— **缺失**：`synra-rust-app/src/pages` 只有
