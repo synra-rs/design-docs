@@ -361,6 +361,21 @@ synra-app ────────────────────┘
 | 9 | **`theme` 的包根零依赖 / `unocss` 是 optional peer**      | 包根本身不出现 `from 'unocss'`；`package.json` 里 `unocss` 在 `peerDependenciesMeta` 中 `optional: true`，且**不在** `dependencies`（[28 §2 R2](./28-app-ui.md)） |
 | 10 | **只有 `./unocss` 那一层能 import `unocss`**               | 除 `packages/theme/src/unocss/**` 以外，任何文件出现 `from 'unocss'` 即失败；负控制：在 `src/css/` 里加一行 import → 必须报红 |
 | 11 | **标签与版本一致**（发布前，不在 `check` 里）                 | `scripts/check-release-tag.ts`：`GITHUB_REF_NAME` 去掉 `v` 之后必须等于**每个**会发布的包的版本。空标签、空工作区、任何一个包对不上都是失败（3 条正/负向测试在 `check-release-tag.test.ts`） |
+| 12 | **每个声明的入口都真的存在**                               | `check-shapes.ts`：`main` / `module` / `types` / `exports.*` 里写的每一个路径都要在包目录里存在。★ **它第一次跑就抓到了 `@synra/testkit`**，见下面的 ★ |
+
+> ★ **守卫 12 是"发布之后才会发现"的那一类里最便宜的一个，而它当场就抓到了一条。**
+>
+> `@synra/testkit` 的 `main` / `module` / `exports.import` 三处都写着 `./dist/index.mjs`，
+> 而 `tsc -b` 产出的是 `dist/index.js` —— 运行期入口指向一个**不存在的文件**（实测：
+> 按声明 import 得到 `ERR_MODULE_NOT_FOUND`，而 `dist/index.js` 有 4 个导出）。
+>
+> **为什么一直没有东西发现它**：`types` 是对的，所以类型检查全绿；`pnpm pack` 也照常成功
+> （它只按 `files` 挑文件，不验证入口）；而 `scripts/link-dist.ts` 的名单只覆盖三个纯类型包
+> （那份名单的存在理由是 `types: [...]` 的解析方式，与这里的运行时包无关）。失败落在使用者的
+> 第一次 `import`，而那已经是我们发出去之后了 —— **它本来会跟着第一次发版一起出去。**
+>
+> 判据特意写成"声明的路径必须存在"而不是"扩展名必须是 `.js`"：后者会把 `.mjs` / `.cjs`
+> 这类合法的选择也判成错，而那是另一件事。
 
 > ★ **守卫 9 与 10 是"两层"这个设计的承重墙**，它们是同一个决定的两种失败方式：
 > 包根依赖 `unocss`（9 失败）会让**官网**为一个它不用的工具付一次体积；而 `unocss` 的 import
