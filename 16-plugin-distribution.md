@@ -896,3 +896,16 @@ pub session: SyncSessionId,   // Which round.
 
 ★ `TransferSender::request()` 不再写死 `sync_session_id: None`，所以一个包到了对端**说得出自己是哪一轮** ——
 这是「接收端回一个结果」欠的最后一件事（第 133 轮的 `sync_result` 与第 134 轮的 `apply_result` 都在等它）。
+
+## 第 167 轮：轮次走到了 listener
+
+★ 上一轮让发起端命名一轮同步；这一轮让**那个名字到达 listener** —— 路与 `digest`、`version`、`request_id`
+完全一样（这是第五次走它），而它读的是 `TransferRequest::sync_session_id`：
+**接收端复述发起端选的值，而不是自己造一个**（一个自己造的轮次，是发起端从未听过的一轮）。
+
+★ 于是 listener 手里现在齐了：`request_id`（回复给谁）、`sync_session_id`（哪一轮）、`plugin_id` 与 `version`
+（哪个插件的哪个版本）、`digest`（哪些字节）、以及 `Served::peer`（哪个设备）。
+
+★ **而「回一个结果」还差最后一件**：`on_finished` 回调**不返回值**，所以接收端装了什么
+（那个决定发生在 daemon 那一侧，第 151 轮）到不了持有 link 的这一侧。
+改它的签名是下一轮的事 —— 而那是唯一还缺的东西。
