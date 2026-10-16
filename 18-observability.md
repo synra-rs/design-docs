@@ -914,3 +914,14 @@ pub fn install_panic_hook(paths: &Paths, version: &str) {
       同时断言消息里有 `--follow` 与 `not implemented` —— 只断言 `Failed` 会把用户引去找一个没在跑的内核。
 - [x] `synra doctor`（CLI）—— **A**：`Command::Doctor`(`args.rs:80`) +
       `DoctorReport::run`(`doctor.rs:76`) 调 `run_probes`(`:83`) + `--failures-only`/`--bundle`。
+
+## 第 165 轮：一次重传被记下来了
+
+★ `transfer_retries_total{kind}`，来源是 `send_a_file` 手里已有的 `resends` —— 那个数一直有
+（`Resend` 事件产生的），只是从来没有被记进指标；它只出现在给用户的报告里。
+
+★ **只在真的发生重传时记**：一个永远加零的计数器是一条没人需要的序列。
+
+★ **而它的证据是诚实的缺口**：没有测试覆盖这一行。重传发生在一次报告丢失时，
+而**制造那件事**需要一条会丢包的链路 —— 这里的测试脚手架做不到。
+所以这一行目前的证据是「编译通过 + 857 条既有测试」，而不是「它被验证过」。
