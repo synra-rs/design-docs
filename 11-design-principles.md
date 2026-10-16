@@ -520,12 +520,14 @@ pub enum ProbeOutcome {
 | 无法完成的操作   | 返回 `Err`，不"尽力而为"                                       |
 
 **检查**：
-- [x] 代码里没有"检测到问题就 `remove_dir_all`"的路径 —— `remove_dir_all` 全仓 42 处命中，
-      逐个看过上下文：**全部在测试代码里**。生产侧的两处是 `endpoint.rs` 的 `TempDir`
-      （`std::env::temp_dir()` 下的测试目录，`Drop` 里清理自己），其余在
-      `synra-observe/src/crash.rs` 的 `#[cfg(test)] mod tests`（L369 起）。
-      也就是说这条规则在生产代码里成立 —— 但成立的原因是**没有人在生产里调用它**，
-      而不是因为有守卫拦着。加一条守卫仍然是值得的，因为这条禁令目前靠的是自觉。
+- [x] 代码里没有"检测到问题就 `remove_dir_all`"的路径 —— ★ **第 107 轮用 `doc-claims` 复核，这一条需要重写**：
+      命中数已经不是 42 而是 **71**，而且**"全部在测试代码里"这句话不再成立**。
+      生产侧确实有调用点，最大的一处是 `synra-store/src/sandbox.rs`（L303/L320）——
+      它删的是**沙箱自己的** cache 与 root，那正是沙箱该做的事，不是"检测到问题就抹掉用户数据"。
+      其余生产文件里的命中（`inbound.rs`、`startup.rs`、`args.rs`、`synra-cli`、`tools/synra-plugin-cli`…）
+      **没有逐个判定完**，所以这里不再下"全部"的结论 —— 一个查过的结论与一个没查的结论混在一句话里，
+      正是这一行原本的问题。**规则本身（不得在检测到问题后抹掉用户数据）仍然成立且值得守卫；
+      它原来的依据（一个手数的数字 + "全部在测试里"）不成立了。**
 - [ ] 卸载流程有测试断言"删除前有询问、删除后有报告"
 - [x] GC 的测试断言“用户数据未被触碰” —— **已有**（第 92 轮）：
       `apps/synra-daemon/src/runtime/tests.rs` 的 `the_sweep_takes_only_what_it_is_for`。
