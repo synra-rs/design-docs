@@ -514,6 +514,41 @@ tag v*  →  标签与版本一致  →  取内核（可缺）  →  install(fro
 > 这次是先在仓库里造一个假内核（含格式不对的 `Cargo.toml`）复现出来的 ——
 > 撤回三处修复就复现，恢复就干净，唯一变量对照过。
 
+> ★ **2026-10-16，第三次：`0.0.11` 这次跑到了 publish，发了第一个包就断了。**
+>
+> 现象是**第一个包成功、第二个包 404**，连在一起看：
+>
+> ```
+> ✅ Published package @synra/protocol@0.0.11
+> [WARN] Skipped OIDC: ERR_PNPM_AUTH_TOKEN_EXCHANGE: Failed token exchange … (status code 404)
+> 📦 synra@0.0.11 → [E404] 404 Not Found - PUT https://registry.npmjs.org/synra
+> ```
+>
+> **原因是 npm 的 Trusted Publisher 逐包配置**：只配了 `@synra/protocol`，所以它的 OIDC 交换成功，
+> 而下一个包没有配置 → 交换 404 → pnpm 退回"没有凭据" → PUT 也是 404。
+> **"第一个包成功、第二个 404" 这个签名就是"只配了一部分包"**，不是 token 过期 ——
+> 后者会在第一个包上就失败，而不是在第 N 个上。
+>
+> ★ **恢复流程按"已经出去了没有"分岔，而这次已经出去了：**
+>
+> | 状态 | 能不能移标签 | 怎么恢复 |
+> | ---- | ------------ | -------- |
+> | 一个包都没出去 | **能**：`git tag -f` + `git push --force origin <tag>` | 修好再触发 |
+> | **已经出去了一部分**（本次） | **不能**：那个版本号烧掉了 | **重跑同一次 workflow run**（同提交、同标签）：pnpm 会跳过已发布的版本，从断点继续 |
+>
+> 第二行成立的前提是 `pnpm publish` **会跳过 registry 上已存在的版本**（实测过：它打
+> `There are no new packages that should be published` 然后继续下一个包）。而 `scripts/publish.ts`
+> **自己故意不查 registry**（§8 的取舍：哪些已经出去了是操作者手里的事实）—— 所以"续发"实际落在 pnpm 那一层；
+> 要人工指定断点时用 `--from <包名>`，那个参数存在的理由就是这一种情况。
+>
+> ★ **读数上的坑，必须写下来，因为它会让"发出去了没有"这个判断出错**：
+> 发布之后 **`npm view <包> version` 可能读到缓存的旧值** —— 这次它返回 `0.0.8`，
+> 而同一个包用**指名版本**问是 `0.0.11`、`time` 里也有 `0.0.11` 的时间戳、`dist-tags.latest` 也是 `0.0.11`。
+> **判据要用"指名版本"（`npm view <包>@<版本> version`）或 `time`，不要只信 dist-tag 的读数。**
+>
+> ★ 日志里那句 `[WARN] Failed to replace env in config: ${NODE_AUTH_TOKEN}` 是**无害的**：
+> `actions/setup-node` 的 `registry-url` 会写一个占位 `.npmrc`，而我们根本不走那条路（OIDC）。
+
 > ★ **本地逐步彩排过八步**（标签守卫 → 内核对照 → `install --frozen-lockfile` → `check` → `test` →
 > `lint` → `build` → publish 彩排），八步全绿。而在 GitHub 上**它从未运行过** ——
 > 第一次打标签就是它的第一次测试。
