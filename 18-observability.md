@@ -751,6 +751,18 @@ pub fn install_panic_hook(paths: &Paths, version: &str) {
       看着完全正常。**一个提交看起来成功、内容却是别的东西**，与这个仓库一直在清理的那些失败同型。
       ★ 现在的做法：只用 `git add <我改的文件>`，改完**立刻**提交，并在提交后 grep 一次源码确认改动真的在里面。
       ★ 本行的状态：门三项 + 直方图两项 + 传输两项 + 发现三项 + 网络两项；
+      ★ **第 159 轮接了接收侧**：`frames_received_total{event}`，在 `listener` 处理 `Decision::Delivered`
+      的那一支 —— 那是唯一知道「是哪一个事件」的地方。它与发送侧分开，因为
+      *说得比听到的多* 与 *听到的比说得多* 是两种不同的处境。
+      ★ **而这一项有一个诚实的缺口**：调用它的那一支只有 `listener::handle_within` 会产生，
+      而 `host/tests.rs` 的端到端测试走的是 `Host::accept` + `link.receive`，**完全绕过它** ——
+      第一版断言就写在那里，它失败了，而失败说明的正是这件事。所以现在的测试测的是
+      `Host::count_frame_received` **本身**，而「它在 listener 里被调用」目前只有编译期证据。
+      ★ **工程上的一条硬教训，比指标重要**：这个仓库里有一个进程会**周期性重置未提交的工作树**
+      （它改写历史，`.git-rewrite/` 就是它的工作目录）。所以「改完再测试再提交」的老做法会丢改动：
+      我曾两次写出内容完全正常的提交标题，而 `git show --stat` 显示改动**根本不在里面**。
+      现在的做法是：**改动、编译、测试、提交放在同一条命令里**，并在提交后立刻 `git show --stat` 核对。
+      ★ 本行的状态：门三项 + 直方图两项 + 传输两项 + 发现三项 + 网络三项（发送、链路、接收）。
       缺的是 `bytes_*`、`reconnect_attempts_total`、`links_close_total{reason}` 等。
       ★ **第 144 轮接了传输组的两项**：`transfer_bytes` 与 `transfer_duration_ms{kind=attachment}`，
       在 `send_file` 的成功返回处（`self.metrics` 已在手，与意图那两项同一个落点）。
