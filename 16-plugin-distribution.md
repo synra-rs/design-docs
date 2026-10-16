@@ -720,7 +720,16 @@ pub struct UpdateInfo {
   `record_received` → `SyncRecord::to_row` → `record_sync_log`。
   ★ 仍缺的：那次传输**之后**的事 —— 安装。而版本号诚实地是 `None`：它在传输的元数据里，
   而监听器不保留元数据，所以不猜。
-  ★ 本轮的代价：22 次工具调用，其中大部分花在**猜函数边界**上 ——
+  ★ **第 150 轮接上了第二张表**：`sync_records`（第 134 轮建的）也第一次有了写者。
+  它与历史回答的是**两个不同的问题**：「发生了什么」与「对端现在有什么」。
+  后者由 `(plugin_id, peer_device)` 主键回答「两端是否一致」，而不是罗列发生过的事。
+  ★ **而做的过程中发现一个真的丢失**：`Received::Verified { digest, .. }` 里有摘要 ——
+  接收端**校验过**它 —— 而 `Decision::Finished` 的产生处用 `..` 把它丢掉了。
+  摘要是唯一能回答「两端是否持有同样的字节」的东西，所以它现在一路带到写库处：
+  `Received::Verified` → `Decision::Finished` → `Served::finished` → 回调 → `sync_records`。
+  ★ **版本号诚实地是空串**：它随传输的元数据走，而一次 `Decision` 带的是**文件证明过**的东西，
+  那个是摘要。一行写着「这个对端持有这些字节」的空版本行是**真的** —— 比从文件名编一个版本好。
+  ★ 仍缺的：那次传输**之后**的事 —— 安装。而版本号诚实地是 `None`：它在传输的元数据里，  ★ 本轮的代价：22 次工具调用，其中大部分花在**猜函数边界**上 ——
   我三次把一个新变量插进了 `start_loops`，而那个闭包一直在 `serve` 里（`start_loops` 在 L130 前就结束了）。
       文档要的是 `version`/`direction`/`startedAt`/`finishedAt`/`outcome`/`bytesTransferred`/`traceId`。
       ★ 无 `Default`、无持久化、无 IPC DTO、无前端消费。
