@@ -827,3 +827,26 @@ synra-plugin keygen --out ~/.synra/keys/dev.key
       `sign` 只写 `signature.json`（`run.rs:248`）。
 - [ ] 迁移文档 + 一个真实的迁移示例（把旧 chat 插件迁过来）—— **未做，且前提不成立**：
       见 §7 的说明，仓库里没有旧插件可以迁。
+
+## 第 180 轮：这 16 条在 51 轮之后仍然准确
+
+★ 第 127 轮判断这 16 条「准确且被挡住」。这一轮逐条核实 —— **16 条全部仍然成立**，
+包括每一处行号引用（`tools/synra-plugin-cli` 确在，`args.rs` 确实只有 4 个子命令，
+全仓 `proc-macro` 仍然 **0 命中**）。
+
+★ **而其中两条值得单独点出，因为它们是同一件事的两个实例 —— 一个检查能通过而事实不成立：**
+
+1. **`verify` 里有一条静默失效的检查。** `verify/target.rs` 的 `wasm_imports` **恒为空向量**
+   （诚实降级为 warn），所以 import 检查在生产中**从不运行**；而更要紧的是
+   **CLI 里没有「import ⊆ 已声明的 capability」这一 §3.1 的核心检查** —— 只有宿主侧有。
+   后果是作者本地 `verify` 全绿，而插件在装载期被拒，**而 CLI 没有告诉他为什么**。
+
+2. **headless 模板产出的不是一个组件。** 它生成 `cdylib` + `#[no_mangle] extern "C" fn synra_plugin_activate()`，
+   而 WIT 要的是 `export!("synra:plugin/lifecycle@1.0.0")` —— 生成的插件装上去会因缺导出被拒。
+   **而模板能过它自己的测试，因为它测的是 manifest。** 那正是「一个检查瞄准了错的分支」的形状。
+
+★ **而它们都修不了，原因是同一个硬冲突**：`export!` 需要 `unsafe`，
+而工作区 `unsafe_code = "forbid"` **不允许**局部 `allow`。
+要落地要么把宏放进一个独立 crate（像 `synra-testkit-alloc` 那样把例外集中到一处），要么改变那个 fixture 的处理方式。
+**那是一次设计选择，不是一行改动** —— 与 `AckPolicy`、`synra-net`、`ReceiverCheck` 属于同一类：
+**这个仓库剩下的工作，几乎全部是决定，而不是实现。**
