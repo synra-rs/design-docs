@@ -640,6 +640,17 @@ pub struct UpdateInfo {
   `Decision::Finished` 带上它，消费者才能区分这两件事。改的是三个文件、一条测试。
   ★ **还有一件必须承认的事**：第 137 轮的 `SyncInbox` 与真实接收路径**形状不同** ——
   真实路径是**流式写盘**，不是「整包在内存的块里」。所以 `SyncInbox` / `ReceiverCheck` 更像是 ⑧ 的
+  ★ **第 139 轮把那件「该明确决定的设计问题」做了一半，而且是最实的一步**：
+  传输完成时不再只知道一个路径。`Receiving`（`session/receive.rs`）在**接受提案时**从
+  `TransferMeta::PluginBundle { plugin_id, version }` 记住 `Option<PluginId>`，
+  `Decision::Finished` 带上它，`listener` 于是能说出区别：
+  *「a plugin bundle for X, which this kernel does not install yet」* 而不是和一张截图同一句话。
+  ★ **为什么字段在 `Receiving` 上**：接受提案时才知道这件事，而完成时手上只剩一个路径 ——
+  从 `plugin-<id>.wasm` 反推文件名会在有人发一个叫 `plugin-notes.wasm` 的文件时错掉。
+  ★ **而这条改动目前只有编译期证据，没有单测。** 写那条测试需要构造一个 `TransferRequest`，
+  它的 `digest` 是一个 `SriDigest` —— 而本轮为了读清形状已经读了九次，所以停在这里：
+  代码编译通过、648 条既有测试全过，但**「一个插件包带着它的 plugin_id、一张附件不带」这句话
+  还没有被一条测试说过**。下一轮第一件事就是它（`TransferMeta` 与 `TransferRequest` 的形状已读清）。
   **清单化**（把六件事说出来、按序要求），而不是能插进流式接收的东西。要不要把它们接上去，
   还是让流式路径自己履行那六条义务，是一个**该明确决定**的设计问题，不是一句「还没接线」。
   所以第 130 轮那个 `ReceiverCheck` 不是「缺一个触发者」，而是**连入站事件都没有**。
