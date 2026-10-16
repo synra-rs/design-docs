@@ -875,3 +875,24 @@ pub session: SyncSessionId,   // Which round.
 所以那个决定同时会影响签名怎么组织（把 `plugin_id`/`version`/`session` 合成一个 `BundleRef`？）。
 
 ★ **没有猜**：编一个 `SyncSessionId` 能让代码编译，而它会让「哪一轮」这个字段变成一个装饰。
+
+## 第 166 轮：那个设计问题有答案了 —— 一轮同步有了名字
+
+★ 上一轮停在一个决定上。这一轮做了它：**发起端造那个标识，而且它必须随传输走。**
+
+理由有两条，而第二条是决定性的：一轮同步由一侧发起，而只有那一侧能命名它 ——
+两台设备同时推送会各自造一个对方从未听过的标识，于是**谁的回复都配不上任何一轮**。
+接收端的职责是把它**复述回来**，而这正是 `TransferRequest::sync_session_id` 携带它的原因。
+
+★ 而实现时撞到一个类型上的事实：协议里的字段是 `Option<SessionId>`（protocol 的类型），
+而 core 有自己的 `SyncSessionId`。**两个类型指的是同一件事，而只有一个装得进包。**
+所以 `SyncRound.session` 是 `SessionId`，而两个类型之间的桥是「同一个标识、两处类型」，
+不是编造一个值 —— 这与「编一个 `SyncSessionId` 让代码编译」是两件不同的事。
+
+★ **而三个参数变成了一个值**：`plugin_id` + `version` + `session` 合成了 `SyncRound`。
+这不仅是因为 `send_bundle` 到了 clippy 的参数上限 —— 它们在构造上就属于一起：
+一轮同步是**关于一个插件的一个版本**的，而一个与它携带的包不一致的声明是没人能处理的报文。
+**给那个东西起名字，比给 lint 加一个 allow 诚实。**
+
+★ `TransferSender::request()` 不再写死 `sync_session_id: None`，所以一个包到了对端**说得出自己是哪一轮** ——
+这是「接收端回一个结果」欠的最后一件事（第 133 轮的 `sync_result` 与第 134 轮的 `apply_result` 都在等它）。
