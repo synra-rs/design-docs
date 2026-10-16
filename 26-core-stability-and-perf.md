@@ -440,6 +440,19 @@ fn hot_paths_do_not_allocate() {
 
 ---
 
+> ★ **而这五条在第 85 轮逐条核过，结论是：其中只有一条能按写的样子写成 grep**。>
+>>
+> | 条目 | 真实状态 |>
+> | --- | --- |>
+> | `to_vec()` / `Vec::from(` 作用于块数据 | **grep 分不出来**：传输路径里唯一的 `to_vec()` 是 `session/send/transfer.rs:53` 的 **bitmap**，不是块数据。要区分它们需要知道变量的来历，而不是看一行。 |>
+> | `pub HashMap`/`pub Vec` 在公开签名里 | **已覆盖**，但在 `api-guard` 而不是 `tools/guards`：它报 `BTreeMap`、`io::Error` 这类**外部类型出现在承诺里**。 |>
+> | `pub` 字段（除 POD） | 同上，也在 `api-guard` 的规则里。 |>
+> | `std::sync::Mutex` 跨 `await` | **不是 grep**：需要跨 await 点的流分析。一个行内正则会把所有持有锁的函数都报出来。 |>
+> | `rayon` / `std::thread::spawn` 在 `crates/*` | **与代码矛盾**：`engine/executor.rs` 的**有界线程池**是 [12](./12-wasm-host.md) 明确赞同的设计（`MAX_THREADS = 64` + `sync_channel`），而 `listener.rs:114` / `synra-control/endpoint.rs:659` 也各自 spawn。按字面写会把已经被认可的设计报成违规。 |>
+>>
+> 也就是说这张表的意图分成三类：**已经被另一个工具覆盖**（#2、#3）、**本身不是 grep**（#4）、>
+> **与现有代码矛盾而需要先做一个决定**（#5）。真正剩下可以写的只有 #1，而它需要知道>
+> 哪些变量是块数据 —— 那不是 grep，是一个关于类型的约定（比如让块走一个 newtype）。>
 ## 7. 反例：这些"优化"是错的
 
 写下反面清单，避免为了性能把核心搞复杂。
