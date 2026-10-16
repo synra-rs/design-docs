@@ -1542,7 +1542,13 @@ pub enum TrustLevel {
       **有界缓冲**（满了就等待然后失败）、**超时返回 `WouldBlock`**（于是 `is_a_timeout` 把它认成
       “安静”而不是“断开”）、**一端 drop 后另一端读到 EOF**。
       ★ **而它自己就是证据**：两个 `PeerLink` 在内存上交换了一个真的 envelope（带帧、
-      带 target/from 校验）。下一步才是把它接到 `synra-testkit` 的两个 `Kernel` 上。
+      带 target/from 校验）。
+      ★ **而第 87 轮让它跑起了真工作**：`session/tests.rs` 的 `connected()` 从
+      “开 `TcpListener`、connect、accept”改成 `MemoryStream::pair()`，
+      **13 条会话测试全部跑在内存上** —— 提议传输、窗口内写块、读报告、确认，每一步都不再需要 socket。
+      ★ **而耗时没有变**：两边都是 6.41s（那一位数来自一条故意等超时的用例，`HELLO_TIMEOUT` 那条），
+      所以这次换接不是用性能换来的。
+      下一步才是把它接到 `synra-testkit` 的两个 `Kernel` 上。
       * 两条合起来说明：**这条缝不只是"能不能换成内存链路"**，它同时决定了
         ①同一套失败语义能不能只写一遍，②`synra-net` 里那些已经写好、测好的决策能不能被用上。
         在它长出来之前，每修一处链路问题都是在两个实现之间做人工同步 —— 第 84 轮就是第二次。
