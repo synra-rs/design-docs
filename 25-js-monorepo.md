@@ -468,6 +468,31 @@ tag v*  →  标签与版本一致  →  取内核（可缺）  →  install(fro
 > 真正的检查在 `check` 里：`shapes` 拿镜像与内核**逐字段对照** —— 那正是 `sync` 的说明让人去跑的那一个。
 > **而它之所以能被发现，是因为这一步在 CI 里跑过一次**：本地 `pnpm run check` 不碰它。
 
+> ★ **2026-10-16：`v0.0.9` 那次标签运行挂在 `pnpm install` 上，而原因值得单独记。**
+>
+> 现象是 `ERR_PNPM_IGNORED_BUILDS: Ignored build scripts: esbuild@0.28.2`。真实原因是
+> **pnpm 有两套"允许依赖构建脚本"的机制，而新的那套在场时旧的那套不再决定结果**：
+> 当时为了挡 `core-js`（`ant-design-vue` 带进来、postinstall 只是捐赠横幅）加了一行 `allowBuilds`，
+> 于是已经写在 `onlyBuiltDependencies` 里的 `esbuild` 从"允许"变成"未允许"。
+>
+> 两条操作性教训：
+>
+> ① **本地没暴露，因为 esbuild 的原生二进制早就装好了** —— 而 CI 是干净安装。
+>    能复现它的命令是 **`pnpm install --force`**（不是普通的 `pnpm install`）。
+>    ★ 而且 pnpm 复现时**自己又往 `pnpm-workspace.yaml` 里补了一行占位**
+>    （`esbuild: set this to true or false`）—— 遇到这行占位就是它在说"这件事我没法替你定"。
+> ② **一个开关开一个，别开两个**：现在只有 `allowBuilds`，`core-js: false` 与 `esbuild: true` 各带理由。
+>
+> ★ **顺便立下一条恢复流程**：标签运行失败时，先判断它挂在**发布之前还是之后** ——
+>
+> | 挂在哪 | 能不能救 | 怎么救 |
+> | ------ | -------- | ------ |
+> | `install` / `check` / `test` / `lint` / `build`（**发布之前**） | **能**：registry 上什么都没出去 | 修好推到 main，然后 `git tag -f <tag>` + `git push --force origin <tag>` 重新触发 |
+> | `publish` 中途（**已经发出去了几个**） | **不能重来**：版本号烧掉了 | 从断点继续（§8 的 `--from`），而不是移动标签 |
+>
+> **判据只有一个：`npm view <包> version` 还是不是上一个版本。** 这次五个包都还是 `0.0.8`，
+> 所以移动标签是安全的；而这条判据在"已经发出去一个"之后就立刻反过来。
+
 > ★ **本地逐步彩排过八步**（标签守卫 → 内核对照 → `install --frozen-lockfile` → `check` → `test` →
 > `lint` → `build` → publish 彩排），八步全绿。而在 GitHub 上**它从未运行过** ——
 > 第一次打标签就是它的第一次测试。
