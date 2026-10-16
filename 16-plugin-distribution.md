@@ -669,6 +669,19 @@ pub struct UpdateInfo {
   ★ 错轮次的块被**计数**（`refused_chunks`）而不是静默丢掉：非零是「有人往这台设备发了一个它不在里面的轮次」
   的唯一证据；而越界与错轮次分开计数 —— 合成一个会让「有人在发错轮次」这个信号被数错冲淡。
   ★ 仍然没有的：daemon 的 socket 接收循环（④–⑦ 的 I/O 那半）、IPC DTO、前端消费、编排者。
+  ★ **第 146 轮想接上「收到一个插件包就写一条同步记录」，结论是：那个位置做不到。**
+  `Decision` 定义在 `synra-core/src/inbound.rs`，而消费它的 `Decision::Finished` 在
+  `synra-core/src/listener.rs` 里 —— 而那里是 **`handle_within` 内部**，那个函数的参数是
+  `host / stream / inbox / deadline / desk / router`：**没有数据库**。所以「写一条 `sync_log`」
+  在收到包的那一刻没有可写的地方，需要改 `handle_within` 的签名（生产调用点与测试调用点各一处）。
+  ★ **而本轮的方向一开始是错的**：我按 `serve_one` 去找，以为它接收 daemon 的 kernel ——
+  那是 `synra-control/src/endpoint.rs` 的**控制端点**方法，与这里无关。同名方法在两个 crate 里，
+  而我猜了六次文件，而不是一次看清模块结构。**一次 `grep -r` 就能定案的事，我用了六个命令。**
+  ★ 三件已经存在却仍无生产调用者的东西，仍然无调用者，而且现在知道**为什么**：
+  `SyncRecord`（第 133 轮）、`sync_log` 表（第 135 轮）、两者之间的转换（第 136 轮）——
+  它们等的是一个**能写库的接收点**，而接收点的形状（`handle_within`）里没有库。
+  ★ 下一轮第一步：改 `handle_within` 的签名，让它在完成时回调一次 ——
+  两处调用点（`serve.rs` 与 `transport/tests.rs`），加上一条测试。
       文档要的是 `version`/`direction`/`startedAt`/`finishedAt`/`outcome`/`bytesTransferred`/`traceId`。
       ★ 无 `Default`、无持久化、无 IPC DTO、无前端消费。
 - [x] 自动更新门槛表（下面那张表）—— **已实现**（第 77 轮）：
