@@ -461,23 +461,29 @@ tag v*  →  标签与版本一致  →  取内核（可缺）  →  install(fro
 > ② workflow 的 YAML 用 `yaml@2.9.1` 解析过，并逐项断言了触发器、权限、步骤顺序与 `--provenance`
 > （9 条全过）。**剩下唯一没验的是 `npm publish` 本身，而那需要 Trusted Publisher 配好。**
 
-> ★ **首次发布（0.0.8）暴露了 npm 的"暂存发布"（staged publishing）：新包名会先进队列。**
+> ★ **首次发布（0.0.8）暴露了三件关于 npm 的事实 —— 其中第二件我一开始判错了，所以三条都写下来。**
 >
-> 新建包名发布时，registry 上先出现一个占位版本 `0.0.0-stage`（它的描述就是
-> "Temporary package placeholder for staged publishing"），而**在维护者批准之前那个包不可安装**；
-> 已经存在的包名发新版本则直接生效。实测：`@synra/protocol`（老包名）与 `synra` 立刻上线，
-> `@synra/theme` 先留下占位、随后上线。
+> ① **一个新包名会带一个 `0.0.0-stage` 占位版本。** 三个首次发布的包，每个的文档里都有
+> `0.0.0-stage`（描述 literally 是 "Temporary package placeholder for staged publishing"）
+> 加上真正的 `0.0.8`。而 `npm stage list` 与 `GET /-/stage` 都返回**空**
+> （`{"items":[],"total":0}`）—— 也就是说**没有任何东西在等批准**：发布时那次 2FA 就是"在场的证明"，
+> 它已经把暂存消费掉了。`npm stage publish` 的用途是**推迟**这次证明（先上传、以后再补），我们没用它。
 >
-> 对这条流水线的含义，两条都重要：
-> ① **OIDC 自动化不了这一步** —— 批准是一个人的动作，而且它自己还要过一次 2FA。
-> "第一次发一个新包"永远需要有人在场，之后的版本发布才是无人值守的；
-> ② 这也解释了为什么 §6.1 选 OIDC 而不是 `NPM_TOKEN` + `--otp`：交互式的东西在 CI 里没有位置。
+> ② **"发布成功"与"公开可见"是两件事，而公开那一侧会延迟 —— 这一条是我判错的地方。**
+> npm 打印 `+ pkg@version`、脚本 `exit 0`，但**新包名的匿名读路径会 404 若干分钟**。
+> 判断"到底发出去了没有"要用**带认证的写视图**：
 >
-> ★ **还有一个坑值得单独写下来：npm 在暂存时照样打印成功行 `+ pkg@version`。**
-> 那次五个包全部打印了 `+ ...` 与"✓ 发布成功"（脚本的 `ok=5 fail=0` 也是这么来的），
-> 而当时 registry 上**只有两个真的可安装**。所以"日志说成功"不是证据，
-> **唯一的判据是 registry 上那个版本的文档存不存在**（`registry.npmjs.org/<name>`，
-> 或镜像站如 jsdelivr 能不能取到 `/<name>@<version>/package.json`）。
+> ```
+> GET https://registry.npmjs.org/<name>?write=true      # Authorization: Bearer <token>
+> ```
+>
+> 它在发布后**立刻**就能看到 `0.0.0-stage, 0.0.8` 与 `latest=0.0.8`；同一时刻匿名 GET 还是 404。
+> ★ **我一开始就是被那个 404 骗了**，把三个新包判成"卡在暂存队列里、等你批准"——
+> 而实际是五个全发成了（几十分钟后匿名读也全部可见；`jsdelivr` 这类第三方镜像更慢）。
+>
+> ③ **发布那一步仍然需要一个能过 2FA 的在场者。** 这一点与 §6.1 选 OIDC 不矛盾：
+> OIDC 免掉的是**后续版本**的 2FA，而不是第一次；而暂存机制的意义正是把这个"在场"
+> 从发布时刻挪到批准时刻（`npm stage approve <stage-id>`）。
 >
 > 参考：<https://docs.npmjs.com/staged-publishing>、`npm stage`（**本地 npm 11.4.2 里还没有这个命令**，
 > 需要更新的 CLI 或网页端批准）。
