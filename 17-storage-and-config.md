@@ -680,9 +680,13 @@ plugins-manifest.json   # 已装插件清单（id + version + source），用于
       **没有 `Store` 类型**。真实的是 `SynraDb`（`sqlite/mod.rs:115`）：持**单个** `Connection`，
       没有 write/read 闭包，**没有 SQLITE_BUSY 重试** —— 只有一条 `busy_timeout=5000` pragma。
       §2.5 的整个形状不存在。
-- [ ] 审计的异步批量提交 —— **未做**。`AuditRing` 有且接进了 `Kernel`（`kernel.rs:314`），
-      但**没有任何代码写 `plugin_audit` 表**（只有 `migrations.rs:109` 的 `CREATE TABLE`），
-      全仓无 batch/flush。内存环有，落盘没有。
+- [~] 审计的落盘 —— **两个宿主都有了**（第 69、81轮）：
+      `SynraDb::record_audit` + `PluginSet::with_audit_sink`，守护进程与 Tauri shell 各装一个 sink。
+      ★ **而 shell 那一半是这一轮才补上的**：`with_audit_sink` 写给了守护进程，
+      而它是**唯一**调用者 —— 所以桌面 shell 里插件的审计只在内存环里，
+      **随进程结束而消失**，而迁移文件里写的正是“持久那半才能让‘最近活动’活过重启”。
+      ★ **而异步批量提交仍然没做**：现在是每次调用一次写入，
+      而设计要的是批量。它是**性能**而不是正确性的差别，所以留在这里而不勾。
 - [x] `PluginDataRoot` + 沙箱逃逸防护 —— **A，但"句柄式"是 B**。
       真名 `PluginDataRoot`（`synra-store/src/sandbox.rs:99`）；`resolve()`(`:198`) 先 canonicalize
       父目录(`:229`)、逃逸在 `:236` 被拒、判定用 `paths.rs` 的 `is_within`；真实逃逸测试含 symlink(`:474`)
