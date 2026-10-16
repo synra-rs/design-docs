@@ -760,7 +760,7 @@ Content-Security-Policy:
       ★ 现存这一个确实是忠实的只读镜像：`:70` 整体替换快照、`:82/:94/:99` 只记录、
       `:133` 的 `switch` 只认三个事件且 `default` 返回 `false`，不含业务规则。
 - [ ] WebView 引擎兼容矩阵（WebView2 / WKWebView / WebKitGTK / Android / iOS）+ 探测 —— **未做**。
-      `WebviewKind` 只存在于设计文档（[09](./09-ui-plugin-model.md)、本文 §384），代码 0 处。
+      `WebviewKind` 只存在于设计文档（[09](./09-plugin-system.md)、本文 §384），代码 0 处。
       ★ 比"没有"更糟的是：`src/ipc/injection.ts` 原先把 `platform`/`hostKind`/`appVersion`
       当成**硬编码常量**暴露（`platform: () => 'windows'`），在 Linux/macOS/Android 上就是撒谎。
       一个按 `platform()` 分支的插件在所有平台都会走 Windows 那条路，而且**不会报错** ——

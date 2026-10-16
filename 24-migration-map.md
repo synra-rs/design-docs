@@ -184,9 +184,14 @@ just docs-check
 | -------------------- | ----------------------------------------------------------- |
 | 同文档内             | `§7.2`                                                       |
 | 同仓库另一篇          | `[04 §7](./04-wire-protocol.md)`                             |
-| 另一新仓库            | ``见 synra-app 仓库的 `design-docs/08-ipc-and-frontend.md`（本地：[08](../../synra-app/design-docs/08-ipc-and-frontend.md)）`` |
+| 另一新仓库            | ``见 synra-app 仓库的 `design-docs/08-ipc-and-frontend.md`（本地：`synra-app/design-docs/08-ipc-and-frontend.md`）`` |
 | 外部资料（规范 / 库） | 正常 Markdown 链接                                            |
 
+
+> ★ **“另一新仓库”那一行原本是一个可点的链接**（`[08](../../synra-app/design-docs/08-ipc-and-frontend.md)`），
+> 而那个目录在迁移完成后已经不存在了。**一张讲“怎么引用”的表格里不该有一个点不到的地方**：
+> 例子本身就是说明，而一个坏掉的例子说明的是反面。现在它是代码段，
+> 因为跨仓库的路径**无法在本仓库校验** —— 而本仓库的链接现在有人校验了（见 `doc-links`）。
 ---
 
 ## 9. 给 AI 协作者的说明
