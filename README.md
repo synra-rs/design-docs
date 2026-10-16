@@ -315,8 +315,8 @@ docs/
 | UI 插件对抗（CSP / 跨 origin）       | `synra-app`   | [21 §5.2](./21-testing-strategy.md)    |
 | 前端行为回归                        | `synra-app`   | [21 §7](./21-testing-strategy.md)      |
 | 桌面 E2E（`tauri-driver`）          | `synra-app`   | [21 §10](./21-testing-strategy.md)     |
-| **类型库形状一致性 / 零运行时**        | `synra-js`    | [25 §6](./25-js-monorepo.md)（10 条守卫） |
-| **UI 样式与 token 一致性**             | `synra-app` + `synra-js` + `docs` | [28 §13](./28-app-ui.md)（11 + 8 条守卫，3 条守不住的） |
+| **类型库形状一致性 / 零运行时**        | `synra-js`    | [25 §6](./25-js-monorepo.md)（11 条守卫；发布流水线见 §6.1） |
+| **UI 样式与 token 一致性**             | `synra-app` + `synra-js` + `docs` | [28 §13](./28-app-ui.md)（11 + 14 条守卫，3 条守不住的） |
 | **站点：双语言结构 / 死链 / schema**   | `docs`        | [27 §7](./27-website.md)（10 条守卫）   |
 
 ---
