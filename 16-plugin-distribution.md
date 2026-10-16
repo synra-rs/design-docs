@@ -607,6 +607,17 @@ pub struct UpdateInfo {
   「对端已经有了吗」有两个答案。
   ★ **而 `SyncRecord` 的历史仍然没有持久化**：表记的是当前状态，日志要另有一张表。
   所以「持久化」这句现在要分成两半读：状态那半做完了，历史那半没有。
+  ★ **第 135 轮把那半也做了**：迁移 **v10** 建了 `sync_log` 表，`SynraDb::record_sync_log()` /
+  `sync_log(plugin_id, limit)` 读写它，四条测试。
+  ★ **形状照 v9（`intents`）的先例，而且理由写在同一个地方**：*整份文档 + 查询用的投影列*。
+  `document` 装内核自己序列化的那一轮，旁边的列只保留**历史页面真正要问的两个问题**
+  （最新的在前、按插件过滤）—— 一个为了找某个插件而解析每一行的查询，会随着同步次数变慢。
+  ★ **两张表的分工现在写清楚了**：`sync_records` 每个 `(plugin_id, peer_device)` 一行、每轮**替换**，
+  回答「对端已经有了吗」；`sync_log` 每轮**追加**，回答「发生了什么、什么时候」。
+  ★ 而 `record_sync_log` 也是 upsert：一轮写两次（开始一次、结束一次），第二次是**同一轮**，
+  两行会让历史把一轮显示两遍、其中一遍说它从未结束。
+  ★ 仍然没有的：core 侧的转换（`SyncRecord` ↔ 这一行，需要给两个枚举加 serde）、
+  IPC DTO、前端消费，以及真正写这些行的编排者。
       文档要的是 `version`/`direction`/`startedAt`/`finishedAt`/`outcome`/`bytesTransferred`/`traceId`。
       ★ 无 `Default`、无持久化、无 IPC DTO、无前端消费。
 - [x] 自动更新门槛表（下面那张表）—— **已实现**（第 77 轮）：
