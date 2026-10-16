@@ -825,3 +825,18 @@ pub struct UpdateInfo {
       无 `UpdateCheck` 类型、无调度器、无门槛表。grep `auto_update`/`update_policy` **0 命中**。
 - [ ] 离线降级行为 + UI 提示 —— **未做**：`synra-rust-app/src` 里 `offline` 只出现在
       **设备卡片**（`DevicesPage.vue:145`、`stores/devices.test.ts`），与插件目录/降级无关。
+
+## 第 163 轮：版本随包一起旅行
+
+★ 那行 `record_sync` 的版本曾经是**空串**，理由写得很清楚：元数据止步于接收端，而一次 `Decision` 带的是
+*文件证明过*的东西，那个是摘要。**那个理由在第 163 轮不再成立** —— 于是它成了假话，
+而这是这份文档要盯着的事：一个说法在它的前提消失以后，读起来仍然像设计说明。
+
+★ 现在的路是：`TransferMeta::PluginBundle { version }` → `version_of`（与 `bundle_of` 并列的一个纯函数）
+→ `Receiving::version` → `Decision::Finished` → `FinishedTransfer::version` → `record_sync`。
+于是那一行说「这个对端持有这些字节，而它们是 1.2.0」——下一次比较不必再查一次。
+
+★ 而**它的第一次尝试是空的**：那个 `version_of` 被插进了 `Receiving` 的字段列表里
+（`functions are not allowed in struct definitions`），因为单行锚点 `/// Which plugin this bundle belongs to…`
+的**第一个**匹配就在结构体内部。把它移到结构体之前以后，`Receiving` 的文档又被顶开了 ——
+**这是本会话第五次踩同一个坑**：把一个 item 插到另一个 item 之前，会把附着在后者上的东西抢走。
