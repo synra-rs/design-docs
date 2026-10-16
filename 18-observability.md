@@ -698,6 +698,16 @@ pub fn install_panic_hook(paths: &Paths, version: &str) {
       一个说「零接入」的行会让人从零开始做一遍已经做完的那部分。
       ★ **而本轮差点就这么做了**：我先查了 §4.1 清单、再查 recorder API、再查注入点，
       第三次之后才问最直接的那个问题 ——「全仓有没有人在记指标」。**那个问题应该第一个问。**
+      ★ **第 142 轮接上了第一个直方图**：`host_call_ms{import=…}`，在 `record()` 里 ——
+      `elapsed_ms` 本来就在它手上（它进了 audit 条目），只是**没有任何生产代码用过** `histogram_observe`，
+      全仓只有 recorder 自己的测试调它。没有调用者的直方图是一个**形状**而不是一次测量。
+      ★ 而它被记在 `record()` 的**最前面**：一次被拒绝的调用也花了它花的时间，
+      只由成功调用构成的分布会用一个错误的问题的答案回答「这个插件有多慢」。
+      ★ 测试做过**变异验证**：把那一行注释掉 → `FAILED` 并报出 `the duration was not recorded`；恢复 → 通过。
+      这一条值得记，因为断言形式是 `is_some()`（`MetricsSnapshot` 没有 `keys()`，所以看不到实际 series），
+      弱断言更需要证明它能失败。
+      ★ 于是本行的状态是：门的三项 + 一个直方图已接入；缺的仍是清单上的**其余项**
+      （网络、发现、意图、传输…）。
       `RingRecorder` 只出现在 `synra-observe` 自己的测试里。§4.1 的指标名中只有
       `frames_sent_total`/`links_open` 出现过，且只是 `metrics/tests.rs` 的测试夹具。
 - [ ] 设置页的"性能"面板（实时指标）—— **缺失**：`synra-rust-app/src/pages` 只有
