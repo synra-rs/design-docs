@@ -682,6 +682,18 @@ pub struct UpdateInfo {
   它们等的是一个**能写库的接收点**，而接收点的形状（`handle_within`）里没有库。
   ★ 下一轮第一步：改 `handle_within` 的签名，让它在完成时回调一次 ——
   两处调用点（`serve.rs` 与 `transport/tests.rs`），加上一条测试。
+  ★ **第 147 轮没有改签名，而是找到了一条更好的路**：`handle_within` **本来就返回** `Served`，
+  所以不需要回调 —— 需要的是让 `Served` **带上**那些完成的传输。
+  现在 `Served.finished: Vec<FinishedTransfer>`（`path` / `byte_length` / `bundle`），
+  而 `Decision::Finished` 那一支往它里面推一条 —— 三个事实一起走，其中 `bundle` 说出这是哪一类。
+  ★ **证据来自已有的测试**：第 145 轮那条真实传输的测试里，监听端线程的 `join()` **就返回 `Served`**，
+  所以它现在断言 `served.finished` 有一条、4096 字节、且 `bundle` 为 `None`（发的是附件）。
+  一个值从「文件落地」走到了「调用方手里」，而这条路径是被一次真实传输证明的。
+  ★ **仍然缺的最后一段**：`listener.rs` 里那个**连接线程**仍然把 `Served` 丢掉
+  （每连接一个线程，它只打印 `ended`）。要真正写库，要么那个线程回调，要么把累加器交出去 ——
+  而它需要 `Send + Sync + 'static`，这是下一轮的形状问题。
+  ★ 于是那三件等待中的东西（`SyncRecord` / `sync_log` / 转换）**仍然**没有生产调用者，
+  但缺的已经不是「值到不了调用方」，而是「连接线程没有把它交给调用方」。
       文档要的是 `version`/`direction`/`startedAt`/`finishedAt`/`outcome`/`bytesTransferred`/`traceId`。
       ★ 无 `Default`、无持久化、无 IPC DTO、无前端消费。
 - [x] 自动更新门槛表（下面那张表）—— **已实现**（第 77 轮）：
