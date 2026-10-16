@@ -840,3 +840,20 @@ pub struct UpdateInfo {
 （`functions are not allowed in struct definitions`），因为单行锚点 `/// Which plugin this bundle belongs to…`
 的**第一个**匹配就在结构体内部。把它移到结构体之前以后，`Receiving` 的文档又被顶开了 ——
 **这是本会话第五次踩同一个坑**：把一个 item 插到另一个 item 之前，会把附着在后者上的东西抢走。
+
+## 第 164 轮：一个完成的传输说得出它回应的是哪个请求
+
+★ 上一轮让**版本**走到落库处；这一轮让**请求的标识**走到 listener。
+路与 `digest`、`version` 完全一样（这是第四次走它）：`Envelope::request_id` → `Receiving::request_id`
+→ `Decision::Finished` → listener 的解构。
+
+★ **为什么是它**：`messaging::sync_result` 要的是**整个请求信封**（`&Envelope`），
+所以一个回复必须先说得清它回应**哪一个**请求 —— 而 `Decision::Finished` 在此之前\只有路径、长度、
+插件、摘要与版本，没有一样能指回那个请求。
+
+★ listener 这一轮用 `..` 收下它而**还没有发回复**：下一个缺的是一件只有它知道的事 ——
+`on_finished` 回调**不返回值**，所以接收端装了什么（daemon 那一侧的决定）到不了握手它的那一侧。
+那要改回调的签名，是下一轮的形状问题。
+
+★ 而这一轮**一次就做对了**，用的是上一轮学到的那两件事：锚点全是单行的，
+新加的东西不插到别的 item 的前面。三个文件、857 条测试、一次编译通过。
