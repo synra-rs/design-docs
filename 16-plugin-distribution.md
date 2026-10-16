@@ -929,3 +929,15 @@ pub session: SyncSessionId,   // Which round.
 ★ **这一轮的执行很糟：四次失败。** 一次把新结构插进了 `impl Envelope` 里（第六次踩同一个坑），
 一次被那个重置工作树的进程清掉了写入，两次让 `messaging.rs` 的签名与函数体不一致 ——
 最后靠**回退那一个文件**、只留下 protocol 的新增才收住。交付是好的，过程是浪费的。
+
+## 第 169 轮：结果构造器收下了那个 context
+
+★ `messaging::sync_result` 从 `(request: &Envelope, from, outcome, at)` 变成
+`(context: ReplyContext, outcome, at)` —— 少了一个参数，而**少掉的那个正是调用方拿不到的那个**。
+
+★ 上一轮的教训直接兑现了：**签名与函数体一起改**，两个测试调用点也在同一个脚本里改掉。
+上一轮就是让它们不一致，才连错两次。这一轮一次编译通过、908 条测试、clippy 干净。
+
+★ 于是「接收端回一个结果」只差最后一件：`on_finished` 回调**不返回值**，
+所以接收端装了什么（那个决定在 daemon 那一侧）到不了持有 link 的这一侧。
+那一步要同时改 daemon 的闭包与 listener 的调用点 —— 而它现在只需要一个 `SyncOutcome`。
