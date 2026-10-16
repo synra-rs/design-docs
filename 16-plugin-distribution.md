@@ -941,3 +941,20 @@ pub session: SyncSessionId,   // Which round.
 ★ 于是「接收端回一个结果」只差最后一件：`on_finished` 回调**不返回值**，
 所以接收端装了什么（那个决定在 daemon 那一侧）到不了持有 link 的这一侧。
 那一步要同时改 daemon 的闭包与 listener 的调用点 —— 而它现在只需要一个 `SyncOutcome`。
+
+## 第 170 轮：一个回复还缺什么，现在是清楚的
+
+★ 想把「接收端回一个结果」做完，于是把回复需要的东西对着 `ReplyContext` 数了一遍。
+listener 手里已经有的：`request_id`（回给谁）、`target`（对端 = `FinishedTransfer::peer`）、
+`sync_session_id`、`plugin_id`、`version`、`digest`。**缺两样：trace，和「谁在回答」。**
+
+★ trace 这一轮补上了（`Decision::Finished` 带上 `Inbound::trace`，第七次走那条「把事实送到 listener」的路）。
+而 `from` 缺的是另一类东西：它是**本机标识**，不属于这次传输，而 `Host::identity` 是 `pub(super)` ——
+listener 在别的模块，看不见。所以那要么是 `Host` 上的一个访问器，要么是 `FinishedTransfer` 再带一个字段 ——
+**而那是下一轮的第一个决定**。
+
+★ **而查 `ReceiverDuty` 时得到一个更重要的结论**：它的七个变体是**检查义务**
+（`PackageDigest`、`Signature`、`Manifest`、`ArchiveLimits`、`SessionComplete`、`LocalActivation`、`LocalGrants`），
+**里面没有「安装」**。而 daemon 只做了安装 —— 所以一个诚实的 `SyncOutcome` 里，
+`performed` 是**空的**，`is_fully_checked()` 是 `false`。
+**那不是缺陷，那是事实**：这个内核还没有运行过 ⑧ 的那七项检查，而一个声称做过的 outcome 会让 ⑨ 说谎。
