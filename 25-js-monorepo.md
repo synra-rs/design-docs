@@ -275,12 +275,25 @@ export type { DeviceId, TransferId, DeviceTarget } from '@synra/protocol'
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "check": "tsc -b && pnpm run shapes",
-    "shapes": "tsx scripts/check-shapes.ts",
+    "shapes": "esno scripts/check-shapes.ts",
     "sync": "pnpm --filter @synra/protocol sync",
     "release": "bumpp -r"
   }
 }
 ```
+
+> ★ **`scripts/**` 的 `.ts` 一律用 `esno` 跑**（`esno scripts/check-shapes.ts` 这种），与
+> `synra-rust-app` / `docs` 一致 —— [27 §5.6](./27-website.md) 更是把 `esno` 写成了那本仓库的约定。
+> 本文先前写的是 `tsx`，而这个仓库一度是**唯一**用它的那个。
+>
+> ★ **说清这次换的是什么**：`esno@4` 的依赖里就是 `tsx`（`esno` 是它的一层包装），
+> 所以换的是**名字与一致性，不是运行时** —— `pnpm exec esno --version` 打印的是 `tsx v4.23.15`。
+> 收益是"三个仓库的脚本用同一个命令跑"，而不是性能或能力。
+>
+> ★ **顺带删掉了四个脚本的 `#!/usr/bin/env tsx`。** 它们是装饰：那些文件在 git 里是 `100644`
+> （**没有可执行位**），也就是从来不能被 `./scripts/x.ts` 那样直接执行 —— 一直都是经 `pnpm run` 跑的。
+> 而一个指向 `tsx` 的 shebang 会让"这个文件可以自己跑"看起来成立，同时把一个已经删掉的运行时又写回了仓库。
+> `docs` / `synra-rust-app` 的脚本都没有 shebang，现在这里也没有。
 
 `@synra/testkit` **也跟同一版本**（它是 client 的替身，语义上必须对齐）。
 
@@ -823,7 +836,7 @@ export default defineBuildConfig({
 > ★ **而第 122 轮核对过这两项，结论是"缺"这句话已经过期了一半**：
 >
 > **守卫 8 存在**：`scripts/check-doc-snippets.ts`，挂在根 `package.json` 的 `docs:types`
-> （`tsx scripts/check-doc-snippets.ts`）。本轮实际跑过，输出是
+> （`esno scripts/check-doc-snippets.ts`）。本轮实际跑过，输出是
 > `· doc-snippets: the complete authoring example in 23 §8 compiles`。
 > 所以这条不是"没有"，是**没有人把它写下来**。
 >
