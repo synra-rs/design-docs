@@ -626,6 +626,18 @@ pub struct UpdateInfo {
   ★ **往返测试走遍三种结局**：`Succeeded` / `Skipped { reason }` / `Failed { error }` 携带的内容不同，
   只测一种会漏掉另一种的字段。
   ★ 仍然没有的：IPC DTO、前端消费，以及真正写这些行的编排者。
+  ★ **第 137 轮做了一个查证，结果值得写下来**：daemon **没有 transfer 的接收侧** ——
+  它只有发送（`commands.rs` 的 `send_file`），入站路径处理的是**意图**（`runtime/intent.rs` 的 `dispatch`）。
+  所以第 130 轮那个 `ReceiverCheck` 不是「缺一个触发者」，而是**连入站事件都没有**。
+  ★ **以及 ④–⑦ 的库层补上了**：`SyncInbox`（`plugin_sync.rs`）
+  —— 会话知道哪一块到了、检查序列知道整包要验什么，而**字节**没有地方放。
+  它是刻意无聊的版本：块在内存里、完成时按 **index 而不是到达顺序** 拼装。
+  落盘与 socket 循环是 daemon 的事，一个假装做了它们的类型正是本仓库反复清除的东西。
+  ★ **记账没有重写**：`SyncSession::absorb` 已经回答「这一块是不是新的、在不在范围内、属不属于这一轮」，
+  重写会给出两个答案，而两个答案就是这样开始漂移的。
+  ★ 错轮次的块被**计数**（`refused_chunks`）而不是静默丢掉：非零是「有人往这台设备发了一个它不在里面的轮次」
+  的唯一证据；而越界与错轮次分开计数 —— 合成一个会让「有人在发错轮次」这个信号被数错冲淡。
+  ★ 仍然没有的：daemon 的 socket 接收循环（④–⑦ 的 I/O 那半）、IPC DTO、前端消费、编排者。
       文档要的是 `version`/`direction`/`startedAt`/`finishedAt`/`outcome`/`bytesTransferred`/`traceId`。
       ★ 无 `Default`、无持久化、无 IPC DTO、无前端消费。
 - [x] 自动更新门槛表（下面那张表）—— **已实现**（第 77 轮）：
