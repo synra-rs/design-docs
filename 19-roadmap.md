@@ -83,7 +83,7 @@ synra-core/spike/            # 不进 workspace，用完可删（或归档）
 | `Cargo.toml` workspace + 11 个空 crate      | [06 §1](./06-workspace-layout.md) 的结构                 |
 | `[workspace.lints]` 严格档 + `panic = "unwind"` | [06 §7](./06-workspace-layout.md)、[ADR-014](./20-adr.md) |
 | `.cargo/config.toml`（移动端 target 参数）   | [06 §7](./06-workspace-layout.md)                        |
-| `tools/guards`（Rust 二进制）                  | ★ **8 条结构守卫**；不是 `justfile` 也不是 `xtask/guards.sh` ——
+| `tools/guards`（Rust 二进制）                  | ★ **一组结构守卫**（条数不写在这里 —— 它一直在长）；不是 `justfile` 也不是 `xtask/guards.sh` ——
   它们从未存在，而当初这一行就是这么写的。运行方式是 `cargo run -q -p guards` |
 | CI（`checks` + `msrv` + feature 矩阵）       | **固定 `dtolnay/rust-toolchain` 版本**（[ADR-014](./20-adr.md)）；MSRV job 跑在 checks 之前 |
 | `crates/synra-protocol` 的 ID/错误/版本类型  | newtype + `SynraError` + 稳定错误码                       |
@@ -110,7 +110,7 @@ cargo tree -p synra-protocol | grep -E 'tokio|rusqlite|wasmtime'                
 cargo deny check bans                                                                   # 必须通过
 
 # 4. 结构守卫
-cargo run -q -p guards   # 8 条全过
+cargo run -q -p guards   # 全过才有退出码 0
 
 # 5. feature 矩阵 + MSRV 全绿
 just matrix
