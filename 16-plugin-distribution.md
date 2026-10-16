@@ -706,6 +706,20 @@ pub struct UpdateInfo {
   是下一轮的第一步。
   ★ 于是回调目前**说出**收到的是什么，而不是假装写进了库。
   **一个说「not recorded yet」的闭包比一个看似写库的闭包诚实。**
+  ★ **第 149 轮把那一行改了，三件孤立的东西第一次真的合作。**
+  在 `shared_db` 还手上的地方取**第二个句柄**（`history_db`），因为第一个句柄在 L637 已被
+  `remembered` 取走。而写库的活儿抽成了函数 `record_received`，**理由是可测性**：
+  回调活在监听器的连接循环里，那个循环**从不返回** —— 只在它内部发生的事**测不到**。
+  搬到函数里之后，一个内存库加一个手搭的 `FinishedTransfer` 就能验证它，
+  而这是「接线能编译」与「收到的包变成一行」之间的区别。
+  ★ **两条测试**：`a_received_bundle_becomes_a_row_of_history`（一行、插件对、按插件也能查回来）
+  与 `an_attachment_is_not_a_synchronisation`（一张截图不是一次同步 —— 一份填满它们的「历史」
+  会用错误的行回答「同步过什么」）。
+  ★ 于是 `SyncRecord`（第 133 轮）、`sync_log` 表（第 135 轮）、两者的转换（第 136 轮）
+  **终于都有了生产调用者**，路径是：`Decision::Finished` → `Served::finished` → 连接线程的回调 →
+  `record_received` → `SyncRecord::to_row` → `record_sync_log`。
+  ★ 仍缺的：那次传输**之后**的事 —— 安装。而版本号诚实地是 `None`：它在传输的元数据里，
+  而监听器不保留元数据，所以不猜。
   ★ 本轮的代价：22 次工具调用，其中大部分花在**猜函数边界**上 ——
   我三次把一个新变量插进了 `start_loops`，而那个闭包一直在 `serve` 里（`start_loops` 在 L130 前就结束了）。
       文档要的是 `version`/`direction`/`startedAt`/`finishedAt`/`outcome`/`bytesTransferred`/`traceId`。
