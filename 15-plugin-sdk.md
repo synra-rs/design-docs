@@ -781,6 +781,14 @@ synra-plugin keygen --out ~/.synra/keys/dev.key
       `crates/synra-plugin-host/src/generated/capability_table.rs`，而它由**宿主**的 `build.rs` 重新生成。
       所以单跑 `-p synra-plugin-sdk` 时，比较的一方可能是**上一次宿主构建**留下的产物；
       在工作区整体构建（CI 的做法）里宿主先生成，这条守卫才是在比较当前合同。
+      ★ **而这个注意点第 127 轮修掉了**：那条测试现在读的是**合同本身** ——
+      把 `wit-codegen`（宿主 `build.rs` 用的同一个解析器）作为 **dev-dependency**，直接 `Contract::parse`
+      读 `wit/synra-plugin.wit`。它不是 `synra-plugin-host`，所以不是原注释担心的那个循环；
+      作为 dev-dependency，它也不会进插件下载的内容里。
+      ★ **而证据正是第 126 轮做不到的那件事**：往合同里加一个函数，**只跑
+      `cargo test -p synra-plugin-sdk`**（不重建宿主），现在会失败 ——
+      `assertion left == right failed: the contract's own count: 36 / left: 36 / right: 35`。
+      第 126 轮同样的探针是**通过**的，那正是这条守卫读错了东西的证据。
       ★ 以及第 126 轮想给它做"能不能失败"的探针时，先撞上的是**另一条更早的守卫**：
       往合同里加一个没有 `@ungated` / `@capability` 的函数，宿主 `build.rs` 直接报
       `'probe-added' has neither @ungated nor @capability…` 并让构建失败 ——
