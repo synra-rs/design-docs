@@ -740,6 +740,18 @@ pub fn install_panic_hook(paths: &Paths, version: &str) {
       它本来就走完了 dial → 握手 → session → envelope，并且已经断言了 `sent() == 1`。
       ★ 本行的状态：门三项 + 直方图两项 + 传输两项 + 发现三项 + **网络一项**；
       缺的是 `links_open`、`bytes_*`、`reconnect_attempts_total` 等。
+      ★ **第 157-158 轮接了网络组的两项**：`frames_sent_total{event}`（`Host::send`，记在**发送之后** ——
+      被链路拒绝的帧从未离开）与 `links_opened_total`（`Host::adopt` 里 session 打开处 ——
+      拨入与接入**共同**经过那里，所以一个计数覆盖两侧）。
+      ★ 而 `Host` 因此多了一个**可选的记录器**（`with_metrics`），理由与插件宿主相同：
+      *一个不记账的 host 是 host，不是坏的*。
+      ★ **这两项曾经一度消失，而教训比指标本身重要**：一个 `git filter-branch` 进程在仓库里活动
+      （它的工作目录 `.git-rewrite/` 一直在变），在我提交**之前**重置了工作树 ——
+      于是 `git add -A` 提交的**只有那个临时目录**，而两次提交的标题（`feat: a sent frame is counted…`）
+      看着完全正常。**一个提交看起来成功、内容却是别的东西**，与这个仓库一直在清理的那些失败同型。
+      ★ 现在的做法：只用 `git add <我改的文件>`，改完**立刻**提交，并在提交后 grep 一次源码确认改动真的在里面。
+      ★ 本行的状态：门三项 + 直方图两项 + 传输两项 + 发现三项 + 网络两项；
+      缺的是 `bytes_*`、`reconnect_attempts_total`、`links_close_total{reason}` 等。
       ★ **第 144 轮接了传输组的两项**：`transfer_bytes` 与 `transfer_duration_ms{kind=attachment}`，
       在 `send_file` 的成功返回处（`self.metrics` 已在手，与意图那两项同一个落点）。
       ★ **而 `transfers_total{outcome}` 故意没接，理由值得写下来**：`send_file` 有多条 early return
