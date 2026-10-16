@@ -745,6 +745,18 @@ pub struct UpdateInfo {
   **一个说「永远是」的注释，在它的前提消失以后是最危险的一种。**
   ★ 仍缺的：真正调用 `open_bundle` 的人。`send_file`（`session/send/awaiting.rs`）走的是 `open`，
   而 daemon 需要一条把包推给对端的路径 —— 那才会让第 134 轮的 `SyncTable` 第一次被调用。
+  ★ **第 153 轮把发送那一半做出来了**：`synra_core::send_bundle`（`session/send/awaiting.rs`），
+  与 `send_file` 同一层、同一条路 —— `TransferSender::open_bundle` 与 `open` 的区别只在请求里说的是什么。
+  ★ **四个步骤因此抽成了 `run_transfer`**：它们是**这次传输**的，不是**载荷**的 ——
+  一个包和一张截图走同一条路，而唯一不同的那件事已经在 sender 里了。抽取之后 `send_file` 的函数体是一行。
+  ★ **`send_bundle` 比 `send_file` 少一个参数**（没有 `chunk_size`），而这是一个判断：
+  包是 daemon 代表插件发的，两者对「一块该走多少字节」都没有看法，所以分块大小是**内核的**。
+  （clippy 的 `too_many_arguments` 正是这样把它从 8 个压到 7 个的。）
+  ★ **而它目前既没有调用者、也没有测试。** 调用它需要 `synra-control` 的 `Kernel` 加一个方法，
+  而那个 trait 有**三个**实现（两个测试替身加 daemon 的 `Runtime`）—— 那是下一轮的事。
+  记在这里，而不是让下一轮以为它与 `send_file` 一样被走过了。
+  ★ 于是链条现在只差两端之间那一段：`Kernel::send_bundle` → `Runtime` → `core::send_bundle`，
+  而它一旦接上，第 134 轮的 `SyncTable` 就有了第一个真实的调用点。
   而监听器不保留元数据，所以不猜。
   ★ **第 150 轮接上了第二张表**：`sync_records`（第 134 轮建的）也第一次有了写者。
   它与历史回答的是**两个不同的问题**：「发生了什么」与「对端现在有什么」。
