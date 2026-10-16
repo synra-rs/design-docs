@@ -556,6 +556,13 @@ pub struct UpdateInfo {
   `performed` 等于 `ReceiverDuty::ALL` —— 不是构造时填的，是走出来的。
   ★ **仍然没有的**：事件的**发送方**（`_synra.plugin.sync.result` 至今无人发出）、transfer 层的接线
   （④–⑦）、以及 A 侧第 ⑨ 步。所以本行**保持未勾**，缺的是另外两半。
+  ★ **第 131 轮把发送方补上了**：`synra_core::sync_result(request, from, outcome, at)`（`messaging.rs`）
+  构造 ⑧ 的回复，载荷是`SyncResult`（`ok` / `installedVersion` / `activated` / `error`）。
+  它是 `reply_to`，所以带着请求的 id 与 trace —— 发起端要能把结局对回到它发起的那个传输上。
+  ★ **内部类型不上线**：`SyncOutcome` 记的是这台设备自己做了哪些义务、顺序如何；
+  对方需要四个事实就够了，给它一份它看不到证据的清单不是线上格式。`SyncResult::of` 做这个转换。
+  ★ 两条测试：成功的四个字段，以及**失败的不能被看成成功** —— 后者才是这条回复存在的理由。
+  而 transfer 层的接线（④–⑦）与 A 侧第 ⑨ 步仍未做，所以本行**保持未勾**。
   ★ 另外 `ReceiverDuty::ALL` 的顺序（digest → signature → manifest → archive-limits → …）与 §5.2 ⑧ 的
   行文（先解包、再走 Verifying）**不一致**。本轮按枚举自己的顺序实现，因为类型注释写明那就是「执行顺序」；
   这个分歧记在这里，没有擅自改任何一边。
