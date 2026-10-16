@@ -717,6 +717,19 @@ pub fn install_panic_hook(paths: &Paths, version: &str) {
       ★ 计时那两项（`intent_duration_ms` / `intent_match_duration_ms`）仍未接：它们要墙钟，
       而这个方法的 `now_ms` 是**逻辑**时间。
       ★ 本行的状态：门三项 + 一个直方图 + 意图两项；缺的仍是网络、发现、传输那几组。
+      ★ **第 144 轮接了传输组的两项**：`transfer_bytes` 与 `transfer_duration_ms{kind=attachment}`，
+      在 `send_file` 的成功返回处（`self.metrics` 已在手，与意图那两项同一个落点）。
+      ★ **而 `transfers_total{outcome}` 故意没接，理由值得写下来**：`send_file` 有多条 early return
+      （路径不存在、地址解析不了、握手失败），只在成功路径记的计数器会统计「成功了的那些」，
+      而对用户正在问的那些一言不发 —— 与意图那条注释里说的同一个错。它需要**每个出口经过同一处**，
+      而这是 `impl Kernel for Runtime` 的 trait 方法，改不了名、包不了壳。
+      ★ 本轮**试过**结构手术（把函数体塞进一个立即调用的闭包，好让所有出口汇聚），
+      脚本定位闭合行时切错了位置、文件变成未闭合，于是 `git checkout` 回退、改成两处小改动。
+      **一次失败的改法换一个更小的改法，比硬推下去便宜。**
+      ★ **而这两项没有单测**：触发成功路径需要一次真实的文件传输（一个可解析的地址、一次握手），
+      而失败路径在 L304 之前就返回了。所以本轮的证据是「编译通过 + 195 条既有测试全过」，
+      不是「这两项被验证过」—— 记在这里，而不是让下一轮以为它们测过了。
+      ★ 本行的状态：门三项 + 直方图两项（host 调用、意图）+ 传输两项；缺的是网络、发现那几组。
       `RingRecorder` 只出现在 `synra-observe` 自己的测试里。§4.1 的指标名中只有
       `frames_sent_total`/`links_open` 出现过，且只是 `metrics/tests.rs` 的测试夹具。
 - [ ] 设置页的"性能"面板（实时指标）—— **缺失**：`synra-rust-app/src/pages` 只有
