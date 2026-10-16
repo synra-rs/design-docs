@@ -519,7 +519,15 @@ pub struct UpdateInfo {
       `SyncRecord`(`plugin_sync.rs:602-611`) 存在**但只有四个字段**（`plugin_id`/`peer`/`action`/`at_ms`），
       文档要的是 `version`/`direction`/`startedAt`/`finishedAt`/`outcome`/`bytesTransferred`/`traceId`。
       ★ 无 `Default`、无持久化、无 IPC DTO、无前端消费。
-- [ ] `UpdateCheck` + 自动更新门槛表 —— **未做**：只有 `UpdateInfo` DTO
+- [x] 自动更新门槛表（下面那张表）—— **已实现**（第 77 轮）：
+      `synra_plugin_api::update`。`UpdatePolicy`（默认 `NotifyOnly`）、`UpdateFacts`、`UpdateBlocker`、
+      `UpdateAction`，以及 `decide(policy, &facts)`。
+      ★ **而表里没写的两件事，这里得自己决定并且写了理由**：
+      * **撤销压过一切**，包括策略。已安装版本被撤销时不是“询问”而是“必须”——
+        否则下载失败时会继续跑一个已被撤回的版本，而那正是这一行存在的原因。
+      * **阻碍项全部报出，不只报第一个。**它们常常同时成立，只报一个会让用户修完一个、
+        重试、再发现下一个 —— 而更糟的是把“发布者公钥变了”藏在一条权限消息后面。
+      ★ **而它故意不做任何动作**：不拉取、不安装、不调度。一个会行动的决策函数没有网络就无法测试。
       （`dto/plugin.rs:72-83`，含 `needs_new_consent`/`added_capabilities`）；
       无 `UpdateCheck` 类型、无调度器、无门槛表。grep `auto_update`/`update_policy` **0 命中**。
 - [ ] 离线降级行为 + UI 提示 —— **未做**：`synra-rust-app/src` 里 `offline` 只出现在
