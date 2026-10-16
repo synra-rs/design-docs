@@ -550,6 +550,15 @@ pub struct UpdateInfo {
       7 个接收方义务 `ReceiverDuty::ALL`（`plugin-sync.rs:263-284`，测试断言 `== 7`）。
       ★ **没有 9 步流程，也没有任何编排者** —— `synra-core/src/plugin_sync.rs` 只被自己和
       `plugin_sync_tests.rs` 使用，**事件名没有发送方**。
+  ★ **第 130 轮做出了接收端那一半**：`ReceiverCheck`（`plugin_sync.rs`）按 §5.2 ⑧ 的顺序推进，
+  每一步都要求前一步**已经做过**，跳步或错序都是一个具名的 `SyncError::OutOfOrder`，
+  而且被拒的步骤**不留痕迹**（`performed` 只记真正做过的）。走完七步得到的 `SyncOutcome` 里
+  `performed` 等于 `ReceiverDuty::ALL` —— 不是构造时填的，是走出来的。
+  ★ **仍然没有的**：事件的**发送方**（`_synra.plugin.sync.result` 至今无人发出）、transfer 层的接线
+  （④–⑦）、以及 A 侧第 ⑨ 步。所以本行**保持未勾**，缺的是另外两半。
+  ★ 另外 `ReceiverDuty::ALL` 的顺序（digest → signature → manifest → archive-limits → …）与 §5.2 ⑧ 的
+  行文（先解包、再走 Verifying）**不一致**。本轮按枚举自己的顺序实现，因为类型注释写明那就是「执行顺序」；
+  这个分歧记在这里，没有擅自改任何一边。
 - [x] `SyncConflictPolicy`（默认 `NeverDowngrade`）—— **C/一半**：
       真名 `ConflictPolicy`（`plugin_sync.rs:89`），`decide()`(`:176-228`) 实现了 NeverDowngrade 语义，
       测试 `plugin_sync_tests.rs:33-118`。
