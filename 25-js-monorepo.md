@@ -725,8 +725,26 @@ export default defineBuildConfig({
 > 而 workspace 里的 `node_modules/@synra/client` 是指向源码的符号链接、没有 `dist`。
 > 这个做法比 `pnpm pack` 快，而且测的是同一件事。
 >
-> ★ **仍然缺的两项**：守卫 8（文档代码块能编译）与清单第 11 条（发布脚本：
-> 拓扑排序、可续跑）。后者目前只有 `release: bumpp -r`，它改版本但不管发布顺序。
+> ★ **而第 122 轮核对过这两项，结论是"缺"这句话已经过期了一半**：
+>
+> **守卫 8 存在**：`scripts/check-doc-snippets.ts`，挂在根 `package.json` 的 `docs:types`
+> （`tsx scripts/check-doc-snippets.ts`）。本轮实际跑过，输出是
+> `· doc-snippets: the complete authoring example in 23 §8 compiles`。
+> 所以这条不是"没有"，是**没有人把它写下来**。
+>
+> **清单第 11 条的"拓扑排序"存在，而且比这句话写的更细**：`scripts/publish.ts` 的 `publishOrder()`
+> 有 6 条测试（依赖在前、**稳定**、遇环拒绝而不是硬破、私有包不参与、工作区外的依赖忽略、
+> 真实工作区的清单能排出顺序），并且默认是**彩排** —— 只有 `--publish` 才真的发布。
+>
+> ★ **而"可续跑"确实还没有**：脚本没有 `--from`，也不去查 npm 上已发布的版本，所以一次发布中断后
+> 只能从头再走一遍 —— 而"已经发出去的那个版本"是不可撤销的（脚本自己的注释就是这么写的）。
+> 这一条**保持未完成**，但缺的是后半句，不是整句。
+>
+> ★ 本轮同时把 `synra-js` **整个跑了一遍**，作为"库开发结束"的证据之一：`pnpm -r test` 四个包
+> （protocol 3 条、testkit 64 条、另两个没有测试文件）、`pnpm run test:scripts` 6 条、
+> `pnpm run check` 四项全过（`tsc -b`、`link-dist` 铺出 3 个已构建包、`shapes agree (10 checks)`、
+> 以及上面那条文档代码块）。**这个仓库在此前多轮验证里从没被跑过** —— 不是因为跑不了，
+> 而是因为我一直只跑 Rust 侧；node 与 pnpm 在离线环境里是有的，181 个依赖也都在本地。
 
 - [x] 建仓库骨架：根 `package.json` / `pnpm-workspace.yaml` / `tsconfig.json` / `.gitignore` / CI
       —— 实际是 `tsconfig.base.json` + `tsconfig.json`，其余一致
