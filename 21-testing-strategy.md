@@ -384,6 +384,14 @@ async fn session_times_out_when_peer_is_silent() {
 > | 28 宿主 panic | ✓ | `catch_unwind` 的测试 |
 > | 29 `can_handle` 产生副作用 | ✓ | `HostCalls::pure()` + 纯会话拒绝副作用的测试 |
 >
+> ★ **而第 96 轮把那修复的另一半也钉住了**：关掉 `timeout: None` 的 deadline 只有在
+> `timeout: Some(_)` **仍然会开**、仍然能停下真客体时才是对的。
+> `a_real_guest_that_loops_is_stopped_by_the_wall_clock_not_by_zero` 跑一个真的死循环，
+> 燃料给足以跑过时钟，所以停下它的必须是**墙上的钟**；
+> 并且断言结果里的 `after` **就是预算的那个时长**（250ms）而不是零 ——
+> `after: 0ns` 正是第 95 轮那个 bug 的签名。
+> ★ 取反对照：把燃料改成 1000⇒红，报 `got FuelExhausted { fuel: 1000 }`，
+> 证明这条测试分得清两层限制。
 > ★ **而第 95 轮把它做成了最强形式：真的客体，穿过 Kernel**：
 > `crates/synra-core/src/dispatch/tests.rs` 的 `a_real_guest_that_loops_is_stopped_without_costing_the_others`。
 > 前一条证的是**内核对结果的处理**，引擎自己的测试证的是**引擎会产生这些结果**，
