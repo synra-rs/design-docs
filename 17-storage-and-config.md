@@ -672,7 +672,7 @@ plugins-manifest.json   # 已装插件清单（id + version + source），用于
 - [x] `rusqlite` + `bundled` + WAL —— **C**：`rusqlite 0.40` + `bundled` 在
       `crates/synra-store/Cargo.toml`；WAL 在 `db/migrations.rs:228`。
       ★ `rusqlite_migration` **不是依赖**，用手写 `MIGRATIONS` 常量 + `db::apply` 取代。
-- [ ] 5 个初始迁移脚本 + CI 对"空库/旧库"各跑一次 —— **实际是 7 个**迁移
+- [ ] 5 个初始迁移脚本 + CI 对"空库/旧库"各跑一次 —— **实际是 9 个**迁移（第 106 轮核对：写这一行时是 7 个，后来又加了两个）
       （`db/migrations.rs:18-209`），不是 5 个。空库有真实 SQLite 测试（`sqlite/tests.rs:18`）；
       "旧库"只在纯模型层覆盖（`db/tests.rs:173` 用闭包而非真库）；
       ★ **CI 不存在**（无 `.github/`），所以"各跑一次"这半没有。
@@ -694,18 +694,24 @@ plugins-manifest.json   # 已装插件清单（id + version + source），用于
       ★ **`cap-std` 不是依赖**，实现是 canonicalize-then-compare，模块自己的注释（`sandbox.rs:14-17`）
       就写明 cap-std 才是目标。**"消除 TOCTOU"没有做到**。
 - [ ] 配置分层（config.json + DB + 环境变量）+ `ConfigPatch` + 副作用处理 ——
-      **五层里两层有**。DB 配置表有（`sqlite/settings.rs:13/48`）；
-      `ConfigPatch` 只存在于 IPC DTO（`synra-ipc/src/dto/config.rs:32`）**且无消费方**；
-      `config.json` 只是个路径常量（`paths.rs:86`，无人读取）；
-      环境变量只有 `SYNRA_DATA_DIR`（`apps/synra-cli/src/session.rs:32`）。
-      无 `Config::patch`，无副作用处理（`KernelEvent::ConfigChanged` 只带一个计数）。
+      ★ **第 106 轮核对：这一行已经过时了。** 写它的时候"五层里两层有"，现在是四层：
+      文件那层是一个**完整模块**（`crates/synra-core/src/config/`，9 个文件、533 行测试），
+      默认值与覆盖分开（`is_overridden`）、**原子应用**（`apply(set, unset)`：要么全生效要么全不）、
+      `load_json` **读一个不信任的文件**（未知键**保留**而不是丢弃）、`to_json` 写回，而 `kernel.rs` 已经在用它。
+      ★ **而这两句仍然成立**，所以它们留在这里而不是被我一起删掉：
+      `ConfigPatch` 只存在于 IPC DTO（`synra-ipc/src/dto/config.rs:32`）**且无消费方**（`synra-ipc` 之外两处命中都只是注释）；
+      环境变量只有 `SYNRA_DATA_DIR`（`apps/synra-cli/src/session.rs:32`），无 `Config::patch`，无副作用处理
+      （`KernelEvent::ConfigChanged` 只带一个计数）。**缺的是消费方与那一层环境变量，不是配置本身。**
 - [ ] `SecretBackend` 五平台实现 + 降级链 + 用户提示 —— **枚举齐全，实现为零**。
       trait 在 `secrets/backend.rs:18`，六个 kind 齐（`kind.rs:10-25`），
       **但只有一个实现：`MemoryBackend`（`backend.rs:63`）**。五个平台 keychain、`EncryptedFile` 全 0 个。
       `choose_backend`(`:123`) 是按 strength 取最大 —— 是**偏好排序而不是降级链**，且没有可降级目标。
 - [ ] 插件 secure storage（XChaCha20-Poly1305 + 每插件 DEK）—— **完全缺失**：
       全仓 0 处 `chacha`/`aead`/`DEK`；`plugin_secrets` 表不在任何迁移里。
-- [ ] `GcTask` + 清理策略 + GC 报告 —— **缺失**，全仓 0 命中 `GcTask`/`GcReport`。
+- [ ] `GcTask` + 清理策略 + GC 报告 —— ★ **两个类型仍缺失，但"清理策略"已经不是了**：
+      `GcReport` 全仓 0 命中；`GcTask` 只有 **1** 命中且是一句注释（`apps/synra-daemon/src/serve.rs:36`）。
+      而 `runtime::intents::sweep` 已经在跑（每小时一次，带 `Retention { intents_ms, audit_ms }`），
+      第 92 轮还有一条**只允许它动自己那三张表**的测试。**缺的是那两个类型与一份可读的报告，不是清理本身。**
       ★ **写入那一半本轮做了：`SynraDb::backup_to` + `synra db backup <path>`。**
       用 `VACUUM INTO ?1`（**绑定参数**，不是拼字符串：路径来自用户，
       引号会结束 SQL 字面量），而不是拷贝文件 ——
