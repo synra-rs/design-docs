@@ -751,6 +751,19 @@ fn event_routing_does_not_allocate() {
       全仓无 `benches/`、无 `criterion`、无 `#[bench]`。唯一被测的是**分配次数**，不是时间。
 - [ ] `fuzz/`：帧解码、信封解析、归档解包、路径解析、capability 解析 —— **未做**，目录不存在。
       现在只有 proptest 覆盖任意字节不 panic；property 测试与 fuzz 的输入族不同，前者通过不能当作后者的结论。
+      ★ **而第 99 轮定位到了其中最具体的一条，并且它已经写在代码里**：
+      `host_calls_tests.rs` 的 `a_pure_session_refuses_the_calls_that_act` 自己写着——
+      *“它证明了拒绝本身有效，而**不证明有任何东西会构造出这样一个 session**”*，
+      而 `Work::allows_side_effects` 到 store 那个标志的**两行是“没有任何测试走到的部分”**。
+      ★ **而原因比“漏了一条测试”更有意思**：引擎测试里没有任何一个客体调用过主机函数。
+      `instantiate` 不接受 session（store 的 `session: None`），只有 `PluginSet` 在每次调用前
+      `set_session`。所以要走到那两行，需要一个**其 `can-handle` 会调用侧效应型主机函数的真客体**，
+      加上一个带 grants 的 session（`LinkerSession::new`）与一个 audit ring（`with_audit`）——
+      因为客体只要忽略返回值就能继续跑，**拒绝只能从审计里看到**。
+      ★ 现成的两个配件已经能拼出它：`ANSWERS` 给了 `string -> string` 的 can-handle ABI，
+      `IMPORTS` 给了 import instance 的写法；而侧效应函数选 `platform-open-url`（`func(url: string) -> outcome`，
+      单个字符串）比 `log`（六个参数）省事。
+      ★ **而本轮没有写它**，因为配件与 host 存根都是真活，写到一半比不写更糟。
 - [ ] `crates/synra-plugin-host/tests/malicious/`：§5.1 的 29 个用例 —— **未做**，目录不存在。
       这是三份文档里最长的测试清单项，目前一个都没有。
       孤立的对抗测试是有的（归档穿越/symlink/体积、签名吊销、令牌伪造、装载期 import 覆盖），
