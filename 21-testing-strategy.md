@@ -763,6 +763,18 @@ fn event_routing_does_not_allocate() {
       ★ 现成的两个配件已经能拼出它：`ANSWERS` 给了 `string -> string` 的 can-handle ABI，
       `IMPORTS` 给了 import instance 的写法；而侧效应函数选 `platform-open-url`（`func(url: string) -> outcome`，
       单个字符串）比 `log`（六个参数）省事。
+      ★ **而第 100 轮写到了哪一步，以及卡在哪里**（配件已回退，因为半成品比没有更糟）：
+      WAT 的骨架跑通了 —— import instance、`core func (canon lower ...)`、
+      `(with "host" (instance ...))`、以及**为什么内存必须自己一个模块**（降低一个带
+      `string` 参数的导入必须指定 memory，而那块内存属于客体，所以不能在它里）。
+      ★ **而卡住的地方是 WIT 的 `outcome`**：真实契约是
+      `platform-open-url: func(url: string) -> outcome`，而 `outcome` 是一个 `variant`（`ok(string)` / `err(error)`，
+      `error` 是一个带 `option<string>` 的 record）。客体导入的类型必须与 linker 定义的一致，
+      而**类型写成一个命名 `$out` 引用时 wasm-tools 报
+      `instance not valid to be used as import`**；内联形式的写法没有试到通。
+      ★ **而真实工具链不这么写**：它用 `wasm-tools component embed/new` 从 WIT 生成配件，
+      类型由 WIT 算出来，手写只是本工作区没有那个工具时的替代。所以下一步有两条路：
+      ①把这个 variant 用内联类型写出来；②引入 `wasm-tools`（当前离线缓存里没有）生成配件。
       ★ **而本轮没有写它**，因为配件与 host 存根都是真活，写到一半比不写更糟。
 - [ ] `crates/synra-plugin-host/tests/malicious/`：§5.1 的 29 个用例 —— **未做**，目录不存在。
       这是三份文档里最长的测试清单项，目前一个都没有。
