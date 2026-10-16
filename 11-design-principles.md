@@ -447,7 +447,13 @@ impl Link<Ready> {
       收一个值就不可能再发，并且 `pairing_window_ms` 已经给了截止时间。
       严格按字面（"`mpsc` 都要有容量"）它不合格；按字面去改要么换个类型、要么加一个恒定容量，
       都是在为一个不存在的泄漏风险写代码。所以这里改文档。
-- [ ] 全仓搜索 `recv().await` / `read().await`：每一个都能被 `CancellationToken` 打断
+- [x] 全仓搜索 `recv().await` / `read().await`：每一个都能被 `CancellationToken` 打断 ——
+      ★ **搜索结果是零，而这不是它想问的那个答案**（第 117 轮）：内核**没有 async**。
+      `crates/` 里 `async fn` 0 处、`.await` 0 处，`apps/` 里也是 0；全仓唯一几个命中是
+      **注释**和**字段名**（`handshake.rs` 的 `await_hello`/`await_ack` 是超时字段，不是 `.await`）。
+      ★ **而实质的那条规则以另一种形式成立**：阻塞读写靠**超时**被打断
+      （`set_read_timeout`/`set_write_timeout`，第 83–96 轮），循环靠**取消令牌**退出（第 111 轮的 `run_task`）。
+      一条“没有 async”的纪律不是证据，这两条才是。
 - [ ] 关停测试：在"正在传输 + 正在调用插件"时关停，必须在 grace 内退出
 - [x] **内核里禁止 `std::sync::Mutex` 跨 `await`** —— `std::sync::Mutex` 全仓 2 处命中，
       都在测试文件里（`desktop_tests.rs`、`host_calls_tests.rs`）。生产代码零命中。
@@ -467,8 +473,20 @@ impl Link<Ready> {
 长操作（网络、Wasm 调用、文件 IO）在锁外做。
 
 **检查**：
-- [ ] 不存在跨越整个 `Kernel` 的锁
-- [ ] 临界区里没有 `await`（除了专门的异步锁）
+- [ ] 不存在跨越整个 `Kernel` 的锁 —— ★ **第 117 轮把它从一句空话变成了一个具体的发现**：
+      `Runtime::host` 的锁在**四条命令路径上跨越了网络** —— `send_text`、`send_file`、`pair`、`send_outbound`，
+      都是 `let mut host = self.host.lock();` 之后直接 `host.dial(...)`（`commands.rs` 的 139/219/508/684 行）。
+      `Host::dial` 取 `&mut self`，因为握手要用本机身份、完成后还要在 host 上记下 session，
+      所以一次握手期间**设备注册表是锁着的**，而一个 `devices` 列表就要等它。
+      ★ **而上方的注释原本声称相反的事**（“release it, dial, and take it again”）——
+      它描述的是**地址查读**那一步，而把拨号也算了进去。注释已改成如实描述。
+      ★ **而它不是挪一行就能修的**：需要把 `Host` 拆成“不需 `&mut self` 就能握手”
+      与“事后认领并记下 session”两半，四个调用点才能把锁收到查读那一步。那是一个设计变更，所以这一条**保持未勾选**。
+- [x] 临界区里没有 `await`（除了专门的异步锁） —— ★ **同上，且这一条值得说明它为什么是空的**：
+      该 crate 里一个 `async fn` 也没有，所以“临界区里的 await”无从发生。
+      ★ **而空的规则不等于满足的规则**：它们两条真正保证的是“这个内核是同步的”，
+      而那个事实本身写在 `kernel.rs` 的模块注释里（“一个从不 await 的 `async fn`
+      只会把每个调用方的签名变成 async”）。**一旦有人引入一个 `async fn`，这两条就重新变成真问题。**
 - [ ] 每个聚合根能被单独构造与测试
 
 ---
