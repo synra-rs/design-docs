@@ -542,6 +542,47 @@ tag v*  →  标签与版本一致  →  取内核（可缺）  →  install(fro
 | 测试       | **Vitest**                                                | 与本机既有项目一致 |
 | 形状断言    | **`check-shapes.ts` 直接与 Rust 对照**（~~`tsd` / `expect-type`~~） | §6 守卫 3：对照比快照强，快照只能发现"变了" |
 | 版本与发布   | `bumpp -r`；**拓扑发布脚本尚缺**（§8 清单第 11 条）          | 本机既有 monorepo 的约定 |
+| 运行 `scripts/**` | **`esno`**（`esno scripts/check-shapes.ts`）              | 与 `docs` / `synra-rust-app` 一致；★ 它本身是 `tsx` 的包装，换的是名字与一致性 |
+| lint 与格式  | **`eslint` + `@antfu/eslint-config`**，格式由 `eslint --fix` 负责 | 与 `docs` / `synra-rust-app` 一致；**仓库里没有 Prettier**（见下面的 ★） |
+
+> ★ **2026-10-16：把 Prettier 全部移除，统一到 `eslint` + `@antfu/eslint-config`。**
+>
+> 背景：这个仓库同时装了 `prettier`、一个 `format` 脚本和一个 `.prettierrc.json`，而**从来没跑过** ——
+> `prettier --check .` 报 **50 个文件**不干净（连 `.prettierrc.json` 自己都不是），而 prettier **不在任何门禁里**。
+> 一个叫 `format` 的脚本、跑一下会重写半个仓库，比没有它更糟。现在：devDeps 换成了
+> `@antfu/eslint-config@^9.5.1` + `eslint@^10.12.0` + `jiti@^2.7.0`（与另外两个仓库逐字一致），
+> 脚本从 `format` 变成 `lint:fix`（`eslint . --fix`），配置文件是 `eslint.config.ts`。
+>
+> ★ **Prettier 仍在 `pnpm-lock.yaml` 里，这一条要说清楚**：它是 `@antfu/eslint-config` **自己的依赖**
+> （那套配置用它实现可选的 `formatters`）。我们没有开 `formatters`，也没有 `.prettierrc`，
+> 所以**没有任何东西会用 prettier 格式化这个仓库**；但"lock 里出现 prettier"是干净的，不是漏删。
+>
+> ★ **迁移过程中 `--fix` 把类型检查弄坏了一次，而抓住它的正是已有的那条守卫。**
+> `ts/method-signature-style` 把客户端类型面上的**方法签名**改成了属性函数类型，于是
+> `storage.get(key)` 与 `storage.get(key, { fallback })` 这对**重载**被合并成一个可选参数签名，
+> 替身包不再满足 `SynraClient` —— `pnpm run types:consumer` 当场变红（§6 守卫 7）。
+> 这条规则现在关掉了，理由写在 `eslint.config.ts` 里（重载无法用属性形式表达；doc 23 也是那么写的）。
+> **教训**：换 lint 配置不是纯格式操作，`--fix` 会改语义相关的形状 —— 所以它必须和类型检查、测试一起跑。
+>
+> ★ **关掉的另外两条，各自都有具体理由（不是"嫌吵"）**：
+>
+> | 规则 | 为什么关 |
+> | ---- | -------- |
+> | `@typescript-eslint/prefer-promise-reject-errors` | ① 在装到的插件版本里**这个名字解析不了**（`Definition for rule … was not found`，上游版本错位）；② 本仓库本来也不要它 —— 客户端的错误是**结构化对象而非 `Error` 子类**（doc 23：调用方靠 `code` 分支） |
+> | `pnpm/yaml-enforce-settings` | 它**不 lint 文件，而是往 `pnpm-workspace.yaml` 里写设置** —— `--fix` 加了 `trustPolicy: no-downgrade`、`shellEmulator: true`、`minimumReleaseAgeExcludePrune`。那改的是依赖解析与 `pnpm run` 的执行方式，属于"构建的决定"，不该藏在 lint 的自动修复里 |
+>
+> ★ **两个配置上的坑，都是实测出来的**：
+> ① **类型感知规则走的是旧的 `project` 选项，不是 project service。** service 按**文件名 `tsconfig.json`**
+> 发现项目，而本仓库根上那个是 solution 文件（只有 references）、每个包的又只覆盖自己的 `src/` ——
+> 于是脚本/测试/`vitest.config.ts` **不属于任何项目**；它的兜底 `allowDefaultProject` 有 **8 个文件**的硬上限，
+> 而我们有二十多个。`tsconfig.lint.json` 正是为此存在的：一个覆盖全部文件的项目，旧选项直接吃它。
+> **代价写清楚**：旧路径走 program 而不是增量 service，lint 更慢。
+> ② **`markdown: false`**：开 markdown 会把代码块抽成虚拟文件（`README.md\2_2.ts`），
+> **没有任何 tsconfig 能命名那个路径**，于是解析器在一个磁盘上不存在的文件上失败。`docs` 也是因此关掉的。
+>
+> ★ **留给以后的一个决定（不是遗漏）**：antfu 想加的 `shellEmulator: true` 对这里**有真实用处** ——
+> `clean` 跑的是 `rm -rf dist`，在 Windows 上需要一个 POSIX shell（现在靠 Git 的 `rm`）。
+> 要不要采用它是**另一个决定**（它改变 `pnpm run` 的执行方式），所以那三行被我回滚了，等你定。
 
 > **不用 Vite+ 的 `vp` 统一 CLI**：本仓库没有前端应用（只有类型包与一个测试替身），
 > 引入额外工具链没有收益（与 [ADR-012](./20-adr.md) 一致；ADR-012 约束的是 **app 仓库**）。
