@@ -324,7 +324,7 @@ synra-app ────────────────────┘
 | 5 | 生成物与 core 一致                                      | 同守卫 3 的那次对照（CI 会把 `synra-core` checkout 到 `synra-rust-core`） |
 | 6 | **四个**包版本一致                                       | 读四个 `package.json` 的 `version` 比较                       |
 | 7 | `types: ["@synra/client"]` 可用                         | `scripts/link-dist.ts` 铺出安装布局 + `tsc -p packages/client/type-tests/tsconfig.json` |
-| 8 | 文档里的类型片段能编译                                    | 把 [23](./23-client-library.md) 里的代码块抽出来做类型检查（防文档漂移）★ **未实现** |
+| 8 | 文档里的类型片段能编译                                    | 把 [23](./23-client-library.md) 里的代码块抽出来做类型检查（防文档漂移）★ **第 122 轮核实：已实现** —— `scripts/check-doc-snippets.ts`，挂在根 `package.json` 的 `docs:types`，实跑输出 `· doc-snippets: the complete authoring example in 23 §8 compiles` |
 
 > ★ **本次核对修正了三处，它们都会让照做的人做错：**
 > * **守卫 2** 原本写的是"检查 `dist/*.d.ts` 里没有 `export declare const/function/class`"。
@@ -336,6 +336,23 @@ synra-app ────────────────────┘
 > * **守卫 3** 原本写"与**快照**一致"。实际做法是与 **Rust 对照**，比快照强：
 >   快照只能发现"变了"，对照能发现"错了"。这一条也不是"没按文档做"，
 >   而是同一目的下更强的做法，所以按实际改了描述。
+>
+> ★ **第 124 轮给守卫 3 的解析器补了测试，并因此找到一个真缺陷。**
+>
+> `check-shapes.ts` 靠正则把两侧都当文本读，所以每条对照都取决于"正则找到了东西"。此前 `scripts/`
+> 只有 `publish.test.ts`，四个纯解析函数（`rustConvention` / `errorCode` 两个 / `evaluateProduct`）一个测试都没有。
+> 现在 `scripts/check-shapes.test.ts` 有 **11 条**，共 27 条。
+>
+> **找到的缺陷**：`rustConvention` 取声明**之前最近的**那个 `rename_all`，注释里的理由是"它紧邻声明"。
+> 这在类型**有**约定时成立，在类型**没有**约定时不成立 —— 那时最近的是**上一个类型**的，
+> 于是它被当成这个类型的。后果有两个，第二个更糟：调用方那句"这个类型没有 `rename_all`"的失败
+> **在这种情况下永远到不了**；而如果邻居的约定恰好和表里写的一样，守卫会把它报成**一致**。
+>
+> 现在的规则是：**只有当这个约定与声明之间没有别的类型声明时，它才属于这个类型**。
+>
+> ★ **而这个缺陷目前是潜伏的**：真实 crate 里表上 13 个类型**各自都有**约定，所以改前改后
+> `shapes agree (10 checks)` 都是绿的。它会在有人新加一个不带 `rename_all` 的类型时发作 ——
+> 而那正是加这条守卫的时刻。补测试的价值不是"现在红了"，是**它本来不会红**。
 
 `synra-app` 仓库的对应守卫：
 
