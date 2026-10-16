@@ -717,6 +717,17 @@ pub fn install_panic_hook(paths: &Paths, version: &str) {
       ★ 计时那两项（`intent_duration_ms` / `intent_match_duration_ms`）仍未接：它们要墙钟，
       而这个方法的 `now_ms` 是**逻辑**时间。
       ★ 本行的状态：门三项 + 一个直方图 + 意图两项；缺的仍是网络、发现、传输那几组。
+      ★ **第 156 轮接了发现组**：`scans_total{result=ran|unavailable}`、`candidates_found`、
+      `scan_duration_ms` —— 落点是 daemon 的 `Runtime::scan`，那里 `self.metrics` 已在手。
+      而在此之前，这一组**一次都没记过**（全仓 `scans_total` 零匹配）。
+      ★ **`unavailable` 那一条是刻意的**：一台没有发现套接字的机器是一个用户会问的状态，
+      而一个只在 daemon 自己的日志里出现的 `return`，`status` 是看不见的。
+      ★ 而「扫了但没有候选」与「扫到了三个」是用户读 `devices` 时的两种处境，只有一种是问题 ——
+      一个从不被记录的计数会让两者变成同一件事。
+      ★ 测试断言的是「**记了**」而不是「记了哪一个」：这个 fixture 有没有发现套接字是它自己的事，
+      而两条路径各记一条。
+      ★ 本行的状态：门三项 + 直方图两项（host 调用、意图）+ 传输两项 + **发现三项**；
+      缺的是网络那一组（`links_open`、`frames_*`、`bytes_*`、`reconnect_attempts_total`…）。
       ★ **第 144 轮接了传输组的两项**：`transfer_bytes` 与 `transfer_duration_ms{kind=attachment}`，
       在 `send_file` 的成功返回处（`self.metrics` 已在手，与意图那两项同一个落点）。
       ★ **而 `transfers_total{outcome}` 故意没接，理由值得写下来**：`send_file` 有多条 early return
