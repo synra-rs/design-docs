@@ -384,6 +384,21 @@ async fn session_times_out_when_peer_is_silent() {
 > | 28 宿主 panic | ✓ | `catch_unwind` 的测试 |
 > | 29 `can_handle` 产生副作用 | ✓ | `HostCalls::pure()` + 纯会话拒绝副作用的测试 |
 >
+> ★ **而第 94 轮把那句关键的“内核仍可用 + 其它插件仍可用”补上了**：
+> `crates/synra-core/src/dispatch/tests.rs` 的
+> `every_way_a_plugin_can_misbehave_leaves_the_others_working`。
+> 原来只有两条隔离测试（一条为 trap、一条为 host panic），而脚本档位能表达 **7 种**失败。
+> 现在一张表跑六种：报告失败、trap、燃料耗尽、内存上限、超时、host panic。
+> ★ **而断言包括“之后仍可用”**：每一种失败后再发一次共享，
+> 它必须仍然被那个没坏的插件服务 —— 一个“恢复了但把 set 弄坏了”的调度
+> 会通过上面每一条断言，然后在下一次共享上失败。
+> ★ **而它证什么、不证什么写在测试里**：它证**内核的处理**（给定这个结果，
+> 其他插件仍被问、用户仍拿到提示），**不证引擎会产生这些结果**（那是第 72
+> 轮的燃料/内存真档位测试）。两半同属一个性质，缺一不可。
+> ★ **而取反对照时第一次打在了错的分支上**：我先改的是 `match_share` 的
+> `Err(PluginSetError)` 臂，而 trap/超时走的是 `Ok(CallOutcome)` 在 `take_answer` 里分类。
+> 那一版取反对照**绿了** —— 而一个通过的取反对照并不证明测试是空的，
+> 它证明的是**取反对照打错了地方**。改到正确的分支后报出 `a trap: both were asked`。
 > ★ **而第 72 轮把其中两条从“只在档位上”变成了真的**：用 `deactivate: func()`（**无参数、无返回值**）
 > 做档位。它的 canonical lift 就是一个没有签名的 core 函数，所以手写 `.wat` **四行就够** ——
 > 而指令预算和内存上限是**引擎**的性质而不是接口的，在 `activate` 里死循环和在 `deactivate` 里死循环
