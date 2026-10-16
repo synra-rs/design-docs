@@ -224,6 +224,13 @@ impl PluginInstance {
 ### 4.1 为什么 fuel 不够，还需要 epoch
 
 | 场景                                        | fuel 能挡住？ | epoch 能挡住？ |
+| 燃料 / `fuel` | 指令数 | ★ **而“不限”必须真的给燃料**：每个 store 都开着 `consume_fuel` 且从 **0** 开始，
+  所以“预算里没提金额”如果什么都不做，客体会立刻报 `FuelExhausted { fuel: 0 }`
+  —— **一个没有指令上限的预算被判为没指令了**。现在 `None` 给 `u64::MAX`。 |
+| 实例复用 | 池 | ★ **而一次超预算不能把插件变成永久坏掉的**：一个 **trap 过的 component instance 不能再次进入**，
+  而 `PluginSet` 原来只在 **panic** 时丢弃实例。于是一次燃料耗尽会让之后每一次调用都报
+  `Trap { "cannot enter component instance" }` —— 用户的唯一办法是重启。
+  现在任何 misbehaviour 都会丢弃实例，与 panic 路径同一条规则；代价是下一次调用重建一次实例，而池就是干这个的。 |
 | ------------------------------------------- | ------------- | -------------- |
 | 插件里的死循环（纯计算）                      | ✅            | ✅             |
 | 插件调用 host function，host 阻塞（如 IO）     | ❌（guest 没消耗指令） | ✅      |
