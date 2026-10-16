@@ -732,3 +732,16 @@ plugins-manifest.json   # 已装插件清单（id + version + source），用于
       `db/health.rs:42` 只**报告**损坏并提示"restore from a backup"，没有恢复路径。
 - [ ] 磁盘配额检查（安装前检查可用空间）—— **缺失**：`doctor/storage.rs:66` 的
       `probe_disk_space` 是**诊断探针**，不是安装前检查；`Quota::max_storage_bytes` 是单插件运行时配额。
+      ★ **第 128 轮补上了这块缺的能力，但没补上这道闸**，所以本行仍然不勾：
+      **缺的不是"检查"而是"可读的数字"** —— 探针一直能说"这个目录写得进去"，却不能说**还剩多少**，
+      因为标准库没有可移植的空闲空间查询，而"free some disk space"是用户唯一能执行的建议。
+      现在有 `doctor::free_space(path) -> Option<u64>`（`doctor/storage.rs`），探针的成功详情报告真实数字
+      （`… ; N bytes are free`），读不到时才退回"this host did not report the free space"。
+      ★ **它靠 `sysinfo` 而不是 FFI**：工作区 `unsafe_code = "forbid"`，所以 `GetDiskFreeSpaceExW` / `statvfs`
+      这条路在本仓库里写不出来；`sysinfo` 读挂载表是安全 Rust，且已在离线缓存里（0.39.6），所以这条**不是**被环境挡住的。
+      ★ 取**最长匹配的挂载点**：`/` 是所有路径的前缀，取第一个匹配会把根文件系统的剩余空间报给另一个挂载卷上的路径 ——
+      一个真实但说错盘的数字，比没有数字更糟。这与第 124 轮那条 `rename_all` 的教训是同一个。
+      ★ **而闸门仍未接**：安装路径还没有拿 `free_space` / `is_low_disk_space` / `LOW_DISK_BYTES`
+      在解包前拒绝一次安装。能力有了，用它的人还没有 —— 这正是本轮不该顺手勾掉本行的原因。
+      ★ 另外，本轮为了跑全工作区测试先撞上了 `LNK1180` / `LNK1285`：清掉 `C:\cargo-target\**\*.pdb`
+      释放 4.57 GB 后 63 个套件 3025 条全过。**那是磁盘，不是代码。**
