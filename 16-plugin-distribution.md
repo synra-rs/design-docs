@@ -618,6 +618,14 @@ pub struct UpdateInfo {
   两行会让历史把一轮显示两遍、其中一遍说它从未结束。
   ★ 仍然没有的：core 侧的转换（`SyncRecord` ↔ 这一行，需要给两个枚举加 serde）、
   IPC DTO、前端消费，以及真正写这些行的编排者。
+  ★ **第 136 轮把 core 侧的转换做了**：`SyncRecord::to_row()` / `from_row()`（`plugin_sync.rs`），
+  `SyncVerdict` / `SyncAction` / `SyncDirection` / `SyncId` / `SyncRecord` 各自加了 serde。
+  ★ **写入时投影列与文档同源**（都从同一个 `self` 取），**读回时以 `document` 为准** ——
+  与文档不一致的列只可能来自有人手工改库，而那时相信哪一半都不对；让列赢会让历史显示一轮
+  从未发生过的同步。坏文档是**错误**而不是猜测，有测试。
+  ★ **往返测试走遍三种结局**：`Succeeded` / `Skipped { reason }` / `Failed { error }` 携带的内容不同，
+  只测一种会漏掉另一种的字段。
+  ★ 仍然没有的：IPC DTO、前端消费，以及真正写这些行的编排者。
       文档要的是 `version`/`direction`/`startedAt`/`finishedAt`/`outcome`/`bytesTransferred`/`traceId`。
       ★ 无 `Default`、无持久化、无 IPC DTO、无前端消费。
 - [x] 自动更新门槛表（下面那张表）—— **已实现**（第 77 轮）：
