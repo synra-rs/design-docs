@@ -527,7 +527,16 @@ pub enum ProbeOutcome {
       也就是说这条规则在生产代码里成立 —— 但成立的原因是**没有人在生产里调用它**，
       而不是因为有守卫拦着。加一条守卫仍然是值得的，因为这条禁令目前靠的是自觉。
 - [ ] 卸载流程有测试断言"删除前有询问、删除后有报告"
-- [ ] GC 的测试断言"用户数据目录未被触碰"
+- [x] GC 的测试断言“用户数据未被触碰” —— **已有**（第 92 轮）：
+      `apps/synra-daemon/src/runtime/tests.rs` 的 `the_sweep_takes_only_what_it_is_for`。
+      ★ **而它比试试看更强在两点**：它用 `counts()`（**产品自己的机制**，
+      `status` 报的就是它）对比扫前扫后，所以不会因为一份手维护的清单而通过；
+      并且它把“**不该动的表**”列出来（identity / paired_devices / plugins / plugin_grants / config…），
+      所以将来新增一个收集目标会**因为出现在差异里**而红，而不是因为没被提到。
+      ★ 而断言的**顺序也是它的一部分**：取反对照时发现，把一个收集目标指向
+      `paired_devices` 会先触发“收集到了 0 条”而**永远走不到那条会点名受损表的断言**。
+      现在具体断言在前：一个会真删的错误目标给出
+      `the sweep changed \`paired_devices\`, which it is not for`（`Some(1)` → `Some(0)`）。
 
 ---
 
