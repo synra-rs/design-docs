@@ -597,6 +597,16 @@ pub struct UpdateInfo {
   ★ **`finished` 返回 `Result`**：一条记录只能有一个结局，收两次尾会**静默覆盖**第一次 ——
   「先失败后成功」读起来就是成功。这是它返回 `Result` 而不是 `self` 的全部理由，也有测试。
   ★ 仍然没有的：持久化、IPC DTO、前端消费，以及真正创建这些记录的编排者。
+  ★ **第 134 轮发现那句话里的「持久化」指错了对象。** `sync_records` 表**从第一个迁移就存在**，
+  而且**没有任何 Rust 代码读过或写过它**。但它的形状是每 `(plugin_id, peer_device)` **一行**、
+  主键就是这两列 —— 那是**对端现在持有什么**（`plugin_sync::SyncTable` / `RemoteState`），
+  不是本轮的日志（`SyncRecord`）。两个东西同名不同物，**表是给前者准备的**：
+  内存里的表在进程结束时就没了，重启之后每台设备都像什么都没有，而那正是设计第 ③ 步要避免的重复传输。
+  ★ 现在 `SynraDb::sync_records()` / `record_sync(...)`（`sqlite/sync.rs`）读它、写它（upsert），
+  两条测试：一次往返，以及**同一对端第二轮是更正那一行而不是多加一行** —— 一台设备两行会让
+  「对端已经有了吗」有两个答案。
+  ★ **而 `SyncRecord` 的历史仍然没有持久化**：表记的是当前状态，日志要另有一张表。
+  所以「持久化」这句现在要分成两半读：状态那半做完了，历史那半没有。
       文档要的是 `version`/`direction`/`startedAt`/`finishedAt`/`outcome`/`bytesTransferred`/`traceId`。
       ★ 无 `Default`、无持久化、无 IPC DTO、无前端消费。
 - [x] 自动更新门槛表（下面那张表）—— **已实现**（第 77 轮）：
