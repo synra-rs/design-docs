@@ -86,6 +86,8 @@
 // ─────────── intent ───────────
 /// 唯一的下发入口（分享、剪切板、插件动作都走这里）
 #[tauri::command] async fn intent_dispatch(state: State<'_, AppState>, source: IntentSourceDto) -> Result<IntentId, IpcError>;
+/// 列出 board 上持有的全部 intent（裸数组，`Many`）—— 首页"received"面板要的是它，而它一直不存在
+#[tauri::command] async fn intent_list(state: State<'_, AppState>) -> Result<Vec<IntentSnapshot>, IpcError>;
 #[tauri::command] async fn intent_snapshot(state: State<'_, AppState>, intent_id: IntentId) -> Result<IntentSnapshot, IpcError>;
 #[tauri::command] async fn intent_decide(state: State<'_, AppState>, intent_id: IntentId, decision: IntentDecisionDto) -> Result<(), IpcError>;
 #[tauri::command] async fn intent_cancel(state: State<'_, AppState>, intent_id: IntentId) -> Result<(), IpcError>;
@@ -615,10 +617,51 @@ Content-Security-Policy:
 >   一次插入把新测试放在了 `#[test]` 与它的函数之间，于是属性重复、
 >   而原来那个函数**一个属性都没有**。编译器只是很小声地说了一句 warning，
 >   而 `cargo test` 输出里看不出少了一条 —— 直到这次重构让它变成了错误。
-- [ ] ~40 个 Tauri command（见 §2.2）—— **20/39**（第 104 轮后）。
+- [ ] ~40 个 Tauri command（见 §2.2）—— **21/40**（第 104 轮后）。
       ★ 而这个数字刚刚落后过一轮：第 104 轮把 `diag_metrics` 移了出去，
       而下面的散文记下了那件事、**这一行没有**。一个数字比一段散文更容易被忘，
       而它正是读者会当真的那个：“剩下十九条”与“剩下十八条”对一个想知道还差多少的人是两个答案。
+      ★ **而这一轮是 21/40：`intent_list` 进了契约（§2.2），因为界面一直在假装它存在。**
+      抓出它的不是人眼，是一条**新守卫**：`scripts/check-shapes.ts` 的 `command-arguments`
+      读 `shell.rs` 的 wrapper 签名（参数名、`Option<T>` 之外都必填、参数名按 `#[tauri::command]` 的默认规则转 camelCase），
+      再与每个 call site 逐键对照。它上线第一次运行就报了两处 —— 而这正是"漏参数"这类错误的形状：
+      **假内核忽略参数**（`invoke(command, _args?)`）、**契约表里根本没有参数那一半**
+      （`commands!` 每行只有 域名/接口/返回形状/是否可变）、旧守卫**只比名字**，三处一起把它藏住了。
+      * `DevicesPage.vue` 调 `devices_scan_start` 没传 `opts`：`#[tauri::command]` 在命令体之前反序列化参数，
+        所以拒绝发生在**桥接层**，客户端把"不是 `IpcError` 的 rejection"归类成 `error.bridgeFailed`，
+        用户读到 "The interface could not reach the kernel."，而真正的原因躺在 `params.detail`（按 R34 界面不渲染它）。
+        现在界面传 `opts`，并且真的扫得动了 —— 见下面那两条。
+      * ★ **而这一轮最后把扫描做成了真的：发现能力搬进了窗口自己。** 之前那条注释写着"discovery 属于守护进程，
+        shell 只差半个内核"，其中**一半已经过期**：`synra-control::Request::Devices{scan_ms}` 早就有按需扫描
+        （daemon 侧 `runtime/devices.rs::scan` 会设 `scan_until_ms` 并等出窗口，CLI 的 `synra devices --scan-ms` 在用），
+        而 `synra-core` 的 worker 本来就读这个截止时间（`tick(..., on_demand)`）。
+        真正挡住的是**两个宿主有两个数据目录**：窗口的是 Tauri 的 `app_data_dir`（`%APPDATA%\com.synra.app`），
+        守护进程的是 `SYNRA_DATA_DIR` / 临时目录 —— 让守护进程扫，扫到的设备写进**它自己的** `devices_seen`，
+        而界面读的是本进程那张表，结果是"扫到三台、界面一台都没有"，比拒绝更糟。
+        所以按 [05 §2.1](./05-system-architecture.md) 的划分（桌面端是**同进程**内核）把 `DiscoveryService` 接进 shell：
+        `src-tauri/src/discovery.rs` 绑两个 socket、用 `synra_core::worker::run_recording` 起一条被 supervisor 管的线程、
+        把听到的写进**本进程**的 `devices_seen`；`devices_scan_start` 于是做三件事 —— 记下 `scanning`（running 的语义）、
+        发布截止时间并等出 `SCAN_PASSIVE` 的窗口、清掉它再作答。命令标了 `#[tauri::command(async)]`：
+        Tauri 对**同步**函数加这个属性会把它放到 sync threadpool（宏里就叫这个名字），窗口在问网络的时候照样重绘。
+        * ★ 顺带修掉了 `synra-core` 里一个**"读者有、写者有、却永远空"的表**：`run_recording` 的回调本来把
+          `host.usable(...)`（`current ∧ displayable`，而 `displayable` 从 `Handshaked` 起）交出去，
+          于是一个只是**广播了自己**的设备永远不会被交到回调手里 —— 而 `devices_seen` 自己的文档写的是
+          "a sighting of a device this kernel has not paired with"。现在交出去的是**这一 tick 真正吸收到的**候选
+          （`Absorbed::New/Updated`），`Unchanged`/`Offline` 不算发现，否则就是每个间隔给每台设备写一行它已经写过的东西。
+        * ★ 还有一处**不能不说清的诚实问题**：`DeviceAnnouncement` 要求非零 `port`（`validate` 拒绝 0），
+          而这个构建**没有传输层** —— 窗口不在任何端口上接受连接。所以它宣告的是它**真的绑了**的那个端口
+          （发现响应端口），并把这句写进模块头：对端若来拨号，遇到的是发现响应器而不是传输层，
+          这是"这个构建没有那半边"的事实，不是"一个谁都没占的地址"。等 shell 有了传输层，这里换成那个端口。
+      * `HomePage.vue` 调 `intent_snapshot` 既没传 `intentId`、又读 `answer.value.intents`：
+        这不是缺参数而是**缺一条命令**。`Board::all()` 一直在（它存在的理由是持久化要存"变了的"，包括刚结束的），
+        缺的是名字 —— 所以 `intent_list`（`Many`，**裸数组**）进了契约、shell 与假内核，那个面板现在读列表本身。
+      * 参数那一侧还有个小的：cached 扫描曾经留下一个 `ScanState{0,0,0}`，而 `scanning` 的语义是
+        **正在进行的扫描**（store 判 `scan !== undefined`）—— 于是按钮变永久"Scanning"、进度条永远不动，
+        直到进程重启。cached 扫描现在什么都不留，而**网络扫描**在等待期间留下的是真的那条（带 `total_ms`），
+        作答前清掉。
+      * 假内核现在按 `shell.rs` 的必填键**拒绝**（消息与 `tauri::Error::InvalidArgs` 同形），
+        而且 cached 与网络两种模式真的分开了；那张必填表本身也被同一个脚本**双向**核对，
+        所以"假内核比真外壳宽松"这个方向不会再回来。
       ★ **而第 85 轮把两个宿主的 `Host` 实现逐方法对了一遍**（守护进程的 `KernelHost` vs shell 的 `DesktopHost`）：
       **26 个方法里只有 1 个不同 —— `platform`**：守护进程拒绝，shell 真做。
       那是**故意的**（无窗口宿主没有剪贴板与通知），而且 `synra-platform` 已经写了
@@ -694,9 +737,9 @@ Content-Security-Policy:
       > ★ **剩下两个仍然不做，但现在说的是真话**：`dispatch` 对 `Command::Plugin` 给出
       > "installing needs a registry client, and removing needs a decision about the plugin's stored data
       > that nothing has made yet"，而不是那句关于内核的假话。
-      39 个名字确实存在，但只在 `crates/synra-ipc/src/command.rs` 的 `commands!` 表里；
+      39 个名字确实存在（**当时**；现在是 40 个，见上），但只在 `crates/synra-ipc/src/command.rs` 的 `commands!` 表里；
       `src-tauri/src/main.rs` 注册了 13 个（identity 2、devices 4、plugins 3、config 2、diag 2）。
-      未实现的 26 个逐条列在 `synra-rust-app/src/ipc/registration.test.ts`
+      未实现的 26 个（**当时**；现在是 19 个）逐条列在 `synra-rust-app/src/ipc/registration.test.ts`
       的 `NOT_YET_REGISTERED` 里，**每条都带原因**（区分"等接线"与"决定不做"）。
       ★ 本次新增的是 `diag_logs_tail`：它原本在"未实现"清单里，理由是
 > ★ **而第 104 轮又把一条从“未实现”移了出去**：`diag_metrics`。
