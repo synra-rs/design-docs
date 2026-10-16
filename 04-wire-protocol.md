@@ -1523,3 +1523,15 @@ pub enum TrustLevel {
       `synra-testkit` 的模块注释（`src/lib.rs:14-16`）其实已经写明了它的用途 ——
       "so two kernels can be linked in one process with no sockets. This is what makes the end-to-end tests of §4.3
       possible without a network" —— 而 §4.3 的那些端到端测试还没有写，因为**没有 socket 可换**。
+      ★ **而第 83–84 轮各撞到了一次"没有这条缝"的代价，两件事都值得记在这里：**
+      * **同一件事被实现了两遍，然后漂移了。** `synra-core/src/peer/link.rs` 从 `flags.timeout` 设了**写**超时，
+        而同 crate 的 `PeerLink`（就是上面那个 `link.rs`）**只有读超时**。于是一个不再读的对端
+        不产生任何错误 —— 调用线程**永远不返回**，TCP 也不会把满窗口报成错误。
+        漂移之所以看不见，正是因为**没有一份共同契约去跑这两个实现**。
+      * **`synra-net` 整个 crate 没有消费者。** `Backoff` / `Liveness` / `WriteQueue`
+        在两个工作区里 0 处使用（`Backoff` 的命中全是 `synra-core` 自己的 supervisor 枚举变体），
+        因为字节层的链路要排队就得先有**写入线程** —— 又是一个缝的决定。
+        代价是 `AckPolicy` 无处可问：全仓搜 `AckPolicy`，`event.rs` 之外只有一条文档注释。
+      * 两条合起来说明：**这条缝不只是"能不能换成内存链路"**，它同时决定了
+        ①同一套失败语义能不能只写一遍，②`synra-net` 里那些已经写好、测好的决策能不能被用上。
+        在它长出来之前，每修一处链路问题都是在两个实现之间做人工同步 —— 第 84 轮就是第二次。
