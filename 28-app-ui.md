@@ -103,7 +103,7 @@ R4 不许假设框架）。而在前端生态里 `ui` 就等于"组件库"（`sh
 | ------ | ------ | -------- |
 | `@synra/theme` | 任何东西（零依赖） | `tokens` 纯数据、分段 CSS 文本、主题约定（`dark` 类） |
 | `@synra/theme/unocss` | 宿主界面、插件界面 | `presetSynra()` / `synraConfig()`（theme + preflights + 结构性 shortcuts + blocklist） |
-| `@synra/theme/antd` | 宿主界面（组件层）、用 antd 的插件作者 | 把 token 映射成 antd v5 的 theme token（`colorPrimary` / `colorBgContainer` / `borderRadius` / `fontFamily` …），**并关掉 antd 自带的阴影与实心浮起面**（R51–R53） |
+| `@synra/theme/antd` | 宿主界面（组件层）、用 ant-design-vue 的插件作者 | `synraAntdTheme()`（`ConfigProvider` 的 `theme`）、`synraAntdTokenMap`（名字对照表）、`synraAntdFloatingCss()`（antd 的 token 体系表达不了的那一小段：玻璃的 `backdrop-filter`）。见 R51–R53 |
 | `@synra/theme/vitepress` | 官网 | `--vp-c-brand-*` 的映射（亮/暗各一支紫，§15 R48） |
 | `@synra/theme/css` | 内联反闪屏、任何只要变量的地方 | 分段 CSS 文本（reset 段 / tokens 段，§15 R47） |
 
@@ -136,6 +136,15 @@ N 份需要互相对齐的映射。
 > 自己的圆角与字号），**而我们刚刚逐条退役了那套语言**（R21/R26/R29）—— 所以适配器不是"配个主色"，
 > 它必须把 antd 的外观拉到我们的材质与颜色上，否则这层绑定会把 §1.4 的设计方向整体推翻
 > （R51–R53 就是为此而写）。
+>
+> ★ **先把名字说清楚，因为它很容易混**：我们说"antd"时指的是**那套设计体系（v5 的 Design Token 模型）**；
+> 而宿主是 **Vue 3**，所以**真正装进 `package.json` 的包是 `ant-design-vue@4`**（peer：`vue >=3.2`，
+> 自带 `@ant-design/colors` / `@ctrl/tinycolor` / CSS-in-JS 运行时）。React 那条线（`antd`）已经到 6.x 且
+> 与 4.x 不是同一版本号 —— 所以**适配器的 optional peer 写 `ant-design-vue`，不写 `antd`**，
+> 而符号名、子路径名继续用 `antd`（它是设计体系的名字，也是插件作者查文档时用的词）。
+>
+> 顺带一个**这条规则自己不承诺、但适配器结构带来的好处**：真要换组件库（或跟到 antd v6），
+> 改动落在适配器与 `ConfigProvider` 这一处，而不是散在四个页面里。
 
 **代价与收益**：`synra-js` 因此多了一个**有运行时**的包（另一个是 `@synra/testkit`），
 而它的版本线**不与那四个类型包相同**（R1）。收益是**没有第六个仓库、也没有第六个跨仓库接触点**——
@@ -284,11 +293,19 @@ Vue 侧要的糖另开子入口（`@synra/theme/vue`），且只在宿主与官�
 
 ### R51 · antd 是宿主的组件层，外观来自 token（MUST）
 
-宿主的交互控件——按钮、输入、选择、表格、对话框、菜单、提示——**用 antd**，不手写。
-但**每一处外观都必须能追到 token**：
+宿主的交互控件——按钮、输入、选择、表格、对话框、菜单、提示——**用 `ant-design-vue@4`**，不手写。
+但**每一处外观都必须能追到 token**，而这就是 `./antd` 这个子路径存在的理由：
 
-- `ConfigProvider` 的 theme **只能**来自 `@synra/theme/antd`；应用里**不许**再写一个 theme 对象；
-- **不许**为了"调一下"而在组件上写 `style=`、`:deep()` 或自带 `box-shadow` 的类，把字面值重新引进来（R6）；
+```vue
+<!-- main.ts / 根组件：唯一一处把 token 交给组件库的地方 -->
+<a-config-provider :theme="synraAntdTheme()">
+  <App />
+</a-config-provider>
+```
+
+- `ConfigProvider` 的 `theme` **只能**来自 `synraAntdTheme()`；应用里**不许**再写第二个 theme 对象、
+  也不许在调用处"就改一个值"（那正是 R6 要消灭的第二份真相源）；
+- **不许**为了调一下而在组件上写 `style=`、`:deep()`，或加一个自带 `box-shadow` 的类，把字面值重新引进来；
 - **R21 / R26 / R29 照旧管着"组合出来的画面"**：用了 antd 不等于可以摆一屏同构的 `Card`、不等于可以用
   `Statistic` 的 title 当全大写小标签、不等于每个可点的面都要 `hoverable` + 过渡。
 
@@ -301,13 +318,29 @@ Vue 侧要的糖另开子入口（`@synra/theme/vue`），且只在宿主与官�
 
 ### R52 · 适配器只做映射，不是第二套 token（MUST）
 
-`@synra/theme/antd` 的输入是包根的 `tokens`，输出是 antd v5 的 theme token：
+`@synra/theme/antd` 的输入是包根的 `tokens`，输出是 ant-design-vue 的 theme token。
+**它导出的东西只有四样**，多一样都要问"这是不是变回了第二套 token"：
+
+| 导出 | 给谁 | 是什么 |
+| ---- | ---- | ------ |
+| `synraAntdTheme()` | 宿主（`ConfigProvider`） | 一份 `ThemeConfig`：`{ algorithm: theme.darkAlgorithm, token: {…}, components: {…} }`。**纯映射，零字面量** |
+| `synraAntdTokenMap` | 用 ant-design-vue 写插件的作者 | 我们的 token 名 ⇄ antd 的 token 名（[09 §5.5](./09-plugin-system.md) 那句"查 antd 文档就能对上"的落点） |
+| `synraAntdFloatingCss()` | 宿主 | **一小段 CSS**：浮起层的 `backdrop-filter` 与 `@supports` 回退 —— 见下面"为什么一个主题适配器要导出 CSS" |
+| （类型）`SynraAntdTheme` 一类 | 两边的作者 | 上面几样的返回类型，供调用处标注 |
+
+约束：
 
 - **不许有独立取值的字面量**（一个 `#` / `rgb(` / `hsl(` 都不行）。它是映射，不是第二份真相源（R6）；
-- `antd` 在该包里是 **optional peer**，与 `unocss` 同一形状：包根仍然零依赖，官网不会为它付装包；
-- **只有 `src/antd/**` 可以 import `antd`**（§13.2 守卫 7/10 从一条变两条）；
-- 它**导出映射表**（`--synra-primary-ink ⇄ colorPrimaryText` 这类），供用 antd 写插件的作者对照 ——
-  这是 [09 §5.5](./09-plugin-system.md)"查 antd 文档就能对上"那句的落点。
+- **`ant-design-vue` 在该包里是 optional peer**，与 `unocss` 同一形状：包根仍然零依赖，官网不会为它付装包；
+- **只有 `src/antd/**` 可以 import `ant-design-vue`**（§13.2 守卫 7/10 从一条变两条）；
+- **映射表用它们自己的类型标注**（`satisfies Partial<AliasToken & SeedToken & …>`）。
+  于是"antd 某个版本改了 token 名字"这件事会变成**编译错误**，而不是一个静默失效的键 ——
+  这条守卫是免费的，代价只是一行 `satisfies`。
+
+> ★ **为什么一个主题适配器要导出 CSS？** 因为 antd 的 token 体系**表达不了 `backdrop-filter`** ——
+> 它的"浮起"由**实心面 + 阴影**表达（`colorBgElevated` / `boxShadow`），而我们的浮起由**玻璃**表达（R53）。
+> 灰度、圆角、字号都能用 token 覆盖，**唯独模糊不能**，所以那部分只能是一段由我们注入的 CSS。
+> 这也说明适配器的边界在哪：**能用 token 表达的用 token，表达不了的用一小段 CSS，两者都不许出现第二套取值。**
 
 **有损的地方要写出来，不许默默砍档**。已知三处：
 
@@ -322,7 +355,9 @@ Vue 侧要的糖另开子入口（`@synra/theme/vue`），且只在宿主与官�
 antd 的 `Modal` / `Drawer` / `Dropdown` / `Tooltip` / `Popover` 全部落在 R43 的"**浮起的层**"里，因此：
 
 - 它们的面是 `--synra-glass` + `--synra-blur`（并带 `@supports (backdrop-filter: …)` 回退到
-  `--synra-glass-base`），**不是** antd 默认的实心 `colorBgElevated`；
+  `--synra-glass-base`），**不是** antd 默认的实心 `colorBgElevated`。
+  分工写清楚：**颜色与阴影走 token 映射**（`colorBgElevated` → 玻璃色、`boxShadow` / `boxShadowSecondary` → 关掉），
+  **模糊与 `@supports` 回退走 `synraAntdFloatingCss()`**（R52 里那段 CSS，因为 token 体系表达不了 blur）；
 - **antd 自带的 `boxShadow` 必须关掉**（Modal / Dropdown / Card / Button 的默认阴影）。
   理由就是 R45：我们的"浮起"由**玻璃 + 下面那层不动**表达，而 antd 的"浮起"由阴影表达 ——
   两套同时在场，读起来不是更强的层级，而是两种材质；
@@ -984,11 +1019,15 @@ UnoCSS 是**构建期**的，插件的 CSS 编译进它自己的产物。于是�
 - [x] `synra-app`：`eslint.config.ts` 开 `unocss: { strict: true }`（blocklist 来自 `synraConfig()`）
 - [ ] `synra-app`：**四个页面**迁到 utility（`--panel` / `--border` / `--muted` 等退役变量还有 35 处）——
       含 R26（面不是卡）、R28（空状态是邀请）、R27（那条线）、R29、R21
-- [ ] **`@synra/theme/antd` 适配器**（R52）：token → antd theme token 的映射 + 导出的映射表 +
-      `antd` 作为 optional peer + "只有 `src/antd/**` 能 import antd" 的守卫（§13.2 守卫 7/10 从一条变两条）
-- [ ] `synra-app`：装 antd，`ConfigProvider` 的 theme **只**取自适配器（R51）；应用里不出现第二个 theme 对象
+- [ ] **`@synra/theme/antd` 适配器**（R52）：四个导出（`synraAntdTheme()` / `synraAntdTokenMap` /
+      `synraAntdFloatingCss()` / 类型）+ `ant-design-vue` 作为 optional peer +
+      "只有 `src/antd/**` 能 import `ant-design-vue`" 的守卫（§13.2 守卫 7/10 从一条变两条）+
+      映射表用对方的 token 类型 `satisfies`（改名即编译失败）
+- [ ] `synra-app`：装 **`ant-design-vue@4`**，`ConfigProvider` 的 theme **只**取自 `synraAntdTheme()`（R51）；
+      应用里不出现第二个 theme 对象
 - [ ] `synra-app`：浮起层（Modal / Drawer / Dropdown / Tooltip / Popover）换成 `--synra-glass` + `@supports`
-      回退，并**关掉 antd 的默认阴影**（R53）—— 顺带验 `-webkit-backdrop-filter`
+      回退，并**关掉 antd 的默认阴影**（R53）—— 顺带验 `-webkit-backdrop-filter`。
+      ★ **这份"哪些 antd 组件算浮起层"的名单要写成可检查的**（它有限且可枚举），否则规则会随版本漂移
 - [ ] `synra-app/scripts/check-shapes.ts`：新增守卫 2 / 3 / 4 / 8 / 11（各配负控制）
 - [ ] 材质落地到组件：`floating` 的 `@supports` 回退、发光只出现在允许的三处（R43、R45）
 - [ ] 字体：字族栈已定（IBM Plex Sans + Mono，R18），**而字体文件与 `@font-face` 那一半没做**
