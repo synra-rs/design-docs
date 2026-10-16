@@ -461,6 +461,21 @@ tag v*  →  标签与版本一致  →  取内核（可缺）  →  install(fro
 > ② workflow 的 YAML 用 `yaml@2.9.1` 解析过，并逐项断言了触发器、权限、步骤顺序与 `--provenance`
 > （9 条全过）。**剩下唯一没验的是 `npm publish` 本身，而那需要 Trusted Publisher 配好。**
 
+> ★ **首次发布（0.0.8）暴露了 npm 的"暂存发布"（staged publishing）：新包名会先进队列。**
+>
+> 新建包名发布时，registry 上先出现一个占位版本 `0.0.0-stage`（它的描述就是
+> "Temporary package placeholder for staged publishing"），而**在维护者批准之前那个包不可安装**；
+> 已经存在的包名发新版本则直接生效。实测：`@synra/protocol`（老包名）与 `synra` 立刻上线，
+> `@synra/theme` 先留下占位、随后上线。
+>
+> 对这条流水线的含义，两条都重要：
+> ① **OIDC 自动化不了这一步** —— 批准是一个人的动作，而且它自己还要过一次 2FA。
+> "第一次发一个新包"永远需要有人在场，之后的版本发布才是无人值守的；
+> ② 这也解释了为什么 §6.1 选 OIDC 而不是 `NPM_TOKEN` + `--otp`：交互式的东西在 CI 里没有位置。
+>
+> 参考：<https://docs.npmjs.com/staged-publishing>、`npm stage`（**本地 npm 11.4.2 里还没有这个命令**，
+> 需要更新的 CLI 或网页端批准）。
+
 | 决定 | 理由 |
 | ---- | ---- |
 | **只有一个文件** | 检查与发布共用同一串步骤，不必维护两份会分叉的步骤列表 |
