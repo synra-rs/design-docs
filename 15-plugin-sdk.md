@@ -771,6 +771,20 @@ synra-plugin keygen --out ~/.synra/keys/dev.key
       没有 9 个 namespace 薄封装，也没有 `Error` 类型。
       ★ 文档点名的 **`fs` namespace 在合同里根本不存在** —— 合同没有文件系统接口；
       真实分层是"裸绑定 + `synra-plugin-api` 边界类型"。
+      ★ **第 126 轮核实：这一条是准确的，而且这个 crate 比它读起来更完整。** 实测
+      `cargo test -p synra-plugin-sdk` 是 **6 + 1 全过**：6 条宿主目标单测（每个导入名与合同一致、
+      名字互不相同、合同版本、边界类型就是 `synra-plugin-api` 的而不是副本、接口与世界名、
+      以及"合同声明的每个宿主函数都有绑定"）加 1 条 guest 世界的集成测试。
+      绑定由 `wit_bindgen::generate!` 在**编译期**从 `wit/synra-plugin.wit` 生成，所以"改了合同忘改 SDK"这一类
+      漂移在结构上不可能；上面那句"没有薄封装"说的是**便利层**，不是绑定层。
+      ★ **一条窄的注意点**：那条"每个函数都有绑定"的测试读的是**签入的**
+      `crates/synra-plugin-host/src/generated/capability_table.rs`，而它由**宿主**的 `build.rs` 重新生成。
+      所以单跑 `-p synra-plugin-sdk` 时，比较的一方可能是**上一次宿主构建**留下的产物；
+      在工作区整体构建（CI 的做法）里宿主先生成，这条守卫才是在比较当前合同。
+      ★ 以及第 126 轮想给它做"能不能失败"的探针时，先撞上的是**另一条更早的守卫**：
+      往合同里加一个没有 `@ungated` / `@capability` 的函数，宿主 `build.rs` 直接报
+      `'probe-added' has neither @ungated nor @capability…` 并让构建失败 ——
+      也就是说"未声明的能力"根本走不到绑定这一步。
 - [ ] `#[plugin]` 属性宏（含编译期检查）—— **未做**：全仓 `Cargo.toml` grep `proc-macro` **0 命中**，
       工作区没有任何 proc-macro crate。
       ★ 而且这里有一个**已知的硬冲突**，不是"还没写"那么简单：
