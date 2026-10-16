@@ -473,6 +473,12 @@ tag v*  →  标签与版本一致  →  取内核（可缺）  →  install(fro
 > "第一次发一个新包"永远需要有人在场，之后的版本发布才是无人值守的；
 > ② 这也解释了为什么 §6.1 选 OIDC 而不是 `NPM_TOKEN` + `--otp`：交互式的东西在 CI 里没有位置。
 >
+> ★ **还有一个坑值得单独写下来：npm 在暂存时照样打印成功行 `+ pkg@version`。**
+> 那次五个包全部打印了 `+ ...` 与"✓ 发布成功"（脚本的 `ok=5 fail=0` 也是这么来的），
+> 而当时 registry 上**只有两个真的可安装**。所以"日志说成功"不是证据，
+> **唯一的判据是 registry 上那个版本的文档存不存在**（`registry.npmjs.org/<name>`，
+> 或镜像站如 jsdelivr 能不能取到 `/<name>@<version>/package.json`）。
+>
 > 参考：<https://docs.npmjs.com/staged-publishing>、`npm stage`（**本地 npm 11.4.2 里还没有这个命令**，
 > 需要更新的 CLI 或网页端批准）。
 
