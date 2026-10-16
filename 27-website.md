@@ -364,6 +364,24 @@ Pages **一个都设不了**。逐个看影响：
 > （`package.json`）。照原表敲命令会得到 "Cannot find module"。
 > 守卫 6 和 7 也不是两个独立文件，而是 `check-public-content.ts` 里的两类规则；
 > 守卫 3 和 5 同属 `check-schema.ts`。清单里按编号勾选时看不出这一点，所以在这里写明。
+>
+> ★ **第 125 轮把 `docs` 仓库整个跑了一遍**（它是五个仓库里最后一个没被本轮验证过的）：
+> 三条守卫、`eslint`、`vue-tsc --noEmit` **全部 exit 0** ——
+> `check-structure` 20 对页面 0 处差异 0 处未译、`check-schema` 3 个 schema 全过、
+> `check-public-content` 42 个文件无问题。
+>
+> ★ **并且证明了两条守卫真的会失败**，因为"能通过"和"能失败"是两件事：
+> 往冻结的 `public/schema/manifest/v1.json` 里加一个字段 → `FAIL`，退出码 1（"a published version's
+> structure changed"）；往 `guide/devices-and-pairing.md` 末尾加一条 `design-docs` 链接 →
+> `FAIL`，退出码 1（"internal design-document link at line 81"）。两次都用 `git checkout -- .` 复原并复跑确认。
+>
+> ★ **两条环境事实，记下来免得下次重新发现**：
+> **① `pnpm ready` 在这个检出里跑不起来** —— `packageManager: pnpm@12.11.2` 的 shim 指向
+> `D:\.pnpm-store\...`，而那个 store 在这台机器上不存在（"not operable program or batch file"）。
+> 绕过办法是直接调 `node_modules/.bin/{esno,eslint,vue-tsc}.CMD` —— 上面所有结论都是这么得到的。
+> **② 这个仓库没有测试，而且离线加不了** —— 三个守卫脚本一个 `.test.ts` 都没有，`vitest` 也没装，
+> 而 store 不可用就没法装。所以"这些守卫本身有没有被测过"**在这里是缺失的，不是被跳过的**；
+> 与 `synra-js`（27 条）和 Rust 侧（`tools/*` 全有测试）不同。
 
 ### 7.1 守卫 6 为什么重要
 
