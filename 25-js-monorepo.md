@@ -749,7 +749,20 @@ export default defineBuildConfig({
 - [x] 四包版本同步（`fixed` 模式 + `bumpp -r`）
       ★ 本轮补上了守卫（`check-shapes.ts` 的"4 publishable packages share version"）。
       原来只有 `bumpp -r`，而"记得跑它"不是一条守卫
-- [ ] 发布脚本（拓扑排序，可续跑）—— **没有**。`release` 目前只有 `bumpp -r`，它改版本但不管发布顺序，
+- [~] 发布脚本（拓扑排序，可续跑）—— **排序已有**（第 91 轮），**续跑还没有**。
+      `scripts/publish.ts`（`publishOrder()` + `readWorkspace()`），`pnpm run publish:workspace`。
+      ★ **而默认不发布**：不加 `--publish` 只打印顺序，因为发布**不可撤回**（到了注册表
+      的版本只能 deprecate），而演练正是一次发布前最需要的东西。
+      ★ **而顺序是一个纯函数**，因为它是能静默出错的那一半：按目录顺序发布看起来
+      和按依赖顺序完全一样，直到有人装了它。测试既跑合成图（链、钻石、循环、私有、外部依赖）
+      也跑**真工作区**（从 `packages/*/package.json` 读），所以依赖变了而顺序没跟上会红。
+      ★ **而环不是被打破而是被拒绝**：环没有合法顺序，两种硬出一个的做法都更糟
+      —— 先发一个依赖缺失的版本（正是这个脚本存在的原因），或者每次顺序不同（演练就预测不了发布）。
+      ★ **而写测试时它抓到了我一个错误的信念**：我写了 `@synra/testkit` 是私有的，
+      而它实际上是**要发布的**（§2.4 明说：插件作者的 `devDependencies`，唯一带运行时的那个）。
+      于是测试改成断言**它的位置**（最后一个，因为它依赖另外三个），而不是它不在列表里。
+      ★ **而“可续跑”这一半确实还没有**：发到一半失败后重跑会重发已发的版本，
+      而已发布的版本发不了第二次。所以这一条保持未勾选。
       而 `@synra/client` 依赖 `synra` / `@synra/protocol`，发布顺序错了作者会装到不存在的版本
 - [x] fixture 工程：从 `pnpm pack` 产物安装并跑 `tsc --noEmit`
       ★ 机制换成 `scripts/link-dist.ts` + `packages/client/type-tests/`，测的是同一件事（见上面的说明）
