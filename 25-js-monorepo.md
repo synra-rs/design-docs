@@ -304,6 +304,19 @@ export type { DeviceId, TransferId, DeviceTarget } from '@synra/protocol'
 > 而协议包的版本号是插件作者用来判断"我的类型要不要跟着升"的东西，**它不该被一次配色改动搅动**。
 > 代价说清楚：§6 的版本守卫从"四个包同版本"改成**两组**，并新增两条依赖关系守卫。
 
+> ★ **而"独立版本线"不等于"发布时用不同的号"。** 一条 `v*` 标签的含义是 **workspace 里每个可发布包
+> 都以这个号出去** —— `bumpp -r` 一次把版本推平，而 `scripts/publish.ts` **故意不查 registry**
+> （§8 里写着：哪些已经出去了是操作者手里的事实）。所以五个包在发布那一刻必然同号。
+>
+> 独立的是**依赖理由**：那四个包因为互相 re-export 而必须同步（§6 守卫 6），而 theme 没有那条边，
+> 所以它的版本**不必**跟着那四个动 —— 但它**会**在发布时跟着动，因为流程只有一个号。
+> **这个区别写在这里，是为了免得以后有人据"独立版本线"去放宽标签守卫** —— 那会让第二次发布
+> 撞上 `cannot publish over existing version`，而那是一次**发到一半**的失败。
+>
+> ★ **五个包现在的版本是 `0.0.0`** —— 一个占位，不是一个已发布的号。真正的号由
+> `pnpm run release`（`bumpp -r`）在发布前决定。它同时给标签守卫一个可对照的确定值：
+> **没有 bump 过就打标签会当场被拦住**（`v0.1.0` 对不上 `0.0.0`），而那正是这条守卫存在的意义。
+
 ### 4.2 发布
 
 | 包                  | `publishConfig.access` | 发布顺序（依赖优先）                |
@@ -362,6 +375,7 @@ synra-app ────────────────────┘
 | 10 | **只有 `./unocss` 那一层能 import `unocss`**               | 除 `packages/theme/src/unocss/**` 以外，任何文件出现 `from 'unocss'` 即失败；负控制：在 `src/css/` 里加一行 import → 必须报红 |
 | 11 | **标签与版本一致**（发布前，不在 `check` 里）                 | `scripts/check-release-tag.ts`：`GITHUB_REF_NAME` 去掉 `v` 之后必须等于**每个**会发布的包的版本。空标签、空工作区、任何一个包对不上都是失败（3 条正/负向测试在 `check-release-tag.test.ts`） |
 | 12 | **每个声明的入口都真的存在**                               | `check-shapes.ts`：`main` / `module` / `types` / `exports.*` 里写的每一个路径都要在包目录里存在。★ **它第一次跑就抓到了 `@synra/testkit`**，见下面的 ★ |
+| 13 | **每个包都带协议文本，且与根上逐字节相同**                 | `check-shapes.ts`：根 `LICENSE` 必须存在，且五个包目录下的那份与它一致。★ **五份拷贝是 npm 的形态决定的**（它只自动包含**包目录下**的 LICENSE，不会去仓库根拿），所以它们会漂移 —— 除非有人盯着 |
 
 > ★ **守卫 12 是"发布之后才会发现"的那一类里最便宜的一个，而它当场就抓到了一条。**
 >
@@ -437,6 +451,15 @@ tag v*  →  标签与版本一致  →  取内核（可缺）  →  install(fro
 >
 > 真正的检查在 `check` 里：`shapes` 拿镜像与内核**逐字段对照** —— 那正是 `sync` 的说明让人去跑的那一个。
 > **而它之所以能被发现，是因为这一步在 CI 里跑过一次**：本地 `pnpm run check` 不碰它。
+
+> ★ **本地逐步彩排过八步**（标签守卫 → 内核对照 → `install --frozen-lockfile` → `check` → `test` →
+> `lint` → `build` → publish 彩排），八步全绿。而在 GitHub 上**它从未运行过** ——
+> 第一次打标签就是它的第一次测试。
+>
+> 两件只能在外面验的事，已经在外面验过：① 三个 action 的版本（`checkout@v7` /
+> `pnpm/action-setup@v6` / `setup-node@v7`）用 `git ls-remote` 问过 GitHub，**三个 tag 都真实存在**；
+> ② workflow 的 YAML 用 `yaml@2.9.1` 解析过，并逐项断言了触发器、权限、步骤顺序与 `--provenance`
+> （9 条全过）。**剩下唯一没验的是 `npm publish` 本身，而那需要 Trusted Publisher 配好。**
 
 | 决定 | 理由 |
 | ---- | ---- |
