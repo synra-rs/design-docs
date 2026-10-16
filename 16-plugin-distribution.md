@@ -694,6 +694,20 @@ pub struct UpdateInfo {
   而它需要 `Send + Sync + 'static`，这是下一轮的形状问题。
   ★ 于是那三件等待中的东西（`SyncRecord` / `sync_log` / 转换）**仍然**没有生产调用者，
   但缺的已经不是「值到不了调用方」，而是「连接线程没有把它交给调用方」。
+  ★ **第 148 轮把最后一段接上了：连接线程现在把值交出去。**
+  `listener::serve` 多了一个 `&Arc<dyn Fn(&FinishedTransfer) + Send + Sync>` 参数 ——
+  它必须是 `Send + Sync + 'static`，因为持有它的是那个连接线程（借用到不了那里）。
+  而 `FinishedTransfer` 多了 `peer`：**逐条带上**，因为「谁发的这个文件」是关于**文件**的事实，
+  而 `Served::peer` 是关于**连接**的。
+  ★ **而 daemon 那一头没有接通，原因是一个具体的作用域事实，不是懒惰**：
+  在 `serve` 里唯一的 `Arc<Mutex<SynraDb>>` 叫 `shared_db`，而它在 **L637 已经被 `remembered` 取走**
+  （一个活得更久的持有者），同时 `db` 在这个作用域是一个**值**（L381 就 move 进了 `shared_db`）。
+  所以写那一行需要一个**并列的第二个 Arc**，或在它被消费前先 clone 一份 —— 那是一处签名上的一行改动，
+  是下一轮的第一步。
+  ★ 于是回调目前**说出**收到的是什么，而不是假装写进了库。
+  **一个说「not recorded yet」的闭包比一个看似写库的闭包诚实。**
+  ★ 本轮的代价：22 次工具调用，其中大部分花在**猜函数边界**上 ——
+  我三次把一个新变量插进了 `start_loops`，而那个闭包一直在 `serve` 里（`start_loops` 在 L130 前就结束了）。
       文档要的是 `version`/`direction`/`startedAt`/`finishedAt`/`outcome`/`bytesTransferred`/`traceId`。
       ★ 无 `Default`、无持久化、无 IPC DTO、无前端消费。
 - [x] 自动更新门槛表（下面那张表）—— **已实现**（第 77 轮）：
