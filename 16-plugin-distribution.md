@@ -754,6 +754,20 @@ pub struct UpdateInfo {
   （clippy 的 `too_many_arguments` 正是这样把它从 8 个压到 7 个的。）
   ★ **而它目前既没有调用者、也没有测试。** 调用它需要 `synra-control` 的 `Kernel` 加一个方法，
   而那个 trait 有**三个**实现（两个测试替身加 daemon 的 `Runtime`）—— 那是下一轮的事。
+  ★ **第 154 轮把那条链接完了**：`Kernel::send_bundle`（traits）→ daemon 的 `Runtime` → `core::send_bundle`。
+  而 daemon 那 142 行的传输函数**搬进了私有方法 `send_a_file`**（`impl Runtime`），
+  两个 trait 入口各是一行 —— 校验、拨号、报告都是同一套，只有请求里说的是什么不同。
+  ★ 搬移用了**括号配对**找闭合行，而不是「第一个四空格的 `}`」——
+  第 144 轮就是后者切错了位置、文件变成未闭合。`send_file` 在 L194-335，一次就对了。
+  ★ **`Kernel::send_bundle` 有默认实现，而 `send_file` 没有**，理由写进了 trait：
+  *「这个内核不发插件包」对同 crate 里的测试替身是一个**正确**的回答* ——
+  一个必需的方法会逼每个替身声称一个它没有的实现，而一个对自己没做的事给出貌似合理回答的替身，
+  正是本仓库反复清除的那种谎。
+  ★ **端到端测试**（`a_bundle_arrives_as_a_bundle`，跑了三次）+ 全量 1122 条：
+  一个包从 `Runtime::send_bundle` 出发、经传输、在对端被认成**插件包**（第 139 轮的 `bundle` 字段）——
+  而在这一轮之前，它会以一张截图的身份到达。
+  ★ 仍缺的：发送端**记下**「对端现在持有我推的这个版本」。`SyncTable::apply_result`（第 134 轮）
+  仍在等它 —— 而接收端那一半（`sync_records`）在第 150 轮已经通了。
   记在这里，而不是让下一轮以为它与 `send_file` 一样被走过了。
   ★ 于是链条现在只差两端之间那一段：`Kernel::send_bundle` → `Runtime` → `core::send_bundle`，
   而它一旦接上，第 134 轮的 `SyncTable` 就有了第一个真实的调用点。
