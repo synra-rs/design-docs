@@ -453,8 +453,22 @@ pub enum ConsentDiff {
 > * **trusted = 至少允许一条** —— 全拒不是批准。`should_run` 是 `enabled && trusted`，所以全拒之后即使再来一次
 >   `enable` 也不会运行，这正是设计里"完全拒绝"应有的样子。
 >
-> 仍然缺的：**升级差异**（`ConsentDiff`）没有实现 —— 现在重新确认是全量重来，不是只问新增的那几条；
-> 以及 app 侧与 daemon 侧各写了一遍"决定"的规则（两处都短，但仍是同一件事的两份实现）。
+> 仍然缺的：**升级差异**（`ConsentDiff`）没有实现 —— 现在重新确认是全量重来，不是只问新增的那几条。
+>
+> ★ **2026-10-18（第二轮）：规则搬进内核了，因为它有两个答案。**
+>
+> 上一轮之后发现：app 的 `plugins_consent_respond` 规定"**每一条**声明都授予了才算 trusted"，而 daemon 是
+> "**至少一条**"。装载器两边都照已授予的行建能力集，于是**同一个用户决定**在一个宿主里得到一个跑不起来的插件、
+> 在另一个里得到一个带着子集运行的插件 —— 而用户看到的只有一个开关。
+>
+> 现在规则在 `synra_core::consent::decide`（纯函数，无 IO）：每个声明一行、granted ⊆ 声明、摘要取当前字节、
+> **trusted = 至少允许一条**。选"部分同意可以运行"是因为它正是 `Consent::is_partial()` 与能力闸门存在的原因：
+> 授予集合是权威，没授予的能力在闸门被拒，而不是让整个插件不跑 —— 后者会让用户看到自己"同意了两条"的插件
+> 永远不工作，且没有任何设置解释原因。
+>
+> 两个宿主现在都只问这个函数，`plugin_consent` / `plugins_consent_respond` 各自只剩"把决定写进库"。
+> 断言在两处：`partial_consent_loads_the_plugin_with_only_what_was_allowed`（daemon，检查装载器拿到的
+> 能力集里**没有**被拒的那条）与 `declining_one_capability_records_the_denial_and_still_trusts`（app）。
 
 ### 2.5 Installing（安装落盘）
 
