@@ -822,6 +822,12 @@ Content-Security-Policy:
       忘记一台设备之后，列表上的那张卡片不该等到页面重开才消失。测试 `forgetting_a_device_tells_the_interface`
       断言序号来自总线、且事件点名的是那一台。**扫描**也有了：`devices_scan_start` 在开始时就发布 `ScanUpdated`（结束那半仍是快照 —— 发现数是数据库的回答，不是那个函数的）。仍然没有发布点的是**发现**（`DeviceCardUpdated`，
       `DeviceCardUpdated` 由 discovery worker 产生，而它现在还没有总线）。
+- [ ] **同意面板（插件页）** —— **被一个缺失的字段挡住**（2026-10-18）。
+      `PluginsPage.vue` 现在能用路径安装（`plugins_install`），但它画不出同意面板：`PluginSnapshot` 只有
+      `granted` / `denied`，**没有** `requested`。首次安装时两个列表都是空的，界面于是无从知道该请用户批准什么；
+      `PluginConsentRequested` 事件带着 `capabilities`，但那是"到达时"的事实，页面刷新之后就没了。
+      **下一步不是加按钮，而是给 DTO 加字段**：`requested`（manifest 声明的能力，无论用户决定与否），由
+      `snapshot()` 从 manifest 填。在那之前不做"全部允许"的按钮 —— 那会把逐项同意退化成一次点击交出全部能力。
 - [ ] `PluginUiOp` 枚举 + 方法白名单 + `plugin_ui_rpc` —— **未做**。
       `PluginUiOp` 全仓 0 处；`plugin_ui_rpc` 只作为注释出现在 `command.rs:39`。
       `command.rs` 里 `Interface::{Host,Plugin}`、`:59` `allows()`、`:375` `plugin_allow_list()` 是真的且有测试，
