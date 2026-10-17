@@ -577,13 +577,20 @@ fn audit_records_capability_not_content() { /* ... */ }
 
 ## 7. 前端与集成回归（app 仓库）
 
-| 项                        | 方式                                                        |
-| ------------------------- | ----------------------------------------------------------- |
-| 组件与 store 单元测试       | Vitest                                                      |
-| 事件桥接（含未知事件兜底）   | Vitest：注入未知 `KernelEvent.type` → 断言触发全量刷新          |
-| UI 插件隔离               | §5.2 的对抗用例                                 |
-| 桌面端到端                | `tauri-driver`：启动 → 渲染四页 → 配对 → 分享 → 执行           |
-| WebView 引擎兼容          | CI 在 WebView2 / WebKitGTK / WKWebView 上跑视觉回归             |
+| 项                        | 方式                                                        | 状态（2026-10-18） |
+| ------------------------- | ----------------------------------------------------------- | ------------------ |
+| 组件与 store 单元测试       | Vitest                                                      | ✅ 170 条：三个 store 的 `apply` 契约、`actions.ts` 的参数形状、`events.ts` 的接线 |
+| 页面挂载测试               | Vitest + `jsdom` + `@vue/test-utils`                        | ✅ 四页各有一份 `*.mount.test.ts`（共 13 条）；默认环境仍是 `node` |
+| 事件桥接（含未知事件兜底）   | Vitest：注入未知 `KernelEvent.type` → 断言触发全量刷新          | ✅ 用**虚构**类型名，因为测的是接线而非内核枚举 |
+| Lint                       | `eslint .`（CI 已跑）                                        | ✅ 0 问题；`--fix` 与 `command-arguments` 守卫曾互相打架，见 08 §9 |
+| UI 插件隔离               | §5.2 的对抗用例                                 | ⬜ 插件 UI 宿主尚不存在 |
+| 桌面端到端                | `tauri-driver`：启动 → 渲染四页 → 配对 → 分享 → 执行           | ⬜ 未做 |
+| WebView 引擎兼容          | CI 在 WebView2 / WebKitGTK / WKWebView 上跑视觉回归             | ⬜ 未做 |
+
+★ **一个环境限制值得写在这里**：`synra-rust-app` 的 `shell.rs` 只在 `tauri-shell` feature 下编译，而本机与 CI 都跑
+`--no-default-features`（默认 feature 需要 WebKitGTK/WebView2 工具链）。所以**改动 `shell.rs` 的工作无法在工作区内
+验证**，只能靠"把它挪进 feature 无关的模块"或"由真正的桌面构建验证"。上一轮想把发现事件接进 worker 时，就是在
+这一点上停下的。
 
 ---
 
