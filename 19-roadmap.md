@@ -571,6 +571,13 @@ M0 ──▶ M1 ──▶ M2 ──▶ M3
    第 158 轮查过；缺的是 desk 与 router 的构造，它们现在只活在 daemon 的启动代码里）。
    最小可行切片：把 `PairingDesk`/`Router` 的构造搬进 core（不搬 daemon 的启动策略），壳照 `discovery` 的形状起一个
    listener 线程，`on_finished` 里写 `sync_records` —— 那也顺带修好上一段说的"表没有写入方"。
+   ★★★★ **两个零件的真实成本（2026-10-18 查 `apps/synra-daemon/src/serve.rs`）**：
+   `PairingDesk::new(local_id, SessionTimeouts::default().pairing)` 一行即可，**它本来就在 core**；
+   而 `Router` 是 **`crate::runtime::intent::Router::new(Arc<plugins>, Arc<board>)` —— 它住在 daemon 里**，
+   不在 core。所以这条切片真正的第一步是**把 Router 搬进 core**（连同它依赖的 `plugins`/`board` 两个 `Arc`），
+   那是跨 crate 的重构，不是"传两个参数"。`Host` 同理已可构造（`Host::new(identity, LocalPeer)`）。
+   **附带一条旁证**：daemon 的 `serve.rs` 里有一段注释说"`insert_plugin` 从来没有生产调用方，所以 `db.plugins()` 永远为空"
+   —— 与本会话发现的 `sync_records` / `plugin_versions` 是**同一个模式**的第三次出现：表与函数都在，**中间的调用没人写**。
 2. **`plugins_sync_plan`**：策略函数 `decide(ours_version, ours_digest, theirs: &RemoteState, policy)`（`plugin_sync.rs:188`）
    与 DTO `SyncPlanDto { plugin_id, targets }`（`dto/plugin.rs:200`）都已存在。**要决定的是**：对端"已有什么"存在哪 ——
    (a) 建一张 `peer_plugins` 表，会话交换清单时写入；还是 (b) 只在会话内计算，命令不持久化。今天的 `RemoteState`
