@@ -569,6 +569,14 @@ M0 ──▶ M1 ──▶ M2 ──▶ M3
 (1) `SeenDeviceRow.device_id` 是 **`String`**，不是 `DeviceId`，比较要先转；
 (2) `SeenDeviceRow` **没有 `address` 字段** —— 我看到的 `address` 是**另一张表/另一行**的字段（`devices.rs:71` 的 `row.get(7)`），
 所以"地址在 `devices_seen.address`"这个结论**需要重新核实**；
+★ **核实结果（同一轮）：结论是错的，而且这是一个真缺口。** `SeenDeviceRow`（`synra-store/src/records.rs:193`）的字段只有
+`device_id: String`、`display_name`、`platform`、`first_seen_ms`、`last_seen_ms`、`source` —— **没有 `address`**。
+`devices.rs:71` 那个 `address` 属于另一个 `from_row`（不是这张表）。也就是说：**发现层记下了设备的名字与来源，却没记它从哪个地址来**，
+所以壳今天**无法**"查表拿地址再拨号"。
+于是 `transfer_send_file` 真正的前置不是胶水，而是二选一：
+(a) 发现时把 `SocketAddr` 一并落库（`devices_seen` 加一列 + 迁移 + `record()` 里填）；或
+(b) 发送前重新发现一次（广播、等应答、拿到地址再拨）—— 慢，但不动 schema。
+**这是设计决定，先定再写。** 在它定下来之前，`transfer_send_file` 写不出来（我这一轮就是写到这里才发现，四处签名错只是表象）。
 (3) `synra_core::host::millis_reading` **要参数**（`clock.rs:14`），不是零参；
 (4) `TransferSender` **没有 `chunk_size()`** 访问器，进度里的"已发字节"只能自己按块数乘常量或从 `blocks()` 的块大小取。
 **教训与之前几次相同**：先 `grep` 出每个类型的字段与每个函数的参数，再一次写成；我这次是照着印象写的，四处全错。
