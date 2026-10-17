@@ -590,6 +590,13 @@ M0 ──▶ M1 ──▶ M2 ──▶ M3
    `plugins_sync_plan` 的前置不是壳里的 wrapper，而是**core 里一对新的请求/应答**（问清单 / 答清单 + 把答复变成
    `RemoteState`），那是 2–3 轮的工作，做完之后壳里的命令才有东西可调。
    **这与传输的教训一样**：命令看起来缺一层胶水，实际缺的是另一端。
+   ★★ **还有一处分层事实（2026-10-18，同一会话，再查一层）**：`synra-core` **不依赖 `synra-ipc`**（它的 `Cargo.toml`
+   只有 protocol/store/capability/observe 一类），所以 **core 不能产出 `SyncPlanDto`** —— 那是 wire 类型。正确形状因此是：
+   core 的 `decide(...)` 给出判定，**壳（`synra-rust-app`，同时依赖两边）负责把它映射成 `SyncPlanDto`**。
+   `SyncTarget` 的完整字段是 `device_id`、`display_name`、`needs_artifact`、`version: Option<String>`、`online: bool`，
+   其中 `online` 只有壳知道（它握着链路状态）—— 这从另一侧证实了映射属于壳。
+   **所以 `plugins_sync_plan` 的实现顺序是**：core 加"问清单/答清单"的消息 → 壳把对端答复与本地插件喂给 `decide` →
+   组装 `SyncPlanDto`（`online` 由壳填）。三步，第一步最大。
 
 三条都写在这里，是为了让下一轮**先选一个、写清理由、再动手**，而不是试探着写一半。
 2. **展示名**：`open()` 从路径推 `file_name`，所以磁盘上的名字就是对方看到的名字 —— 用 `message-<yyyymmdd>.txt`
