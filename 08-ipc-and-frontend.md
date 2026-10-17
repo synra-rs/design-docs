@@ -842,7 +842,13 @@ Content-Security-Policy:
       由 app 的事件桥读一次库、构造卡片、再 `emit` wire 事件 —— 代价是桥里多一步 I/O；(b) worker 直接造卡片 ——
       代价是卡片构造出现两份，而这张卡片是设备页的全部内容，漂移的后果是同一台设备在两个入口长得不一样。
       **倾向前者**：桥本来就是"把内核的事实翻译成界面的事实"的地方，卡片的唯一作者仍是 `devices_snapshot`。
-      要做的事：`events.rs` 里一个 `DeviceSeen → DeviceCardUpdated` 的翻译 + 一条"改了名字的设备带来新卡片"的断言。- [x] **卸载（插件页 + 命令）** —— **做完了**（2026-10-18），四层各有一条测试。
+      要做的事：`events.rs` 里一个 `DeviceSeen → DeviceCardUpdated` 的翻译 + 一条"改了名字的设备带来新卡片"的断言。
+      ★ **而这条路线要修正一处**：app 的 `EventBus` 里装的是 **wire** 事件（`synra_ipc::event::KernelEvent`），
+      不是 core 的 `KernelEvent` —— 所以"worker 发 `DeviceSeen`、桥再翻译"要么需要**第二条总线**（装 core 事件），
+      要么让 worker 调一个**宿主给的回调**（`announce(device_id)`），由宿主读库、造卡片、发 wire 事件。
+      **倾向前者之外的第三条：回调。** 它既不需要第二条总线，也不需要 worker 造卡片 —— 只把"谁发现了谁"交给宿主，
+      卡片的唯一作者仍是 `devices_snapshot`。
+- [x] **卸载（插件页 + 命令）** —— **做完了**（2026-10-18），四层各有一条测试。
       决定写在 [14 §2.9](./14-plugin-lifecycle.md)：`PluginFiles` 是与 `Sandbox` 并列的第二个删除所有者，
       只删"某个 id 的 artifact 目录 + `remove_data` 为真时的 data 目录"。
       store 的 `remove_plugin` 在一个事务里删 `plugins` 行与 `plugin_grants` 行；命令按 **先记录、后目录** 的顺序
