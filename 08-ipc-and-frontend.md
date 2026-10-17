@@ -811,6 +811,13 @@ Content-Security-Policy:
       常量移到 `src/ipc/channel.ts`，并新增守卫
       `fake-quarantine`（`scripts/check-shapes.ts`）：只有 `kernel.ts` 可以提到那个假实现。
       负控制：让 `DevicesPage.vue` 再 import 一次 → 守卫红并点名该文件。
+      ★ **2026-10-18：接上了，于是"只有测试在 new 它"不再成立。** `src/events.ts` 的 `startEvents` 在 `main.ts`
+      挂载之后启动：订阅 `KERNEL_EVENT_CHANNEL` → `EventDispatcher.accept` → 设备 store 的 `apply`；
+      未知类型走 `refresh`（重读 `devices_snapshot`），失败的重读**不**调用 `snapshotTaken` ——
+      把没拿到的快照标记成"已完整"正是这条链要消灭的那种静默过期。
+      测试 `src/events.test.ts` 四条：订阅了那个通道、设备卡片进 store、未知类型触发一次重读、`stop()` 真的解绑。
+      仍然缺的：插件/意图/传输 store 还没有 `apply`，所以那几类事件目前只会触发一次重读 ——
+      推送的通道通了，但"每一类事实"还没用完它。
 - [ ] `PluginUiOp` 枚举 + 方法白名单 + `plugin_ui_rpc` —— **未做**。
       `PluginUiOp` 全仓 0 处；`plugin_ui_rpc` 只作为注释出现在 `command.rs:39`。
       `command.rs` 里 `Interface::{Host,Plugin}`、`:59` `allows()`、`:375` `plugin_allow_list()` 是真的且有测试，
