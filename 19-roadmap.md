@@ -587,6 +587,16 @@ M0 ──▶ M1 ──▶ M2 ──▶ M3
    而 trait 只多一个方法，改动面在 `listener.rs` 与 `serve` 的调用点。**代价**：`serve` 的签名变一次，
    daemon 与壳各改一处 —— 比搬 660 行小得多。
    **如果将来壳真的需要意图编排**（比如它要自己跑插件），再搬不迟；那时 `Router` 已经是一个 trait 的实现，搬的是实现不是接口。
+   ★★★★★ **上面两条都作废（2026-10-18，本会话最重要的一次更正）**：`listener::serve` 收的**不是** daemon 那个 660 行的
+   `runtime::intent::Router`，而是 **`synra_core::dispatch::orchestrate::Router`** —— 它只有两个字段，构造函数是
+   `Router::new(Arc<Mutex<PluginSet>>, Arc<Mutex<Board>>)`（`orchestrate.rs:301`），而**壳里两样都已经有了**：
+   `AppState.board: Arc<Mutex<Board>>`（`state.rs:57`）与 `AppState.plugins: Option<Arc<Mutex<PluginSet>>>`（`state.rs:59`）。
+   也就是说接收侧需要的三样 —— `Host::new(identity, LocalPeer)`、`PairingDesk::new(id, timeout)`、
+   `Router::new(plugins, board)` —— **全部可以在壳里就地构造，一个 trait 都不需要，660 行一行也不用搬**。
+   我前两轮把 daemon 的 `Router` 和 core 的 `Router` 当成了同一个东西（名字相同、职责相关、但类型不同），
+   于是把一个"三行构造"的活儿估成了"跨 crate 重构"。
+   **修正后的切片**：壳照 `discovery` 的形状起 listener 线程 → `serve(host, cancel, data_dir, desk, &router, &on_finished)`
+   → `on_finished` 里写 `sync_records`。`plugins` 是 `Option`（壳可以没有插件宿主），为 `None` 时用一个空的 `PluginSet` 构造 Router 即可。
 2. **`plugins_sync_plan`**：策略函数 `decide(ours_version, ours_digest, theirs: &RemoteState, policy)`（`plugin_sync.rs:188`）
    与 DTO `SyncPlanDto { plugin_id, targets }`（`dto/plugin.rs:200`）都已存在。**要决定的是**：对端"已有什么"存在哪 ——
    (a) 建一张 `peer_plugins` 表，会话交换清单时写入；还是 (b) 只在会话内计算，命令不持久化。今天的 `RemoteState`
