@@ -606,6 +606,16 @@ M0 ──▶ M1 ──▶ M2 ──▶ M3
    而一个接了 share 却路由不到任何地方的监听器是"答应了却什么也不做"）；(2) **令牌今天没人调用** ——
    它是给进程内停止准备的，退出进程会自己释放端口，注释里写明了这一点而不是假装有关窗取消。
    **剩下的**：两个进程互发的端到端测试（今天只有构造与编译验证）。
+   ★ **那条测试的做法（2026-10-18 预留配方，下一轮照此写）**：不需要两个进程 —— `serve` 的 peer 是一个真实的
+   `TcpStream`，所以一个进程内就能起两端：
+   1. `let mut host = Host::new(identity, local_peer)`，`listener::bind(&mut host, 0)` 拿到端口；
+   2. `let cancel = Cancellation::new()`，起一个线程跑 `serve(&Arc::new(Mutex::new(host)), &cancel, &data_dir, &desk, &router, &finished)`；
+   3. 主线程 `dial_peer(&their_local_peer, Flags::production(), addr, Some(token), now)` → `into_link` →
+      `send_blocks(...)` 推一个 bundle；
+   4. 断言 `finished` 回调被调用过，且 `db.sync_records()` 里出现了对端那一行。
+   **难点只有一个**：握手要双方同意（`PairingDesk` 的 token 与 `Flags`），所以这条测试实际上也在验证配对；
+   如果配对太麻烦，退化版本是**只验证 `serve` 接受了连接并结束了传输**（`on_finished` 被调一次即成功），
+   把 `sync_records` 的写入留给已有的单测（`record_sync` 本身有测试）。
 2. **`plugins_sync_plan`**：策略函数 `decide(ours_version, ours_digest, theirs: &RemoteState, policy)`（`plugin_sync.rs:188`）
    与 DTO `SyncPlanDto { plugin_id, targets }`（`dto/plugin.rs:200`）都已存在。**要决定的是**：对端"已有什么"存在哪 ——
    (a) 建一张 `peer_plugins` 表，会话交换清单时写入；还是 (b) 只在会话内计算，命令不持久化。今天的 `RemoteState`
