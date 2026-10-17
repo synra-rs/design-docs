@@ -661,6 +661,25 @@ pub async fn remove(&self, plugin_id: &PluginId, opts: RemoveOptions) -> Result<
 
 ---
 
+> ★ **2026-10-18：卸载的阻塞点不是 UI，是删除职责；而上面第 6 步的路径写错了。**
+>
+> **路径。** 实现的布局是 `plugins/<id>/`（artifact）与 **`plugin-data/<sanitised-id>/`**（用户数据）**两个目录**，
+> 不是"`<data>/plugins/<id>/` 里面还装着用户数据"。`Paths::plugins_dir` 与 `Paths::plugin_data_dir` 是两个成员，
+> `plugin_data_dir_for` 会对 id 做 sanitise。所以"删插件、留数据"在布局上成立 —— 这正是第 6 步要的默认值。
+>
+> **删除职责。** 结构性守卫 `only the sandbox may delete a directory tree` 只允许
+> `crates/synra-store/src/sandbox.rs` 调 `remove_dir_all`，而 `plugins/<id>/` 不属于沙箱（沙箱管的是 plugin-data）。
+> 于是卸载卡在**所有权**上而不是缺一个函数：要删插件目录，必须先有一个明确命名的所有者。
+>
+> **决定。** 在 `synra-store` 里新增 `PluginFiles`，与 `Sandbox` 并列，只做一件事：删掉某个插件 id 的 artifact
+> 目录，以及（可选）它的 data 目录。守卫的允许名单加这一条，理由写在同一行。三条约束：
+>
+> * id 先 `sanitise_component`，再断言结果仍在 `plugins_dir` 之下（`is_within` 已存在）；
+> * 只认这两个目录，不接受任意路径；
+> * data 目录**只在 `remove_data` 为真时**删，默认保留 —— 第 6 步的"询问"就是它的默认值。
+>
+> 之后三步（store 的 `remove_plugin`、命令 `plugins_uninstall`、页面按钮）按这个形状写。
+
 ## 3. 更新（Update）
 
 ```rust
