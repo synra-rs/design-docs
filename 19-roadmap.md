@@ -530,6 +530,13 @@ M0 ──▶ M1 ──▶ M2 ──▶ M3
 必须由 worker 从链路一侧填，而不是从请求里读。这一点决定了 `snapshot_from` 的签名要收一个 `peer`，而不是只收请求。
 `read_block(chunk_id)` 后 `send_chunk` → `announce_transfer`；`Envelope` 交现有的消息分派（`messaging.rs` 已有）。
 壳里还缺的是**谁来建这个 link**（监听 + 拨号），而那正是 `discovery` 之外 `with_*_or_report` 还没写的那一个。
+★ **建链的入口也已经有了（2026-10-18 查过，`crates/synra-core/src/listener.rs`）**：
+`bind(host, port) -> SocketAddr` 绑定端口，`serve(host, cancel, data_dir, desk, router, on_finished)` 是**现成的连接循环**
+—— 它接受连接、按 `Cancellation` 退出、把每条连接交给自己的线程，并用 `FinishedCallback` 回报完成的传输
+（`FinishedTransfer`、`Served`、`no_answer()`）。
+**所以壳里不是"写一个监听器"，而是"调用 `serve` 并给它一个 `FinishedCallback`"** —— 那个回调正是
+`announce_transfer` + 结束时 `forget`/`TransferFinished` 的落点，`Router` 与 `PairingDesk` 在 daemon 里已有构造先例。
+`snapshot_from(request, peer, state, started_at_ms)` 已在壳里写好并有两条测试。
 ★ **2026-10-18 再补一条：`transfer_cancel` 也注册了（27 条），而且端到端。** 它从注册表移除并发布
 `TransferFinished`，前端的 `intents` store 收到就删掉那一行 —— 没有这个事件，被取消的传输会一直躺在进度列表里
 直到页面重开，那正是其它命令当初被修掉的那种静默过期。三种结果各有理由：id 不合法是调用方的错（`InvalidArgument`）、
