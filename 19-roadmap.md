@@ -576,10 +576,15 @@ M0 ──▶ M1 ──▶ M2 ──▶ M3
    `a_send_over_a_connected_link_reports_every_block_and_finishes` 用内存链路跑通了整条成功路径
    （逐块到达 + `TransferFinished` + 注册表清空）。副作用：`finish` 闭包提成了模块级 `finish_transfer`，
    因为"删行"与"通知"必须成对，闭包让它们在两个地方各写一遍。
-   ★ **第 2 条也一并决定（同日）**：选 (b) 的变体 —— **按需计算**。`SyncSession` 本来就要一条链路才能开，
-   所以可以把"拿对端状态"与"算计划"放在同一次短会话里：`plugins_sync_plan(device_id)` 拨号 → 交换清单 → `decide` →
-   返回 `SyncPlanDto`，会话结束即丢。**代价是每次计划要一次拨号**；好处是不建表、不过期、不需要"上次同步时对方有什么"这种
-   会撒谎的状态。**第 1 条（接收侧）仍未决定** —— 它需要一条壳↔daemon 通道，那是比这两条都大的问题。
+   ★ **第 2 条也一并决定（同日）**：选 (b) 的变体 —— **按需计算**。所以 `plugins_sync_plan(device_id)` 的形状是
+   拨号 → 交换清单 → `decide` → 返回 `SyncPlanDto`，会话结束即丢。**代价是每次计划要一次拨号**；好处是不建表、不过期、
+   不需要"上次同步时对方有什么"这种会撒谎的状态。**第 1 条（接收侧）仍未决定** —— 它需要一条壳↔daemon 通道。
+   ★★ **2026-10-18 更正那句话里的一个错误**：我原先写"`SyncSession` 本来就要一条链路才能开"，暗示计划走 `SyncSession`。
+   **不对** —— `SyncSession::open(session, plugin_id, source, transfer, declared_version, declared_digest, total_chunks)`
+   （`plugin_sync.rs:434`）是**接收一个包**时逐块装配的状态机（`have: BTreeSet<u32>`、`duplicates`），与"比较双方有什么"
+   毫无关系。计划要的是 `RemoteState` + `decide`，而 `RemoteState` 得从对端**交换**得来 —— 那条请求/应答在
+   `messaging.rs` 的 envelope 层，还没查。**所以下一轮的第一个动作是查 envelope：有没有"问对方插件清单"的消息类型**，
+   而不是从 `SyncSession` 开始。
 
 三条都写在这里，是为了让下一轮**先选一个、写清理由、再动手**，而不是试探着写一半。
 2. **展示名**：`open()` 从路径推 `file_name`，所以磁盘上的名字就是对方看到的名字 —— 用 `message-<yyyymmdd>.txt`
