@@ -511,7 +511,14 @@ pub struct UpdateInfo {
       `:103`（转义）、`:113`（空 map）—— 跨版本稳定性成立。
 - [x] `signature.json` 的生成（CLI）与校验（宿主）—— **A**：
       生成 `run.rs:248`；校验 `plugin-host/src/verify/mod.rs`（`Stage::Signature`）
-      + `publisher.rs:363` ed25519 验签；测试 `verify_tests.rs:105-170`/`:529`。
+      + `publisher.rs` ed25519 验签；测试 `verify_tests.rs`。
+      ★ **而"校验"曾经只做了一半，2026-10-18 补上另一半。** 宿主验的是**签名本身**，从不问它签的是不是
+      **这个包** —— 于是「拿一个真签名的包、换掉 `plugin.wasm`、保留 `signature.json`」能通过全部 11 步。
+      CLI 那边反而三样都比了（manifest 摘要、artifact 集合、`covers`），也就是同一条规则两份实现、
+      其中一份漏了一格。现在比较在 `SigningSubject::mismatch`（`publisher.rs`）里，宿主与 CLI 都调它；
+      `VerifyError::SignatureCoversOtherBytes` 让流水线在 `Stage::Signature` 停下，并点名是哪个文件不一致
+      （"the signature covers X, the package has Y"），因为"签名无效"会把作者送去重新签名一个可能没问题的包。
+      三条测试挡着这件事：签名真但字节不同、签名后改过 manifest、签名不覆盖新增的 artifact。
 - [x] `PublisherTrustStore`（TOFU + 公钥指纹绑定 + 撤销）—— **A，但从不持久化**。
       `publisher.rs:619-710` 的 `PublisherTrustStore{trust/forget/revoke/classify}`，
       测试 `publisher_tests.rs:276-346`、`verify_tests.rs:184-232`。
