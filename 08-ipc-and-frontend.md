@@ -918,8 +918,12 @@ Content-Security-Policy:
       (b) 首次打开时解压（懒，但要考虑并发与失败重试）；
       (c) 直接从 zip 读（每次请求解一个条目，I/O 换实现简单）。
       **倾向 (a)**：它与现有安装管线的失败语义一致（装不上就是装不上），而且 `ui_file` 现在就能直接吃那个目录。
-      定下来之后，剩下的就是 `builder()` 里 `register_uri_scheme("synra-plugin", …)` 十行，加上注册
-      `plugin_ui_ready`（注入端已带 label）。
+      ★ **2026-10-18 再查一步，代价变清楚了**：`synra-plugin-ui` 的 `Cargo.toml` **没有 `zip` 依赖**，
+      `expand.rs` 里也没有任何 `zip::` 调用 —— 它解析条目是手写的，只做**限额判定**，不做落盘。所以 (a) 的第一步不是
+      "加一步解压"，而是**先引入一个解压实现**（`zip` crate，或者把现在手写的条目解析扩成能写文件），并给它配上
+      zip-slip 防护（条目名同样要过 `check_path`，落盘路径同样要 `is_within`）。这是一轮的工作量，不是十行。
+      `plugin_ui_ready` 那一条已经完成并注册（2026-10-18），`shapes` 的"调用未注册命令"从 1 变成 **0**。
+      剩下真正缺的只有一件事：**页面文件从哪里来**。
 - [x] **事件 → store 的四个读者**（2026-10-18 落地，第四个是配置）。
       ★ **第四个 store：`settings`。** 内核现在发布 `ConfigUpdated(Box<ConfigSnapshot>)`（整份快照，不是补丁 ——
       补丁是**写入方**的输入，不是结果的描述），前端 `events.ts` 把它交给 `useSettingsStore`，设置页是它的读者。
