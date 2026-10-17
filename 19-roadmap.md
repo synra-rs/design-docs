@@ -563,6 +563,14 @@ M0 ──▶ M1 ──▶ M2 ──▶ M3
 1. **接收侧**：`listener::serve(host, cancel, data_dir, desk, router, on_finished)` 需要 `Host`、`PairingDesk`、`Router`，
    三者都在 daemon 里。**要决定的是**：壳与 daemon 之间是否有一条通道（今天没有），还是把编排搬进 core 让两边共用。
    在此之前壳无法接收入站连接 —— 这不是"还没写"，是"没有地方放"。
+   ★★★★ **已决定（2026-10-18）：壳必须自己接收，不能委托 daemon。** 依据不是新判断，而是 `discovery.rs:3` 里早就写下的
+   同一套理由：**壳与 daemon 是两个宿主、各自的数据目录**（壳是 `%APPDATA%\com.synra.app`，daemon 是 `SYNRA_DATA_DIR`），
+   所以 daemon 收到的连接写进的是**它自己的**表，而界面读的是这个进程的。委托的结果就是"对端连上了、计划却看不见"，
+   与当年"发现到三台设备却一台都不显示"是同一种失败。
+   于是缺的不是"通道"，而是**让壳能构造 `Host`/`PairingDesk`/`Router`**（`Host::new(identity, LocalPeer)` 已可构造，
+   第 158 轮查过；缺的是 desk 与 router 的构造，它们现在只活在 daemon 的启动代码里）。
+   最小可行切片：把 `PairingDesk`/`Router` 的构造搬进 core（不搬 daemon 的启动策略），壳照 `discovery` 的形状起一个
+   listener 线程，`on_finished` 里写 `sync_records` —— 那也顺带修好上一段说的"表没有写入方"。
 2. **`plugins_sync_plan`**：策略函数 `decide(ours_version, ours_digest, theirs: &RemoteState, policy)`（`plugin_sync.rs:188`）
    与 DTO `SyncPlanDto { plugin_id, targets }`（`dto/plugin.rs:200`）都已存在。**要决定的是**：对端"已有什么"存在哪 ——
    (a) 建一张 `peer_plugins` 表，会话交换清单时写入；还是 (b) 只在会话内计算，命令不持久化。今天的 `RemoteState`
