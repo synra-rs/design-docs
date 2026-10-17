@@ -603,6 +603,14 @@ M0 ──▶ M1 ──▶ M2 ──▶ M3
 **成功路径的测试不需要 socket**：`synra_core::link::memory::MemoryStream::pair()`（`link/memory.rs:153`，模块 `pub`）
 造出一对内存流，`PeerLink::new(stream, local, peer, agreed: Agreed, flags)` 就能在一端发、另一端收 `Inbound::Block`。
 剩下的唯一未知是 `Agreed` 的构造（一次 `grep 'pub struct Agreed'` 即可）。
+★ **试过了，这条路暂时不通（2026-10-18，已回退）**：`Agreed { common, missing_required }` 确实可以字面量构造，
+但**接收端会永久阻塞** —— `PeerLink::receive_inbound()` 在没有数据时不返回，而 `PeerLink` 上**没有** `set_read_deadline`
+（那是 `LinkStream` trait 的方法），`Flags { timeout: Some(..) }` 只作用于握手，不作用于读。
+于是测试挂死（第一次跑还留下一个 `synra_core-*.exe` 占着链接器输出，导致 `link.exe` 报 1104）。
+**结论**：要么给 `PeerLink` 加一个读超时覆盖（它内部已有 `read_timeout_override` 字段，只是没有 setter），
+要么在测试里只发**一块**并在发之前就先 `receive`（时序仍不可靠）。
+**建议加那个 setter**：字段已经存在，缺的只是一个 `pub fn with_read_timeout(self, ..) -> Self`，
+而它对真实链路也有用 —— "读卡住不能永远等"。**这一步没做，因为它在 core 的公开 API 上，值得单独一轮。**
 **教训与之前几次相同**：先 `grep` 出每个类型的字段与每个函数的参数，再一次写成；我这次是照着印象写的，四处全错。
 **这一步把工作从"壳里几十行"变成"core 里几十行 + 壳里十行"，而 core 那侧的测试可以用 `link.rs` 现成的 localhost 双端。**
 **传输发送侧已无未知**：地址表、`LocalPeer`、`Flags`、`LinkToken`、`dial_peer`、`TransferSender` 逐块方法、
