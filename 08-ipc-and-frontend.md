@@ -869,6 +869,12 @@ Content-Security-Policy:
       ★ 三处 `applySnapshot` 只用于**首次读取**（`devices_snapshot` / `plugins_list` / `intent_list`），此后只有事件。
       ★ 一条测试因此改了含义：`events.test.ts` 里"未知类型触发重读"曾拿 `pluginUpdated` 当例子，而它现在是已知
       类型；现在用了一个**虚构**的类型名，因为这条测的是"本文件没注册处理器"，是接线的性质而非内核枚举的性质。
+      ★ **2026-10-18（补）：意图的两类事件有发布者了。** `intent_dispatch` / `intent_decide` / `intent_cancel`
+      成功后，用私有 `announce(state, id)` 从**面板**读回快照再发 `IntentUpdated` —— 从面板读回而不是就地拼，
+      因为面板才是 `intent_list` 会回答的东西，拼一份就是同一意图的第二份描述。
+      两个细节：决定**被拒绝**时不发（什么都没变，发布未变的状态等于说"发生了"）；面板答不出来时**静默**
+      （竞态修不了，而事件不是用来发错误的 —— 少播报一次代价是过期列表，编一次代价是错误列表）。
+      **传输的两类仍然没有发布者**：没有传输子系统，`transfer_*` 四条命令也仍未注册。
 - [x] **发现（`DeviceCardUpdated`）的发布点 —— 扫描结束时播报卡片**（2026-10-18 落地）。
       位置是 `devices_scan_start`：`discovery.scan(budget)` 返回、`scanning` 清掉之后，读一次 `devices_snapshot`
       并把**每张卡片**逐条 publish 成 `DeviceCardUpdated`。三个理由：
