@@ -506,6 +506,12 @@ M0 ──▶ M1 ──▶ M2 ──▶ M3
 `TcpStream` 实现，并在 localhost 双端有测试。**壳侧缺的是一个 `AppState.transfers`（`TransferId → TransferSnapshot`）
 与一个像 `discovery` 那样起 worker 的地方** —— worker 用 `TransferSender`/`Receiver` 推进，每次状态变化发布
 `TransferUpdated`（前端 store 与事件类型都已就绪），`transfer_list` 从那张表答。
+★ **2026-10-18：前两件已落地。** `commands::transfers::Transfers`（`record`/`forget`/`list`，替换而非合并、按 id 排序，
+三条测试）、`AppState.transfers`、`transfer_list` 命令并注册（注册数 25 → 26）。
+**一处与设计签名不同**：`08 §2` 把它写成 `Result<Vec<TransferSnapshot>, IpcError>`，实现返回 `Vec<TransferSnapshot>` ——
+一个"列出我持有的东西"的读不可能失败，用 `Result` 只为形状统一会让调用方写一段永远走不到的 `if (!ok)`。
+按"文档是权威、但偏离要写明"的规矩记在这里；若要统一，改的应是文档而不是实现。
+剩下的仍是 worker：它需要 `LinkStream` + `TransferSender`/`Receiver`，并在每次状态变化发布 `TransferUpdated`。
 
 **传输子系统**不该在一轮里开工：它的第一个切片应该是"一个本机回环的传输计划"（`plugins_sync_plan` 已存在但未注册），先把计划与状态机跑通，再谈真正的收发。
 
