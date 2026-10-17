@@ -591,6 +591,14 @@ Content-Security-Policy:
 > 文本拒绝不留文件、内存链路端点）。
 > **仍未做**：worker（拨号与循环在命令线程里跑，两次发送会排队）与接收侧（`listener::serve` 要
 > `Host`/`PairingDesk`/`Router`，那三样在 daemon 里）。
+> ★★★★ **上面两句都已过时（2026-10-18 晚，同一会话的后续）**：
+> (1) **发送不再占命令线程** —— 两条命令改成 `async` + 后台线程（`shell.rs` 的 `blocking` 辅助函数），窗口线程不再被占用、
+> 两次发送并行，而**返回值仍然 await**，所以拒绝依旧以 `Err` 返回而不是变成事后方事件；
+> (2) **接收侧已经实现** —— `src-tauri/src/listener.rs` 的 `spawn(app)` 用 `Host::new` / `listener::bind` /
+> `PairingDesk::new` / `Router::new(state.plugins, state.board)` 起线程跑 `serve`，`on_finished` 里对 bundle 调
+> `record_sync` —— 所以 `sync_records` 第一次有了生产写入方。`Router` 不是 daemon 那 660 行编排，而是
+> `synra_core::dispatch::orchestrate::Router`（两个 `Arc`，壳里本来就有）。
+> **壳侧注册总数现在是 30**（多出的是 `plugins_sync_plan`）。仍未做的只有：接收侧的端到端测试（配方在 `19 §8.7`）。
 > ★ **worker 的第一步被一个细节挡住（2026-10-18）**：把两条发送命令改成 `async` + `spawn_blocking` 是最省力的修法，
 > 但那要求把 `AppState` move 进去 —— 而 `AppState` **只有 `#[derive(Debug)]`，没有 `Clone`**（`state.rs:39`），
 > `tauri::State` 又借不着 `'static`。两条路：让 `AppState` 变成可 `Clone`（字段大多已是 `Arc`/`Mutex`，
