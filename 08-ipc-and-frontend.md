@@ -887,6 +887,14 @@ Content-Security-Policy:
           feature 的 `cargo check` 里验证编译）。
       **倾向 (c)**：它才不会留下一条半功能命令；代价是这一轮改动的可验证性从"完全"降到"编译 + 单元测试"。
       不管选哪个，(a)/(b) 都必须在命令的文档注释里写清"还没有 token"这件事，否则它就是一条看起来正常的假命令。
+      ★ **2026-10-18 晚些时候又看清楚一层，方案 (c) 本身也不够**：`UiSessionRegistry::validate` 的签名是
+      `validate(nonce, claimed_plugin: &PluginId, running_version: &str, now_ms)` —— 它要**声明者**和**运行版本**，
+      两者都是宿主侧的事实，token 里没有；而 `initialization_script` 只能把 token 交进页面，交不了"这个 WebView
+      属于谁"。所以第一片不是"加一条命令"，而是**宿主记住它给哪个插件开了哪个窗口**：
+      `AppState` 里一张 `hosted_ui: HashMap<label, (plugin_id, version, nonce)>`，由**创建 WebView 的那段代码**写入；
+      之后 `plugin_ui_ready(label)` 才能查表、`validate`、记录就绪。
+      这张表在没有 WebView 创建代码之前只能是空的，而"表永远是空的"命令和 (a) 一样是假的 —— 所以这一片必须与
+      **WebView 创建**一起做，成为一轮完整的工作，而不是两半。
 - [x] **事件 → store 的四个读者**（2026-10-18 落地，第四个是配置）。
       ★ **第四个 store：`settings`。** 内核现在发布 `ConfigUpdated(Box<ConfigSnapshot>)`（整份快照，不是补丁 ——
       补丁是**写入方**的输入，不是结果的描述），前端 `events.ts` 把它交给 `useSettingsStore`，设置页是它的读者。
