@@ -600,6 +600,13 @@ M0 ──▶ M1 ──▶ M2 ──▶ M3
    走 `plugin_versions_active` 那个部分索引），配一条测试（`sqlite/tests.rs:149` 已有 INSERT 的先例可仿）。
    **这一幕在本会话里出现了第五次**："接线"的对面缺一块基础能力，而它藏在一个没人读过的表后面。
    五个待补的基础能力分别是：`server` 端接收、`RemoteState` 的来源、`plugin_versions` 的读、监听循环、壳↔daemon 通道。
+   ★★★★ **`plugins_sync_plan` 已经做完（2026-10-18，同一会话）**：`active_plugin_version` 落在
+   `sqlite/versions.rs`（走部分索引，2 条测试）；`plugins_sync_plan` 落在壳的 `commands/sync_plan.rs`
+   （`plugins()`/`active_plugin_version`/`sync_records()` → `plan_for`，**不拨号**），并已注册（壳 30 条命令）。
+   `plan_for` 有 4 条测试、`RemoteState::from_summary` 3 条、请求/应答 3 条、协议类型 3 条。
+   **这条线剩下的是"让 `sync_records` 有新鲜数据"** —— 那需要一次会话真的交换清单，而会话需要链路与
+   `PairingDesk`/`Router`，也就是第 1 条那个未决定的架构问题。**所以 `plugins_sync_plan` 现在返回的计划基于"上次同步时的
+   对端状态"，这必须在界面上说清楚**（`online` 只表示"能拨"，不表示"刚问过"）。
    ★★ **2026-10-18 更正那句话里的一个错误**：我原先写"`SyncSession` 本来就要一条链路才能开"，暗示计划走 `SyncSession`。
    **不对** —— `SyncSession::open(session, plugin_id, source, transfer, declared_version, declared_digest, total_chunks)`
    （`plugin_sync.rs:434`）是**接收一个包**时逐块装配的状态机（`have: BTreeSet<u32>`、`duplicates`），与"比较双方有什么"
