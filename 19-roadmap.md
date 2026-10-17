@@ -577,6 +577,7 @@ M0 ──▶ M1 ──▶ M2 ──▶ M3
 (a) 发现时把 `SocketAddr` 一并落库（`devices_seen` 加一列 + 迁移 + `record()` 里填）；或
 (b) 发送前重新发现一次（广播、等应答、拿到地址再拨）—— 慢，但不动 schema。
 ★ **2026-10-18 决定 (a)，并写清实现清单**（迁移是 11，因为当前最高是 `version: 10`）：
+★★ **这一整条清单在下一轮被证伪，不要照做 —— 见下面的"但地址本来就有"。**
 1. `crates/synra-store/src/db/migrations.rs`：新增 `version: 11` 的 `ALTER TABLE devices_seen ADD COLUMN address TEXT`；
    **可为空**，因为旧行没有地址，而"不知道"与"没有"在这里是同一件事；
 2. `crates/synra-store/src/records.rs`：`SeenDeviceRow` 加 `pub address: Option<String>`，`from_row` 用下标 7 读它；
@@ -586,6 +587,13 @@ M0 ──▶ M1 ──▶ M2 ──▶ M3
 4. `record()` 的调用方（发现路径）把 `SocketAddr` 一并传入；
 5. 校验：`guards`（doc-claims 会核对 schema 版本）、`synra-store` 的单测（加一条"没有地址的更新不会抹掉已有的地址"）。
 **这五步是下一轮的全部工作**，做完 `transfer_send_file` 的地址来源就有了。
+★★ **但地址本来就有（2026-10-18 晚，同一天内第二次更正）：`paired_devices` 表已经有 `address` 列。**
+`DeviceRow`（`records.rs`）与它的 `from_columns` 都带着 `address: Option<String>`，`paired_devices()` 的 `SELECT` 是
+`records::columns::DEVICE` 的第 7 列（`devices.rs:71`）。**而转账的目标本来必须是已配对设备**，所以壳该查的是
+`paired_devices()`，不是 `devices_seen()` —— 上面那五步（迁移 11、加列、`COALESCE`、发现路径传地址）**全部作废**。
+教训：我把"设备"当成了两张表里的一张，而实际上"看得见"与"可拨号"是两件事，后者早就有地址。
+`transfer_send_file` 的取数因此是一行：`db.paired_devices()` → 按 `device_id` 找 → `address`（`None` 就是
+`ErrorCode::Unsupported`，"从没连过，没有地址"）。
 **这是设计决定，先定再写。** 在它定下来之前，`transfer_send_file` 写不出来（我这一轮就是写到这里才发现，四处签名错只是表象）。
 (3) `synra_core::host::millis_reading` **要参数**（`clock.rs:14`），不是零参；
 (4) `TransferSender` **没有 `chunk_size()`** 访问器，进度里的"已发字节"只能自己按块数乘常量或从 `blocks()` 的块大小取。
