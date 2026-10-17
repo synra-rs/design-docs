@@ -19,7 +19,7 @@
 >
 > ★ 这解释了此前几轮分别记下的几件事，它们不是各自独立的问题，而是同一个洞的不同侧面：
 > `plugin_grants` 没有写入方（没有同意流程就没有决定可记）、
-> 装载期 verify 管线没有调用者、`session: None` 导致闸门从未运行、
+> 装载期 verify 管线没有调用者（★ 2026-10-18 起有了：守护进程的 `plugin install` 走它，见 §2.5 末尾）、`session: None` 导致闸门从未运行、
 > 审计环没有生产者、以及 app 侧 26 个未注册命令里那一整组 `plugins_*`。
 > 也就是说：**插件子系统的每一块都被很好地单独测试了，而它们之间没有一条路。**
 >
@@ -471,7 +471,30 @@ pub async fn install_atomically(
 | 失败清理        | ⚠️ 部分（Capacitor 失败 rm）                    | ✅ staging 清理 + 记录                   |
 | 已存在同版本    | ⚠️ 直接覆盖                                    | ✅ 幂等：摘要相同则跳过，不同则报错        |
 
+> ★ **2026-10-18：上面第 1–5 步有了第一个实现，而它的几处与伪代码不同。**
+>
+> 实现是 `synra-daemon/src/runtime/install.rs`（`from_directory`），入口是控制通道的
+> `Request::PluginInstall` → `Kernel::plugin_install` —— 也就是 `synra plugin install <目录>` 第一次真的做事。
+> 差异每一条都是刻意的：
+>
+> * **没有 `<version>` 这一层**：现存布局是 `plugins/<plugin-id>/`（`load_one` 与 `record_discovered_plugins` 都按
+>   这条规则解析目录），换成带版本号的目录是另一件事，不该被"接上安装路径"顺手改掉。
+> * **staging 在叶子旁边**：`plugins/@acme/.hello.installing-<ts>` → rename 成 `plugins/@acme/hello`。临时名只能用
+>   **叶子**（`hello`）而不是 id（`@acme/hello`）—— 后者会拼出两级路径，第一版就是错的，测试当场报 `os error 3`。
+> * **先读字节再写**：每个 artifact 只读一次，哈希与落盘用同一份字节。读两次（一次算摘要、一次复制）会留下一个
+>   窗口，写下去的是没人校验过的字节。
+> * **没有 `source.json` / `.installed` 标记**：来源与时间在 `plugins` 行上（时间戳由 `insert_plugin` 写），
+>   再写一份文件就是同一事实的第二个作者。
+> * **失败即回滚**：目录已就位而写库失败时删掉目录。反过来会让一行指向从未写下的文件，
+>   `load_installed` 会把它报成"插件坏了"，而不是"安装失败了"。
+> * **落点是 `enabled=false, trusted=false`**：第 5 步写的是"安装"，不是"批准"。同意仍然是 `plugins_consent_respond`
+>   （app 侧）与 `plugin enable` 那两步。
+>
+> 仍然没有的：`PluginSlot` 仍然没有驱动者（状态机与数据库行是同一件事的两份描述，尚未合一）、
+> registry 安装（没有 HTTP 客户端）、以及 app 侧的 `plugins_install` 命令。
+
 ### 2.6 Installed / Activating / Active
+
 
 ```rust
 pub async fn activate(&self, plugin_id: &PluginId) -> Result<(), ActivateError> {
