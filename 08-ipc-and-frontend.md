@@ -830,20 +830,22 @@ Content-Security-Policy:
       ★ **没有"全部允许"按钮** —— 把逐项同意压缩成一次点击，正是这套能力模型存在理由的反面。
       ★ 同一张卡片上还有：安装（路径）、启用开关（`plugins_enable`/`disable`；成功后由 `PluginUpdated` 事件让列表
       自己更新 —— 开关**不**自己改列表，同一个变化只留一份描述）。
-      ★ **仍然缺的：这个页面一条测试都没有。** 插件**命令**有十余条 Rust 测试，页面只有 `vue-tsc` 兜着：勾选后传
-      什么参数、开关失败会不会显示错误，都没有断言。补它要先给 vitest 装 DOM 环境（现在 `environment: 'node'`，
-      全仓零组件测试），那是一个独立决定。
-      ★ **2026-10-18：试过了，而且失败了，这里记下为什么，免得下次重走。**
-      装了 `jsdom` + `@vue/test-utils`，并给 `vitest.config.ts` 加了 `@vitejs/plugin-vue`（不加的话报的是
-      "content contains invalid JS syntax"，指向模板里的 `{{ }}`，与真实原因无关）。
-      页面能挂载、能断言"挂载时请求了 `plugins_list`"和"渲染出标题/版本"——**但只有前两条通过**：
-      * 第 3、4 条换成任何内容都失败，挂载钩子里抛未处理的错误 —— antd 组件依赖 `matchMedia`、
-        `ResizeObserver` 与 teleport，jsdom 都没有；
-      * 把 `ant-design-vue` 整体 stub 成"渲染 slot 的 div"之后列表**整个不渲染**：`AList` 的内容来自
-        `renderItem` **作用域插槽**，普通 stub 不调用它。
-      结论：组件测试不是"装两个包"，而是要给这套 antd 用法写一套**认识插槽的 stub 层**（或引入官方测试适配），
-      并接受它只覆盖渲染、不覆盖交互。这是一次独立的工具链决定，不该夹在功能轮里做完。已回退（依赖、配置、
-      测试文件都删了，`pnpm test` 仍是 148 条全绿）。
+      ★ **2026-10-18：先失败一次，随后做成了，两个教训都记下来。**
+      **失败的那次**：装了 `jsdom` + `@vue/test-utils`、加了 `@vitejs/plugin-vue`（不加时报的是
+      "content contains invalid JS syntax"，指向模板里的 `{{ }}`，与真实原因无关），前两条测试通过、其余全挂；
+      于是把 `ant-design-vue` 整体 stub 成"渲染 slot 的 div"，列表**整个不渲染**：`AList` 的内容来自 `renderItem`
+      **作用域插槽**，普通 stub 不调用它。当时判断"需要一套认识插槽的 stub 层"，于是回退。
+      **做成的这次**：真组件留着，只补 jsdom 没有的三个 API —— `matchMedia`、`ResizeObserver`、
+      `IntersectionObserver`。真正的原因不在 antd，而在一句**问错问题的守卫**：
+      `if (!('matchMedia' in window))` —— jsdom 给 `window` 一个**占位**的 `matchMedia`（存在但不是函数），
+      所以守卫认为"已经有了"，什么都不装；前两次挂载恰好没走到那条路径，第三次才炸。
+      **教训**：一个问错问题的守卫比没有守卫更糟 —— 它让前两条测试通过，并把原因藏起来。
+      现在每个测试都无条件安装这些 API（`src/pages/plugin-page.mount.test.ts`）。
+      **覆盖**：挂载即读列表、卡片文字到达 DOM、显示 `requested` 而非 `granted`、拒绝渲染 `ErrorNotice` 且 `code` 正确
+      （断言**组件 prop** 而不是在文本里找 code）、以及**store 里放进一张卡片屏幕就出现**（页面读 store、`events.ts`
+      写 store 的接合点）。**不覆盖**点击：那是 antd 的行为，而点击产生的**参数**由
+      `src/pages/plugins/actions.test.ts` 断言。全局环境仍是 `node`，需要 DOM 的文件用
+      `// @vitest-environment jsdom` 自己声明。
 - [x] **事件 → store 的三个读者**（2026-10-18 落地）。
       `src/events.ts` 是界面里**唯一**订阅 `KERNEL_EVENT_CHANNEL` 的地方：它按序号判定（应用 / 忽略重复 / 重读
       快照），再分给三个 store —— `devices`（`deviceCardUpdated`、`deviceRemoved`）、`plugins`（`pluginUpdated`）、
