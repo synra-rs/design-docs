@@ -928,6 +928,15 @@ Content-Security-Policy:
       `06` 的第 295 行把 `synra-plugin-ui` 描述为"UI 插件 artifact 的**解包/校验/目录管理**、提供 UI 加载 URL"。
       所以解压实现就该落在 `synra-plugin-ui`，而"放在哪里"（`plugins/<id>/ui/`）与"谁触发"（安装管线）只是实现细节。
       缺的确实只是一个 zip 读取器。
+      ★ **2026-10-18 晚：读取器写完了，接线卡在一个回滚细节上。**
+      `synra-plugin-ui` 现在有 `zip` 依赖（`default-features = false` + 只开 `deflate` —— 别的后端都是会跑在攻击者输入上
+      的代码），以及 `artifact::unpack(archive, dest, limits)` 与 `bundle_dir(plugin_dir)`：
+      条目名先过 `check_path`、join 后再查 `starts_with(dest)`、单文件/累计/条目数三重限额。三条测试（正常解压、
+      `../identity.toml` 被拒且外面什么都没写、超限被拒）。MSRV 1.88 上 `cargo check` 通过，`guards` 的 MSRV 项也绿。
+      **接进 `synra_core::install` 的真正阻塞**：安装管线失败时靠 `discard(&staging, &files)` 回滚，而它是**按文件列表**
+      删除的；解压出来的 `ui/` 是一棵**目录树**，`discard` 不认它，而 `remove_dir_all` 是守卫只允许沙箱调用的操作。
+      所以要么 `unpack` 返回它写了哪些路径（让 `discard` 逐文件删），要么给 `discard` 一个"删除自己刚建的目录"的
+      受控入口。**这是安装器的回滚语义问题，不是十行接线** —— 决定了再动手，否则失败安装会留下一棵无主目录树。
 - [x] **事件 → store 的四个读者**（2026-10-18 落地，第四个是配置）。
       ★ **第四个 store：`settings`。** 内核现在发布 `ConfigUpdated(Box<ConfigSnapshot>)`（整份快照，不是补丁 ——
       补丁是**写入方**的输入，不是结果的描述），前端 `events.ts` 把它交给 `useSettingsStore`，设置页是它的读者。
