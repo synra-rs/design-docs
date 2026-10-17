@@ -822,12 +822,20 @@ Content-Security-Policy:
       忘记一台设备之后，列表上的那张卡片不该等到页面重开才消失。测试 `forgetting_a_device_tells_the_interface`
       断言序号来自总线、且事件点名的是那一台。**扫描**也有了：`devices_scan_start` 在开始时就发布 `ScanUpdated`（结束那半仍是快照 —— 发现数是数据库的回答，不是那个函数的）。仍然没有发布点的是**发现**（`DeviceCardUpdated`，
       `DeviceCardUpdated` 由 discovery worker 产生，而它现在还没有总线）。
-- [ ] **同意面板（插件页）** —— **被一个缺失的字段挡住**（2026-10-18）。
-      `PluginsPage.vue` 现在能用路径安装（`plugins_install`），但它画不出同意面板：`PluginSnapshot` 只有
-      `granted` / `denied`，**没有** `requested`。首次安装时两个列表都是空的，界面于是无从知道该请用户批准什么；
-      `PluginConsentRequested` 事件带着 `capabilities`，但那是"到达时"的事实，页面刷新之后就没了。
-      **下一步不是加按钮，而是给 DTO 加字段**：`requested`（manifest 声明的能力，无论用户决定与否），由
-      `snapshot()` 从 manifest 填。在那之前不做"全部允许"的按钮 —— 那会把逐项同意退化成一次点击交出全部能力。
+- [x] **同意面板（插件页）** —— **做完了**（2026-10-18）。
+      `PluginSnapshot.requested` 落地（`crates/synra-ipc/src/dto/plugin.rs`，`#[serde(default)]`），由 app 的
+      `snapshot()` 从 manifest 的 `capabilities` 填；TS 侧在 `@synra/protocol` 的 `ui.ts` 同步。
+      页面为每个声明渲染一个勾选框（初始态来自 `granted`），提交 → `plugins_consent_respond` → **用返回的卡片替换
+      那一条**，不重读：返回的就是内核刚记下的。
+      ★ **没有"全部允许"按钮** —— 把逐项同意压缩成一次点击，正是这套能力模型存在理由的反面。
+      ★ 同一张卡片上还有：安装（路径）、启用开关（`plugins_enable`/`disable`；成功后由 `PluginUpdated` 事件让列表
+      自己更新 —— 开关**不**自己改列表，同一个变化只留一份描述）。
+      ★ **仍然缺的：这个页面一条测试都没有。** 插件**命令**有十余条 Rust 测试，页面只有 `vue-tsc` 兜着：勾选后传
+      什么参数、开关失败会不会显示错误，都没有断言。补它要先给 vitest 装 DOM 环境（现在 `environment: 'node'`，
+      全仓零组件测试），那是一个独立决定。
+- [ ] **卸载（插件页 + 命令）** —— **未做**，而且缺的是一个**决定**而不是代码：移除插件时它的数据删不删。
+      §2.9 要求"删除前有询问、删除后有报告"；`RemoveOptionsDto` / `RemoveReport` 已在 `synra-ipc` 里等着，
+      store 侧没有 `remove_plugin`，命令层也没有入口。
 - [ ] `PluginUiOp` 枚举 + 方法白名单 + `plugin_ui_rpc` —— **未做**。
       `PluginUiOp` 全仓 0 处；`plugin_ui_rpc` 只作为注释出现在 `command.rs:39`。
       `command.rs` 里 `Interface::{Host,Plugin}`、`:59` `allows()`、`:375` `plugin_allow_list()` 是真的且有测试，
