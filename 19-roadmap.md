@@ -586,6 +586,13 @@ M0 ──▶ M1 ──▶ M2 ──▶ M3
    `from_row` 即可），`online` 由壳填，**不拨号**。`plugin_list_request`/`response` 仍然有用 —— 它们是"在会话里问一次、
    然后把答复写进 sync_records"的那条路径，也就是让这张表有新鲜数据的手段。
    **教训**：我在决定"要不要建表"之前没有查 `migrations.rs`，而那是一个 `grep sync` 就能回答的问题。
+   ★★ **命令本体还差的最后一块数据（2026-10-18 查清）**：`plan_for` 需要"本机这个插件的 version 与 digest"，而
+   `PluginRow`（`plugins` 表）**只有 `plugin_id`、`enabled`、`trusted`、`health`、两个时间戳 —— 没有版本、没有 digest**。
+   它们在 **`plugin_versions`**（`migrations.rs:74`：`plugin_id, version, artifact, digest, manifest, installed_ms, active`，
+   主键 `(plugin_id, version)`，并有 `plugin_versions_active` 的**部分索引**指向当前生效的那一行）。
+   所以命令的取数完整路径是：`plugins()` 拿 allowed 列表 → 对每个插件用 `plugin_versions` 的 active 行取 `version`/`digest`
+   → `sync_records()` 拿每个对端的状态 → `plan_for`。**下一个动作是查 `plugin_versions` 的读函数名**（`sqlite/` 下），
+   然后这条命令就没有未知了。
    ★★ **2026-10-18 更正那句话里的一个错误**：我原先写"`SyncSession` 本来就要一条链路才能开"，暗示计划走 `SyncSession`。
    **不对** —— `SyncSession::open(session, plugin_id, source, transfer, declared_version, declared_digest, total_chunks)`
    （`plugin_sync.rs:434`）是**接收一个包**时逐块装配的状态机（`have: BTreeSet<u32>`、`duplicates`），与"比较双方有什么"
