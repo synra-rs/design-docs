@@ -530,6 +530,14 @@ M0 ──▶ M1 ──▶ M2 ──▶ M3
 必须由 worker 从链路一侧填，而不是从请求里读。这一点决定了 `snapshot_from` 的签名要收一个 `peer`，而不是只收请求。
 `read_block(chunk_id)` 后 `send_chunk` → `announce_transfer`；`Envelope` 交现有的消息分派（`messaging.rs` 已有）。
 壳里还缺的是**谁来建这个 link**（监听 + 拨号），而那正是 `discovery` 之外 `with_*_or_report` 还没写的那一个。
+★ **2026-10-18 追加一个必须先回答的问题**：`serve` 要的那几样壳里**一个都没有** —— `Host`（`synra-core/src/host/kernel.rs`）、
+`PairingDesk`、`Router` 都活在 **daemon** 里，壳从来没构造过它们（`host/mod.rs` 只对外给了 `Host`、`dial_peer`、
+`SharedHost`/`shared`）。所以"壳里起传输"不是加一个 `with_*` 函数，而是先决定：
+(a) 传输归 daemon，壳通过某种 IPC 拿进度（今天**没有**壳↔daemon 的通道）；
+(b) 把 `Host`/`Desk`/`Router` 的构造搬进 core 并让壳也用一份（那是 daemon 的编排，搬迁面很大）；
+(c) 壳只做"发送"这一侧（`dial_peer` 已导出），接收留在 daemon。
+**这三条是设计决定，不是实现细节**；在回答之前动手，就等于在壳里重建一遍 daemon 的编排。
+`snapshot_from`、`announce_transfer`、注册表、`transfer_cancel` 都已就绪，无论选哪条都不浪费。
 ★ **建链的入口也已经有了（2026-10-18 查过，`crates/synra-core/src/listener.rs`）**：
 `bind(host, port) -> SocketAddr` 绑定端口，`serve(host, cancel, data_dir, desk, router, on_finished)` 是**现成的连接循环**
 —— 它接受连接、按 `Cancellation` 退出、把每条连接交给自己的线程，并用 `FinishedCallback` 回报完成的传输
