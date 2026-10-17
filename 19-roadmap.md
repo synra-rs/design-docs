@@ -565,6 +565,13 @@ M0 ──▶ M1 ──▶ M2 ──▶ M3
 所以最省事的做法是把 `into_link` 写成 `Dialled::into_link(self, local: DeviceId, flags: Flags) -> Link`，
 由它的调用方（本模块里的 `send_file`）把 `ours.device_id` 与 `flags` 传进来 —— 这样 `Dialled` 不必多存一个字段，
 而"谁的连接"仍然只有一个来源。
+★ **2026-10-18 尝试写 `transfer_send_file` 时的四个签名错误（已回退，别再踩）**：
+(1) `SeenDeviceRow.device_id` 是 **`String`**，不是 `DeviceId`，比较要先转；
+(2) `SeenDeviceRow` **没有 `address` 字段** —— 我看到的 `address` 是**另一张表/另一行**的字段（`devices.rs:71` 的 `row.get(7)`），
+所以"地址在 `devices_seen.address`"这个结论**需要重新核实**；
+(3) `synra_core::host::millis_reading` **要参数**（`clock.rs:14`），不是零参；
+(4) `TransferSender` **没有 `chunk_size()`** 访问器，进度里的"已发字节"只能自己按块数乘常量或从 `blocks()` 的块大小取。
+**教训与之前几次相同**：先 `grep` 出每个类型的字段与每个函数的参数，再一次写成；我这次是照着印象写的，四处全错。
 **这一步把工作从"壳里几十行"变成"core 里几十行 + 壳里十行"，而 core 那侧的测试可以用 `link.rs` 现成的 localhost 双端。**
 **传输发送侧已无未知**：地址表、`LocalPeer`、`Flags`、`LinkToken`、`dial_peer`、`TransferSender` 逐块方法、
 `snapshot_from`、`announce_transfer` 全部就位且各有出处；剩下的是把它们连起来的那几十行。
