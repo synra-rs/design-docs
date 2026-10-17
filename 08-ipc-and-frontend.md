@@ -816,8 +816,12 @@ Content-Security-Policy:
       未知类型走 `refresh`（重读 `devices_snapshot`），失败的重读**不**调用 `snapshotTaken` ——
       把没拿到的快照标记成"已完整"正是这条链要消灭的那种静默过期。
       测试 `src/events.test.ts` 四条：订阅了那个通道、设备卡片进 store、未知类型触发一次重读、`stop()` 真的解绑。
-      仍然缺的：插件/意图/传输 store 还没有 `apply`，所以那几类事件目前只会触发一次重读 ——
+      ★ **仍然缺的：插件/意图/传输 store 还没有 `apply`**，所以那几类事件目前只会触发一次重读 ——
       推送的通道通了，但"每一类事实"还没用完它。
+      ★ **2026-10-18（第二轮）：设备侧有了第一个发布点。** `devices_forget` → `DeviceRemoved`：
+      忘记一台设备之后，列表上的那张卡片不该等到页面重开才消失。测试 `forgetting_a_device_tells_the_interface`
+      断言序号来自总线、且事件点名的是那一台。仍然没有发布点的是**扫描**与**发现**（`ScanUpdated` /
+      `DeviceCardUpdated` 由 discovery worker 产生，而它现在还没有总线）。
 - [ ] `PluginUiOp` 枚举 + 方法白名单 + `plugin_ui_rpc` —— **未做**。
       `PluginUiOp` 全仓 0 处；`plugin_ui_rpc` 只作为注释出现在 `command.rs:39`。
       `command.rs` 里 `Interface::{Host,Plugin}`、`:59` `allows()`、`:375` `plugin_allow_list()` 是真的且有测试，
