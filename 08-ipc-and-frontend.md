@@ -846,6 +846,17 @@ Content-Security-Policy:
       写 store 的接合点）。**不覆盖**点击：那是 antd 的行为，而点击产生的**参数**由
       `src/pages/plugins/actions.test.ts` 断言。全局环境仍是 `node`，需要 DOM 的文件用
       `// @vitest-environment jsdom` 自己声明。
+      ★ **四个页面都挂上了**（`plugin-page`、`devices-page`、`home-page`、`settings-page` 四个 `*.mount.test.ts`）。
+      写这四个文件时踩了四个坑，每一个都**表现为"测试写得不对"而不是"代码有问题"** —— 记下来，下一个写挂载测试的人
+      不必重踩：
+      1. **`matchMedia` 在 jsdom 里是占位而不是函数**。`if (!('matchMedia' in window))` 会认为已经存在、什么都不装，
+         于是前几次挂载恰好成功、后面某一次才炸在 `window.matchMedia is not a function`。要**无条件赋值**。
+      2. **`useRouter()` 需要真的 router**。空路由表 + `createMemoryHistory` 就够，但少了它会在任何断言之前抛出。
+      3. **按命令名作答**，不要一刀切 `{ ok: true, value: [] }`。多调用页面里，返回值形状错了会炸在离出错调用很远的
+         地方 —— 设备页第一次就这么错的（`{ self, paired, visible }` 根本不是 `DevicesSnapshot`）。
+      4. **断言组件 prop，不要断言文本里的 code**。通知组件渲染的是翻译后的句子；而对 DTO **不存在的字段**断言
+         （`INTENT.summary`）会以 `undefined` **通过**。
+      仍然**不覆盖**的是点击：那是 antd 的行为，而点击产生的**参数**由 `src/pages/plugins/actions.test.ts` 断言。
 - [x] **事件 → store 的三个读者**（2026-10-18 落地）。
       `src/events.ts` 是界面里**唯一**订阅 `KERNEL_EVENT_CHANNEL` 的地方：它按序号判定（应用 / 忽略重复 / 重读
       快照），再分给三个 store —— `devices`（`deviceCardUpdated`、`deviceRemoved`）、`plugins`（`pluginUpdated`）、
