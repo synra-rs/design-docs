@@ -873,6 +873,16 @@ Content-Security-Policy:
       测试于是改成断言真正发生的事，并顺带覆盖了 `announce` 在成功路径上的行为。
       ★ **另一个反直觉的教训**：先写断言、让失败告诉你行为是什么，比先假设行为再构造夹具便宜得多 —— 这一条省掉了
       "造一个能匹配的插件"那一整轮。
+- [x] **事件 → store 的四个读者**（2026-10-18 落地，第四个是配置）。
+      ★ **第四个 store：`settings`。** 内核现在发布 `ConfigUpdated(Box<ConfigSnapshot>)`（整份快照，不是补丁 ——
+      补丁是**写入方**的输入，不是结果的描述），前端 `events.ts` 把它交给 `useSettingsStore`，设置页是它的读者。
+      不注册的话，一条配置事件会被当成"未知类型"，触发一次**与配置无关的设备重读**。
+      ★ **接这个 store 时撞出一个真实缺陷，值得单独记下**：`SettingsPage.vue` 原来把 `config_get` 的返回值当作
+      键值表（`config.value = configAnswer.value`），而它实际是 `{ values, overridden }`。于是 `config['theme']`
+      **永远是 `undefined`**，两个偏好项在界面上从来只显示"未设置"。**类型标注是错的**（写成
+      `Record<string, unknown>`）—— 一个错误的类型断言让 `vue-tsc` 通过，并且把一整块功能藏了十几轮。
+      教训：**对着 IPC 边界手写的类型标注，和守卫里的"手抄一份 DTO"是同一种漂移**；`ConfigSnapshot` 现在来自
+      `@synra/protocol`，错形状会在编译期失败。
 - [x] **事件 → store 的三个读者**（2026-10-18 落地）。
       `src/events.ts` 是界面里**唯一**订阅 `KERNEL_EVENT_CHANNEL` 的地方：它按序号判定（应用 / 忽略重复 / 重读
       快照），再分给三个 store —— `devices`（`deviceCardUpdated`、`deviceRemoved`）、`plugins`（`pluginUpdated`）、
