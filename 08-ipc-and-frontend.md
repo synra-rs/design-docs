@@ -883,6 +883,10 @@ Content-Security-Policy:
       `Record<string, unknown>`）—— 一个错误的类型断言让 `vue-tsc` 通过，并且把一整块功能藏了十几轮。
       教训：**对着 IPC 边界手写的类型标注，和守卫里的"手抄一份 DTO"是同一种漂移**；`ConfigSnapshot` 现在来自
       `@synra/protocol`，错形状会在编译期失败。
+      ★ **这个缺陷有两层，第二层被第一层遮住**：形状修好之后，页面仍然读不到值——它的键名是 `theme`，而内核用点分
+      路径 `ui.theme`（`messages/settings.ts` 里甚至写着"页面的键名不是内核的"，但页面照旧用短名）。现在有
+      `configKey(key)` 一处映射，并有一条断言"`ui.theme: dark` 会显示成 dark"。
+      **单个错误的类型断言可以同时掩盖两层缺陷** —— 它让编译器替一个错误的世界观背书，而两处错误都在它后面。
 - [x] **事件 → store 的三个读者**（2026-10-18 落地）。
       `src/events.ts` 是界面里**唯一**订阅 `KERNEL_EVENT_CHANNEL` 的地方：它按序号判定（应用 / 忽略重复 / 重读
       快照），再分给三个 store —— `devices`（`deviceCardUpdated`、`deviceRemoved`）、`plugins`（`pluginUpdated`）、
