@@ -579,6 +579,13 @@ M0 ──▶ M1 ──▶ M2 ──▶ M3
    ★ **第 2 条也一并决定（同日）**：选 (b) 的变体 —— **按需计算**。所以 `plugins_sync_plan(device_id)` 的形状是
    拨号 → 交换清单 → `decide` → 返回 `SyncPlanDto`，会话结束即丢。**代价是每次计划要一次拨号**；好处是不建表、不过期、
    不需要"上次同步时对方有什么"这种会撒谎的状态。**第 1 条（接收侧）仍未决定** —— 它需要一条壳↔daemon 通道。
+   ★★★ **2026-10-18 再更正一次，这次推翻的是上面那个决定的前提**：`sync_records` 表**早就存在**（迁移 2，`migrations.rs:121`：
+   `plugin_id, peer_device, version, digest, synced_at_ms`，主键 `(plugin_id, peer_device)`），`SyncRow` 是它的记录类型。
+   也就是说"上次同步时对方有什么"**本来就有地方存**，我上一句"不建表"里那个"不"是多此一举。
+   **修正后的计划**：`plugins_sync_plan` 读 `sync_records` 得到每个对端的 `RemoteState`（`RemoteState::from_summary` 的兄弟
+   `from_row` 即可），`online` 由壳填，**不拨号**。`plugin_list_request`/`response` 仍然有用 —— 它们是"在会话里问一次、
+   然后把答复写进 sync_records"的那条路径，也就是让这张表有新鲜数据的手段。
+   **教训**：我在决定"要不要建表"之前没有查 `migrations.rs`，而那是一个 `grep sync` 就能回答的问题。
    ★★ **2026-10-18 更正那句话里的一个错误**：我原先写"`SyncSession` 本来就要一条链路才能开"，暗示计划走 `SyncSession`。
    **不对** —— `SyncSession::open(session, plugin_id, source, transfer, declared_version, declared_digest, total_chunks)`
    （`plugin_sync.rs:434`）是**接收一个包**时逐块装配的状态机（`have: BTreeSet<u32>`、`duplicates`），与"比较双方有什么"
