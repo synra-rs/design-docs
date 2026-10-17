@@ -833,7 +833,16 @@ Content-Security-Policy:
       ★ **仍然缺的：这个页面一条测试都没有。** 插件**命令**有十余条 Rust 测试，页面只有 `vue-tsc` 兜着：勾选后传
       什么参数、开关失败会不会显示错误，都没有断言。补它要先给 vitest 装 DOM 环境（现在 `environment: 'node'`，
       全仓零组件测试），那是一个独立决定。
-- [x] **卸载（插件页 + 命令）** —— **做完了**（2026-10-18），四层各有一条测试。
+- [ ] **发现（`DeviceCardUpdated`）的发布点** —— **未做，而且不是一行**（2026-10-18 查过）。
+      worker 走 `discovery::start` → `synra_core::worker::run_recording(db, callback)`，回调里只有
+      `record(db, candidates)`，**没有总线**。看起来把 `Arc<EventBus<…>>` 传进去发一条就行，但 wire 事件里
+      "设备被发现"只有 `DeviceCardUpdated(Box<DeviceCard>)`：那张卡片要 deviceId、displayName、platform、paired、
+      online，由 `devices_snapshot` 从**数据库里已有的行**构造，而 worker 手里只有"刚看到的这一台"。
+      **两个形状只能选一个**：(a) worker 发**内部**事件（`synra_core::KernelEvent::DeviceSeen`，core 里已有），
+      由 app 的事件桥读一次库、构造卡片、再 `emit` wire 事件 —— 代价是桥里多一步 I/O；(b) worker 直接造卡片 ——
+      代价是卡片构造出现两份，而这张卡片是设备页的全部内容，漂移的后果是同一台设备在两个入口长得不一样。
+      **倾向前者**：桥本来就是"把内核的事实翻译成界面的事实"的地方，卡片的唯一作者仍是 `devices_snapshot`。
+      要做的事：`events.rs` 里一个 `DeviceSeen → DeviceCardUpdated` 的翻译 + 一条"改了名字的设备带来新卡片"的断言。- [x] **卸载（插件页 + 命令）** —— **做完了**（2026-10-18），四层各有一条测试。
       决定写在 [14 §2.9](./14-plugin-lifecycle.md)：`PluginFiles` 是与 `Sandbox` 并列的第二个删除所有者，
       只删"某个 id 的 artifact 目录 + `remove_data` 为真时的 data 目录"。
       store 的 `remove_plugin` 在一个事务里删 `plugins` 行与 `plugin_grants` 行；命令按 **先记录、后目录** 的顺序
