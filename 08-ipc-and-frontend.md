@@ -924,6 +924,10 @@ Content-Security-Policy:
       zip-slip 防护（条目名同样要过 `check_path`，落盘路径同样要 `is_within`）。这是一轮的工作量，不是十行。
       `plugin_ui_ready` 那一条已经完成并注册（2026-10-18），`shapes` 的"调用未注册命令"从 1 变成 **0**。
       剩下真正缺的只有一件事：**页面文件从哪里来**。
+      ★ **责任归属是明确的，不需要再决定**：`01` 把产物定义为 `plugin.wasm`（headless）与 **`ui.zip`**（UI）；
+      `06` 的第 295 行把 `synra-plugin-ui` 描述为"UI 插件 artifact 的**解包/校验/目录管理**、提供 UI 加载 URL"。
+      所以解压实现就该落在 `synra-plugin-ui`，而"放在哪里"（`plugins/<id>/ui/`）与"谁触发"（安装管线）只是实现细节。
+      缺的确实只是一个 zip 读取器。
 - [x] **事件 → store 的四个读者**（2026-10-18 落地，第四个是配置）。
       ★ **第四个 store：`settings`。** 内核现在发布 `ConfigUpdated(Box<ConfigSnapshot>)`（整份快照，不是补丁 ——
       补丁是**写入方**的输入，不是结果的描述），前端 `events.ts` 把它交给 `useSettingsStore`，设置页是它的读者。
