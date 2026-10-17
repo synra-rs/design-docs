@@ -833,9 +833,17 @@ Content-Security-Policy:
       ★ **仍然缺的：这个页面一条测试都没有。** 插件**命令**有十余条 Rust 测试，页面只有 `vue-tsc` 兜着：勾选后传
       什么参数、开关失败会不会显示错误，都没有断言。补它要先给 vitest 装 DOM 环境（现在 `environment: 'node'`，
       全仓零组件测试），那是一个独立决定。
-- [ ] **卸载（插件页 + 命令）** —— **未做**，而且缺的是一个**决定**而不是代码：移除插件时它的数据删不删。
-      §2.9 要求"删除前有询问、删除后有报告"；`RemoveOptionsDto` / `RemoveReport` 已在 `synra-ipc` 里等着，
-      store 侧没有 `remove_plugin`，命令层也没有入口。
+- [x] **卸载（插件页 + 命令）** —— **做完了**（2026-10-18），四层各有一条测试。
+      决定写在 [14 §2.9](./14-plugin-lifecycle.md)：`PluginFiles` 是与 `Sandbox` 并列的第二个删除所有者，
+      只删"某个 id 的 artifact 目录 + `remove_data` 为真时的 data 目录"。
+      store 的 `remove_plugin` 在一个事务里删 `plugins` 行与 `plugin_grants` 行；命令按 **先记录、后目录** 的顺序
+      —— 目录先删而记录还在，装载器会把不存在的目录报成"插件损坏"；反过来只是残留文件，下次启动会被重新发现。
+      ★ 页面上的确认句**必须说出数据去哪了**（"removed and its data stays on disk"），且 `remove_data` 恒为
+      `false`：确认说数据会留下，却传 `true`，就是让按钮和它旁边那句话互相矛盾。
+      ★ **没有事件**：界面唯一认识的插件事件是 `PluginUpdated`，而它携带一张卡片 —— 已经不存在的插件没有卡片；
+      页面在命令返回后自己重读列表。
+      `RemoveOptionsDto` / `RemoveReport` 两个 DTO 仍然没有被用到：报告里要的 `bytes_freed` 需要一个测量，
+      而这一版只回答"删了/没删"。
 - [ ] `PluginUiOp` 枚举 + 方法白名单 + `plugin_ui_rpc` —— **未做**。
       `PluginUiOp` 全仓 0 处；`plugin_ui_rpc` 只作为注释出现在 `command.rs:39`。
       `command.rs` 里 `Interface::{Host,Plugin}`、`:59` `allows()`、`:375` `plugin_allow_list()` 是真的且有测试，

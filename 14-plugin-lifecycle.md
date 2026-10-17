@@ -679,6 +679,13 @@ pub async fn remove(&self, plugin_id: &PluginId, opts: RemoveOptions) -> Result<
 > * data 目录**只在 `remove_data` 为真时**删，默认保留 —— 第 6 步的"询问"就是它的默认值。
 >
 > 之后三步（store 的 `remove_plugin`、命令 `plugins_uninstall`、页面按钮）按这个形状写。
+>
+> **四步均已落地**（2026-10-18）：`crates/synra-store/src/plugin_files.rs`（含三条测试）、
+> `SynraDb::remove_plugin`（事务，含一条断言两张表都干净）、`commands::plugins::plugins_uninstall`
+> （先记录后目录，含两条）、页面上的 `Remove` + `APopconfirm`。
+> ★ 页面确认句写的是"removed and its data stays on disk"，所以 `remove_data` 恒为 `false` —— 若将来加
+> "同时删除数据"，它必须出现在一个能显示路径的对话框里，而不是一行确认。
+> ★ **仍然缺的**：`RemoveReport`（`bytes_freed` 需要一次测量）没有被返回；命令只回答"删了/没删"。
 
 ## 3. 更新（Update）
 
