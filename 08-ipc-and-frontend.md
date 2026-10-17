@@ -596,6 +596,11 @@ Content-Security-Policy:
 > `tauri::State` 又借不着 `'static`。两条路：让 `AppState` 变成可 `Clone`（字段大多已是 `Arc`/`Mutex`，
 > 但要逐个确认 `SynraDb`/`Paths` 是否可克隆），或者 `manage(Arc<AppState>)` 并让每条命令先 `Arc::clone`。
 > **后者更稳**：它不要求每个字段都可克隆，只把已有的那一个 `Arc` 交给闭包。
+> ★ **界面语义的决定（2026-10-18，不需要改契约）**：有人会问"改成后台后，拨号失败还怎么告诉用户"。
+> 答案已经在 DTO 里 —— `TransferSnapshot` 有 **`abort_reason: Option<String>`** 与 `state`。所以后台 worker 的失败
+> 走 `announce_transfer(state="failed", abort_reason=Some(...))` + `TransferFinished`，前端的 `intents` store 本来就在
+> 消费这两个事件。**命令的返回值因此只承诺"已排队"，而不是"已送达"** —— 那是后台化的真正代价，也是它必须写进
+> 命令文档注释的一句话（今天的注释说"阻塞"；改后台时那里要改成"排队"）。
 
 > ★ 这一节在实现之前写就，长期整节未勾选。逐条核对源码后：**这一节目前没有一条可以勾。**
 > 三样东西是真的（`IpcError` 三件套、`KernelEventEnvelope` 带 `seq`、`EventDispatcher` 的 gap/unknown 逻辑），
