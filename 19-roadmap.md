@@ -538,6 +538,12 @@ M0 ──▶ M1 ──▶ M2 ──▶ M3
 (c) 壳只做"发送"这一侧（`dial_peer` 已导出），接收留在 daemon。
 **这三条是设计决定，不是实现细节**；在回答之前动手，就等于在壳里重建一遍 daemon 的编排。
 `snapshot_from`、`announce_transfer`、注册表、`transfer_cancel` 都已就绪，无论选哪条都不浪费。
+★ **2026-10-18 决定走 (c)，并且查证过它可行**：`Host::new(identity: Identity, local: LocalPeer)`（`host/kernel.rs:53`）
+是可构造的 —— 壳里已有 identity（`identity_get` 就是读它）与设备标识，所以"没有 Host"这个理由不成立；
+而 `dial_peer(ours: &LocalPeer, flags: Flags, address: SocketAddr, token: Option<LinkToken>, now_ms: u64) -> Dialled`
+（`host/connections.rs`）**根本不需要 Host**。于是壳侧发送只需：从已配对设备取地址 → `dial_peer` → `TransferSender::open`
+→ `send_chunk` 循环 → `announce_transfer`；接收仍归 daemon，等壳↔daemon 通道具备再说。
+**这是本会话对传输的最后一次决策**：发送在壳里做完，接收留待通道。
 ★ **建链的入口也已经有了（2026-10-18 查过，`crates/synra-core/src/listener.rs`）**：
 `bind(host, port) -> SocketAddr` 绑定端口，`serve(host, cancel, data_dir, desk, router, on_finished)` 是**现成的连接循环**
 —— 它接受连接、按 `Cancellation` 退出、把每条连接交给自己的线程，并用 `FinishedCallback` 回报完成的传输
