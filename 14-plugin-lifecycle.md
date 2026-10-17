@@ -508,6 +508,16 @@ pub async fn install_atomically(
 >
 > 仍然没有的：`PluginSlot` 仍然没有驱动者（状态机与数据库行是同一件事的两份描述，尚未合一）、
 > registry 安装（没有 HTTP 客户端）、以及 app 侧的 `plugins_install` 命令。
+>
+> ★ **2026-10-18（第二轮）：第二条门也查签名了。**
+>
+> `plugins/` 有两条入口：`plugin install`（跑完 11 步）与**手工放进去一个目录**（启动时的
+> `record_discovered_plugins`，作者开发时就是这么做的）。后者原来"有 manifest 就记成已安装"，于是
+> **一个被换掉 `plugin.wasm`、签名是真的但覆盖的是别的字节的包，会变成"已安装插件"** —— 用户随后看到的同意提示，
+> 是关于一份没人签过的文档。现在扫描时若目录里有 `signature.json`，就验签 + 比对 subject 的摘要；
+> 没有签名的目录仍然照记（那是作者的本地构建），只是它照样是 untrusted，同意仍是闸门。
+>
+> 代价是一次扫描每个新目录多几个哈希、不编译；收益是"签了名的包不能声称自己是另一个包"。
 
 ### 2.6 Installed / Activating / Active
 
