@@ -675,7 +675,9 @@ plugins-manifest.json   # 已装插件清单（id + version + source），用于
 - [ ] 5 个初始迁移脚本 + CI 对"空库/旧库"各跑一次 —— **实际是 9 个**迁移（第 106 轮核对：写这一行时是 7 个，后来又加了两个）
       （`db/migrations.rs:18-209`），不是 5 个。空库有真实 SQLite 测试（`sqlite/tests.rs:18`）；
       "旧库"只在纯模型层覆盖（`db/tests.rs:173` 用闭包而非真库）；
-      ★ **CI 不存在**（无 `.github/`），所以"各跑一次"这半没有。
+      ★ **CI 从 2026-10-18 起存在**（`synra-core` 与 `synra-app` 各一个 `checks` workflow），所以"没有 CI"不再是
+      这半缺失的原因 —— 原因变成"CI 里没有这一项"：两个 workflow 跑的都是 `cargo test`，没有一个 job 会**两次**
+      启动内核（空库一次、旧库一次）并把两边的报告收起来。
 - [ ] `Store::write` / `Store::read` + SQLITE_BUSY 重试 —— **未做**。
       **没有 `Store` 类型**。真实的是 `SynraDb`（`sqlite/mod.rs:115`）：持**单个** `Connection`，
       没有 write/read 闭包，**没有 SQLITE_BUSY 重试** —— 只有一条 `busy_timeout=5000` pragma。

@@ -571,7 +571,8 @@ fn hot_paths_do_not_allocate() {
 - [ ] 依赖选型表落进 `Cargo.toml` + PR 模板 —— **一半，且 PR 模板没有**。
       7 个里 4 个已落：`bytes`、`compact_str 0.9`、`smallvec 1`、`serde_json raw_value`。
       `bitvec` / `foldhash` / `dashmap` **不在任何 `Cargo.toml`**（手写 `ProgressBitmap` 代替 bitvec、
-      `std::hash::RandomState` 代替 foldhash）。无 `.github/` → 无 PR 模板。
+      `std::hash::RandomState` 代替 foldhash）。PR 模板仍然没有 —— 但理由变了：`.github/` 从 2026-10-18 起存在
+      （两个 `checks` workflow），缺的是模板文件本身和一条要求它被填写的规则。
 - [ ] ★ 另外记一条**不在清单里但属于本文范围**的：根 `Cargo.toml` 的
       `[profile.release] panic = "unwind"` 注释写着"插件 panic 必须能被 `catch_unwind` 捕获"，
       而 `catch_unwind` 在全仓出现 **0 次** —— 为一个不存在的机制做的配置。
