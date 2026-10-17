@@ -868,7 +868,6 @@ pub struct AuditEntry {
       `validate`(`:140`，要求 nonce + plugin_id + version 三者一致)、`revoke`(`:113`)、
       过期清扫(`:232`)；proptest `session/proptests.rs:66`
       `a_revoked_nonce_is_indistinguishable_from_an_unknown_one`。
-      ★ **Tauri initialization script 注入完全没有**：`synra-rust-app/src-tauri/Cargo.toml`
       ★ **Tauri initialization script 注入：2026-10-18 已做了一半**——注册表在 core、`AppState.ui_sessions` 在壳、
       `initialization_script(label, token)` 生成脚本并由 `plugin_ui_open` 使用。**仍缺**协议 handler 与 CSP。
       （`synra-observe/src/audit.rs:179`，不是 `AuditLog`）。`MEMORY_CAPACITY = 10_000` 与 §7 一致；
