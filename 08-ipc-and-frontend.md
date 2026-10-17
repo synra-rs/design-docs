@@ -873,6 +873,20 @@ Content-Security-Policy:
       测试于是改成断言真正发生的事，并顺带覆盖了 `announce` 在成功路径上的行为。
       ★ **另一个反直觉的教训**：先写断言、让失败告诉你行为是什么，比先假设行为再构造夹具便宜得多 —— 这一条省掉了
       "造一个能匹配的插件"那一整轮。
+- [ ] **插件 UI 宿主的第一片：`plugin_ui_ready` 在没有 token 时能说什么**（2026-10-18 查清，留给下一轮的决定）。
+      已确认的事实：`synra-plugin-ui` 的 `session` 模块**是完整的**（`UiSessionRegistry::{issue_with, issue_placeholder,
+      revoke, revoke_plugin, revoke_all, validate}`、`UiSessionToken`、`SESSION_LIFETIME_MS`、`ValidatedSession`），
+      所以"令牌怎么签发/校验"不需要写。缺的只有两件：
+      * `AppState` 里没有 `ui_sessions` 字段（`synra-plugin-ui` 已是依赖）；
+      * `plugin_ui_ready` / `plugin_ui_rpc` 两条命令没注册。
+      **而真正的阻塞在注入层**：`src/ipc/injection/index.ts` 的 `ready()` 调用 `plugin_ui_ready` 时**不带任何参数**，
+      因为 `InjectionContext` 里根本没有 token/nonce 字段。所以现在注册这条命令，它只能：
+      (a) 接受一个**可选** token，没有就拒绝（`InvalidArgument`），等于"注册了一条永远拒绝的命令"；
+      (b) 无参记录"某个插件 UI 说它准备好了"，但那是一个**没有身份的声明**，等于把校验推迟到 `plugin_ui_rpc`；
+      (c) 连同注入层一起做：`initialization_script` 把 token 注入到 `InjectionContext`（`tauri-shell` 下，只能在默认
+          feature 的 `cargo check` 里验证编译）。
+      **倾向 (c)**：它才不会留下一条半功能命令；代价是这一轮改动的可验证性从"完全"降到"编译 + 单元测试"。
+      不管选哪个，(a)/(b) 都必须在命令的文档注释里写清"还没有 token"这件事，否则它就是一条看起来正常的假命令。
 - [x] **事件 → store 的四个读者**（2026-10-18 落地，第四个是配置）。
       ★ **第四个 store：`settings`。** 内核现在发布 `ConfigUpdated(Box<ConfigSnapshot>)`（整份快照，不是补丁 ——
       补丁是**写入方**的输入，不是结果的描述），前端 `events.ts` 把它交给 `useSettingsStore`，设置页是它的读者。
