@@ -591,6 +591,11 @@ Content-Security-Policy:
 > 文本拒绝不留文件、内存链路端点）。
 > **仍未做**：worker（拨号与循环在命令线程里跑，两次发送会排队）与接收侧（`listener::serve` 要
 > `Host`/`PairingDesk`/`Router`，那三样在 daemon 里）。
+> ★ **worker 的第一步被一个细节挡住（2026-10-18）**：把两条发送命令改成 `async` + `spawn_blocking` 是最省力的修法，
+> 但那要求把 `AppState` move 进去 —— 而 `AppState` **只有 `#[derive(Debug)]`，没有 `Clone`**（`state.rs:39`），
+> `tauri::State` 又借不着 `'static`。两条路：让 `AppState` 变成可 `Clone`（字段大多已是 `Arc`/`Mutex`，
+> 但要逐个确认 `SynraDb`/`Paths` 是否可克隆），或者 `manage(Arc<AppState>)` 并让每条命令先 `Arc::clone`。
+> **后者更稳**：它不要求每个字段都可克隆，只把已有的那一个 `Arc` 交给闭包。
 
 > ★ 这一节在实现之前写就，长期整节未勾选。逐条核对源码后：**这一节目前没有一条可以勾。**
 > 三样东西是真的（`IpcError` 三件套、`KernelEventEnvelope` 带 `seq`、`EventDispatcher` 的 gap/unknown 逻辑），
