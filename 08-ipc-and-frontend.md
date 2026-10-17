@@ -857,6 +857,15 @@ Content-Security-Policy:
       4. **断言组件 prop，不要断言文本里的 code**。通知组件渲染的是翻译后的句子；而对 DTO **不存在的字段**断言
          （`INTENT.summary`）会以 `undefined` **通过**。
       仍然**不覆盖**的是点击：那是 antd 的行为，而点击产生的**参数**由 `src/pages/plugins/actions.test.ts` 断言。
+- [ ] **`intent_dispatch` / `intent_decide` 的成功路径没有测试**（2026-10-18 查清，刻意推迟）。
+      现在测到的只有失败路径：没有引擎时拒绝、`announce` 对面板不认识的 id 静默。成功路径要一个**能匹配意图**的
+      `PluginSet`，而 `PluginSet::new(backend: Backend, host: Arc<dyn Host>)` 的两个参数都得造：
+      * `Backend` 是 `struct Backend { inner: Arc<dyn WasmBackend> }`，测试替身是
+        `synra_plugin_host::engine::scripted::ScriptedBackend`（core 的 `dispatch/tests.rs` 就用它）；
+      * **`Host` 没有默认方法** —— core 的测试模块自己写了一个"全部拒绝"的实现，而它在 core 内部是私有的。
+      也就是说，app 侧要补的成功路径测试，代价是**在 app 里再实现一遍 `Host` trait**（十几个方法），或者把 core 的
+      测试 Host 提升到 `synra-testkit` 里公开。后者是正确做法，但那是一次跨仓库的测试设施改动，不该夹在功能轮里。
+      ★ 这一条留着，是为了下次有人想"补一条测试"时先看到它其实是一次重构。
 - [x] **事件 → store 的三个读者**（2026-10-18 落地）。
       `src/events.ts` 是界面里**唯一**订阅 `KERNEL_EVENT_CHANNEL` 的地方：它按序号判定（应用 / 忽略重复 / 重读
       快照），再分给三个 store —— `devices`（`deviceCardUpdated`、`deviceRemoved`）、`plugins`（`pluginUpdated`）、
