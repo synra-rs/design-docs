@@ -554,6 +554,24 @@ M0 ──▶ M1 ──▶ M2 ──▶ M3
    `create_dir_all` 与 `remove_dir_all` 不是一回事，建目录不受限，删目录才受限）；名字是 **`message-<unix_ms>.txt`**。
    理由：系统临时目录对机器上每个进程可读，而这个文件装的是人打的字 —— "会被删掉"与"存在期间谁都能读"是两件事。
    测试相应改成断言 **outbox 目录不存在**（拒绝发生在写文件之前），比原先数 `env::temp_dir()` 里文件个数更准，也不受别的进程干扰。
+
+### 8.7 三个待决问题（2026-10-18 收尾时列，每个都是"先决定再写"）
+
+传输的**发送侧已经无缺口**（四条命令、后台执行、失败经事件、临时文件私有目录且取消即删、9 条测试）。
+剩下三件事都不是实现难度问题，而是各自缺一个决定：
+
+1. **接收侧**：`listener::serve(host, cancel, data_dir, desk, router, on_finished)` 需要 `Host`、`PairingDesk`、`Router`，
+   三者都在 daemon 里。**要决定的是**：壳与 daemon 之间是否有一条通道（今天没有），还是把编排搬进 core 让两边共用。
+   在此之前壳无法接收入站连接 —— 这不是"还没写"，是"没有地方放"。
+2. **`plugins_sync_plan`**：策略函数 `decide(ours_version, ours_digest, theirs: &RemoteState, policy)`（`plugin_sync.rs:188`）
+   与 DTO `SyncPlanDto { plugin_id, targets }`（`dto/plugin.rs:200`）都已存在。**要决定的是**：对端"已有什么"存在哪 ——
+   (a) 建一张 `peer_plugins` 表，会话交换清单时写入；还是 (b) 只在会话内计算，命令不持久化。今天的 `RemoteState`
+   只在 `SyncSession` 的生命周期里活着，所以 (b) 更省，但界面在会话之外就得不到计划。
+3. **`transfer_send_text` 的成功路径测试**：需要把链路注入命令层（`MemoryStream::pair_with_capacity` 已证明可行，
+   见 `send/tests.rs` 的 `the_blocks_arrive_over_a_real_link`）。**要决定的是**：注入点放在 `send_over` 的签名上
+   （多一个 `Link` 参数，生产代码传真实链路），还是在测试里替换 `dial_peer`。
+
+三条都写在这里，是为了让下一轮**先选一个、写清理由、再动手**，而不是试探着写一半。
 2. **展示名**：`open()` 从路径推 `file_name`，所以磁盘上的名字就是对方看到的名字 —— 用 `message-<yyyymmdd>.txt`
    而不是裸 uuid。**代价**：同一天两条文本会在对方那里同名，可接受（对方会自己加后缀，那是接收侧的事）。
 3. **清理**：三条退出路径（成功、拨号失败、块被拒）都删那个文件；`transfer_cancel` 目前只能删注册表里的行，
