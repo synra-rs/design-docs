@@ -550,6 +550,11 @@ M0 ──▶ M1 ──▶ M2 ──▶ M3
 **`LocalPeer` 的六个字段**（`peer/host.rs:13`）：`device_id`、`display_name`、`platform`、`app_version`、`features`、`requires`；
 `Flags::production()` / `Flags::no_timeout()`（`peer/config.rs`），`LinkToken::from_bytes([u8; 32])`。
 这些是 `dial_peer` 与 `LocalPeer` 的全部输入面 —— 剩下的未知只有"已配对设备的地址从哪张表取"。
+★ **最后那个未知也答了（2026-10-18）**：地址在 `devices_seen.address`（`synra-store/src/sqlite/devices.rs:71`，
+`SeenDeviceRow.address: Option<String>`，第 7 列），与 `first_seen_ms`/`last_seen_ms`/`source` 同一张表。
+所以 `transfer_send_file` 的取数路径是：`devices_seen` 里按 id 取 `address` → 解析成 `SocketAddr` → `dial_peer`。
+**传输发送侧已无未知**：地址表、`LocalPeer`、`Flags`、`LinkToken`、`dial_peer`、`TransferSender` 逐块方法、
+`snapshot_from`、`announce_transfer` 全部就位且各有出处；剩下的是把它们连起来的那几十行。
 **这是本会话对传输的最后一次决策**：发送在壳里做完，接收留待通道。
 ★ **建链的入口也已经有了（2026-10-18 查过，`crates/synra-core/src/listener.rs`）**：
 `bind(host, port) -> SocketAddr` 绑定端口，`serve(host, cancel, data_dir, desk, router, on_finished)` 是**现成的连接循环**
