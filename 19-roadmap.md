@@ -543,6 +543,13 @@ M0 ──▶ M1 ──▶ M2 ──▶ M3
 而 `dial_peer(ours: &LocalPeer, flags: Flags, address: SocketAddr, token: Option<LinkToken>, now_ms: u64) -> Dialled`
 （`host/connections.rs`）**根本不需要 Host**。于是壳侧发送只需：从已配对设备取地址 → `dial_peer` → `TransferSender::open`
 → `send_chunk` 循环 → `announce_transfer`；接收仍归 daemon，等壳↔daemon 通道具备再说。
+★ **2026-10-18 查 `send_text` 时发现的第二处设计缺口**：传输引擎**没有"文本"这种东西** —— `TransferSender` 只有
+`open(path, chunk_size)` 与 `open_bundle(..)`，而 `TransferMeta` 只有 `PluginBundle` 与 `Attachment`。
+所以 `transfer_send_text` 必须是"把文本写成临时文件、按 `Attachment` 发、发完删掉"，而临时文件的名字、清理时机
+（成功/取消/失败三种）与 `file_name` 展示规则都是要定下来的东西，不是一行代码。
+**`LocalPeer` 的六个字段**（`peer/host.rs:13`）：`device_id`、`display_name`、`platform`、`app_version`、`features`、`requires`；
+`Flags::production()` / `Flags::no_timeout()`（`peer/config.rs`），`LinkToken::from_bytes([u8; 32])`。
+这些是 `dial_peer` 与 `LocalPeer` 的全部输入面 —— 剩下的未知只有"已配对设备的地址从哪张表取"。
 **这是本会话对传输的最后一次决策**：发送在壳里做完，接收留待通道。
 ★ **建链的入口也已经有了（2026-10-18 查过，`crates/synra-core/src/listener.rs`）**：
 `bind(host, port) -> SocketAddr` 绑定端口，`serve(host, cancel, data_dir, desk, router, on_finished)` 是**现成的连接循环**
