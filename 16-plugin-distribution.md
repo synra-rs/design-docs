@@ -94,15 +94,26 @@ signature.json:
   "algorithm": "ed25519",
   "signedAt": "2026-07-22T10:00:00Z",
   "subject": {
-    "manifest": "sha256-...",
+    "manifest": "<sha256, 64 hex digits>",
     "artifacts": {
-      "plugin.wasm": "sha256-...",
-      "ui.zip": "sha256-..."
+      "plugin.wasm": "sha256-<base64, no padding>",
+      "ui.zip": "sha256-<base64, no padding>"
     }
   },
   "signature": "<base64 ed25519 signature over canonical subject>"
 }
 ```
+
+> ★ **两种编码，而且是有意不同的 —— 2026-10-18 实测踩过一次。**
+>
+> **manifest 用 hex**（`synra_plugin_api::manifest_digest`，64 个十六进制字符），**artifact 用 SRI**
+> （`sha256-` + 无 padding 的 base64），因为前者是"一份文本文件的摘要"、后者是"一个按内容寻址的 blob"。
+> 本节的示例原先两边都写成 `sha256-...`，实现按 hex 签 manifest、按 SRI 签 artifact，于是**一个真签名的包会
+> 被报成"签名覆盖了别的 manifest"** —— 而两边的摘要都不可能匹配，因为连编码都不同。
+>
+> 这条被两个测试钉住：`a_signed_package_with_a_genuine_signature_installs`（正控制，签对了必须装上）与
+> `a_signed_package_whose_signature_covers_other_bytes_is_refused_at_the_signature`。
+> 教训是**比较一方算出来的摘要时，要和签名方用同一个函数**，不要"顺手"用另一个 crate 的 SRI 助手。
 
 **规范化（canonicalization）**：签名对象是**确定性序列化**的 `subject`（字段顺序固定、无空白、UTF-8）——用一个专门的 `canonical_json` 函数，**不用** `serde_json::to_string`（后者顺序依赖结构体字段序，跨版本可能变）。
 
