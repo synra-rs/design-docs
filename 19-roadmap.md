@@ -512,6 +512,13 @@ M0 ──▶ M1 ──▶ M2 ──▶ M3
 一个"列出我持有的东西"的读不可能失败，用 `Result` 只为形状统一会让调用方写一段永远走不到的 `if (!ok)`。
 按"文档是权威、但偏离要写明"的规矩记在这里；若要统一，改的应是文档而不是实现。
 剩下的仍是 worker：它需要 `LinkStream` + `TransferSender`/`Receiver`，并在每次状态变化发布 `TransferUpdated`。
+★ **worker 要调用的方法签名（2026-10-18 查过，`crates/synra-core/src/transfer/`）**：
+`TransferSender::open(path, chunk_size)` 或 `open_bundle(..)` → `request()` 得到 `TransferRequest` → `blocks()` /
+`read_block(index)` / `mark_sent(index)` / `has_sent` / `adopt_acknowledged(&ProgressBitmap)` / `is_complete()` /
+`outstanding()`；接收侧 `TransferReceiver::accept(&request, destination)` → `absorb(index, data) -> Absorbed` /
+`received_count()` / `path()` / `finish(&SriDigest) -> ObjectDigest`。
+也就是说两端都是**逐块推进**的：worker 从链路拿到一帧就调一次 `absorb` 或 `read_block`+`mark_sent`，然后把进度交给
+`announce_transfer`（已有）。壳侧不再需要任何新的状态机。
 ★ **2026-10-18 再补一条：`transfer_cancel` 也注册了（27 条），而且端到端。** 它从注册表移除并发布
 `TransferFinished`，前端的 `intents` store 收到就删掉那一行 —— 没有这个事件，被取消的传输会一直躺在进度列表里
 直到页面重开，那正是其它命令当初被修掉的那种静默过期。三种结果各有理由：id 不合法是调用方的错（`InvalidArgument`）、
