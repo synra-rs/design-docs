@@ -593,6 +593,13 @@ M0 ──▶ M1 ──▶ M2 ──▶ M3
    所以命令的取数完整路径是：`plugins()` 拿 allowed 列表 → 对每个插件用 `plugin_versions` 的 active 行取 `version`/`digest`
    → `sync_records()` 拿每个对端的状态 → `plan_for`。**下一个动作是查 `plugin_versions` 的读函数名**（`sqlite/` 下），
    然后这条命令就没有未知了。
+   ★★★ **查了，结论是：`plugin_versions` 没有读者（2026-10-18）**。全仓 `plugin_versions` 的出现只有五处：
+   建表、建索引、目录名、一条测试的 INSERT、以及 `plugins.rs` 里一句注释。`sqlite/` 下**没有任何函数从它读** ——
+   写入在 daemon 的安装路径里，而读取从来没被需要过。
+   所以命令本体的**真正第一步是给 store 加一个读函数**（`active_plugin_version(plugin_id) -> Option<(version, digest)>`，
+   走 `plugin_versions_active` 那个部分索引），配一条测试（`sqlite/tests.rs:149` 已有 INSERT 的先例可仿）。
+   **这一幕在本会话里出现了第五次**："接线"的对面缺一块基础能力，而它藏在一个没人读过的表后面。
+   五个待补的基础能力分别是：`server` 端接收、`RemoteState` 的来源、`plugin_versions` 的读、监听循环、壳↔daemon 通道。
    ★★ **2026-10-18 更正那句话里的一个错误**：我原先写"`SyncSession` 本来就要一条链路才能开"，暗示计划走 `SyncSession`。
    **不对** —— `SyncSession::open(session, plugin_id, source, transfer, declared_version, declared_digest, total_chunks)`
    （`plugin_sync.rs:434`）是**接收一个包**时逐块装配的状态机（`have: BTreeSet<u32>`、`duplicates`），与"比较双方有什么"
