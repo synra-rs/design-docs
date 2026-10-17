@@ -587,10 +587,19 @@ fn audit_records_capability_not_content() { /* ... */ }
 | 桌面端到端                | `tauri-driver`：启动 → 渲染四页 → 配对 → 分享 → 执行           | ⬜ 未做 |
 | WebView 引擎兼容          | CI 在 WebView2 / WebKitGTK / WKWebView 上跑视觉回归             | ⬜ 未做 |
 
-★ **一个环境限制值得写在这里**：`synra-rust-app` 的 `shell.rs` 只在 `tauri-shell` feature 下编译，而本机与 CI 都跑
-`--no-default-features`（默认 feature 需要 WebKitGTK/WebView2 工具链）。所以**改动 `shell.rs` 的工作无法在工作区内
-验证**，只能靠"把它挪进 feature 无关的模块"或"由真正的桌面构建验证"。上一轮想把发现事件接进 worker 时，就是在
-这一点上停下的。
+★ **一个被自己写错、随后纠正的结论**（2026-10-18）：我曾在这里写下"`shell.rs` 只在 `tauri-shell` feature 下编译，
+而本机与 CI 都跑 `--no-default-features`，所以改动它无法在工作区内验证"，并据此推迟了发现事件的接线。**这是错的**：
+本机 `cargo check --manifest-path src-tauri/Cargo.toml`（默认 feature）**能通过** —— 需要 WebKitGTK 的是 **CI 的
+Ubuntu runner**，不是这台开发机。
+
+正确说法是：
+
+* **测试**只在 `--no-default-features` 下跑（失败原因清楚、跑得快），所以 `shell.rs` 里**没有**测试；
+* **编译**两种 feature 都能在本机验证：改 `shell.rs` 之后必须跑 `cargo check`（默认），否则那种错误只有在真正的桌面
+  构建里才会暴露；
+* 因此"要改 `shell.rs` 的活做不了"是假限制。真正的限制是**它没有测试**，只能用类型与编译护栏。
+
+教训：**先验证限制本身，再按限制做决定** —— 一个没被验证过的约束，可能一直在无谓地缩小可选方案。
 
 ---
 
