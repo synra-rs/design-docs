@@ -578,6 +578,15 @@ M0 ──▶ M1 ──▶ M2 ──▶ M3
    那是跨 crate 的重构，不是"传两个参数"。`Host` 同理已可构造（`Host::new(identity, LocalPeer)`）。
    **附带一条旁证**：daemon 的 `serve.rs` 里有一段注释说"`insert_plugin` 从来没有生产调用方，所以 `db.plugins()` 永远为空"
    —— 与本会话发现的 `sync_records` / `plugin_versions` 是**同一个模式**的第三次出现：表与函数都在，**中间的调用没人写**。
+   ★★★★ **再量一次，`Router` 的搬迁是 660 行（2026-10-18）**：`apps/synra-daemon/src/runtime/intent.rs` 660 行，
+   依赖 `synra_control::Refusal`、`synra_core::dispatch::orchestrate`、`synra_core::dispatch::PluginSet`、
+   `synra_core::intent::Board`，测试里还依赖 `daemon::runtime::plugin_host::KernelHost` —— **最后这一条决定了不能只搬一个文件**。
+   ★ **改建议（这是我的决定）**：不搬 `Router`，而是**让 `listener::serve` 收一个 trait**（例如 `trait SharedInbound`，
+   只有一个"收到一个 share/intent 时怎么路由"的方法），`Router` 实现它，壳传一个极简实现（收下就丢弃或只记审计）。
+   理由：壳今天**没有**意图编排的需求（它不跑插件），为了一个用不到的能力搬 660 行是把 daemon 的复杂度复制到壳里；
+   而 trait 只多一个方法，改动面在 `listener.rs` 与 `serve` 的调用点。**代价**：`serve` 的签名变一次，
+   daemon 与壳各改一处 —— 比搬 660 行小得多。
+   **如果将来壳真的需要意图编排**（比如它要自己跑插件），再搬不迟；那时 `Router` 已经是一个 trait 的实现，搬的是实现不是接口。
 2. **`plugins_sync_plan`**：策略函数 `decide(ours_version, ours_digest, theirs: &RemoteState, policy)`（`plugin_sync.rs:188`）
    与 DTO `SyncPlanDto { plugin_id, targets }`（`dto/plugin.rs:200`）都已存在。**要决定的是**：对端"已有什么"存在哪 ——
    (a) 建一张 `peer_plugins` 表，会话交换清单时写入；还是 (b) 只在会话内计算，命令不持久化。今天的 `RemoteState`
