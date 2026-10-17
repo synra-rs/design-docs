@@ -597,6 +597,12 @@ M0 ──▶ M1 ──▶ M2 ──▶ M3
 **这是设计决定，先定再写。** 在它定下来之前，`transfer_send_file` 写不出来（我这一轮就是写到这里才发现，四处签名错只是表象）。
 (3) `synra_core::host::millis_reading` **要参数**（`clock.rs:14`），不是零参；
 (4) `TransferSender` **没有 `chunk_size()`** 访问器，进度里的"已发字节"只能自己按块数乘常量或从 `blocks()` 的块大小取。
+★ **2026-10-18：`transfer_send_file` 已经写完并注册（28 条命令），两条测试覆盖了"未配对拒绝"与"拨号失败后不留行"。**
+写它时又纠正了两件事：(a) 路径必须**真实存在** —— 命令先 `TransferSender::open` 再拨号，假路径会以 `InvalidArgument`
+提前返回，根本到不了拨号；(b) `Paired` 的公开路径是 `synra_store::Paired`（`sqlite::pairing` 是私有模块）。
+**成功路径的测试不需要 socket**：`synra_core::link::memory::MemoryStream::pair()`（`link/memory.rs:153`，模块 `pub`）
+造出一对内存流，`PeerLink::new(stream, local, peer, agreed: Agreed, flags)` 就能在一端发、另一端收 `Inbound::Block`。
+剩下的唯一未知是 `Agreed` 的构造（一次 `grep 'pub struct Agreed'` 即可）。
 **教训与之前几次相同**：先 `grep` 出每个类型的字段与每个函数的参数，再一次写成；我这次是照着印象写的，四处全错。
 **这一步把工作从"壳里几十行"变成"core 里几十行 + 壳里十行"，而 core 那侧的测试可以用 `link.rs` 现成的 localhost 双端。**
 **传输发送侧已无未知**：地址表、`LocalPeer`、`Flags`、`LinkToken`、`dial_peer`、`TransferSender` 逐块方法、
