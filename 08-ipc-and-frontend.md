@@ -995,9 +995,9 @@ Content-Security-Policy:
 - [ ] UI 插件自定义协议 handler（`synra-plugin://`）+ CSP（`connect-src 'none'`）—— **未做**。
       全仓 0 处 `synra-plugin://`、`register_uri_scheme`、`WebviewWindowBuilder`。
       `plugin-ui/src/artifact/serving.rs` 只有 `check_path` 与 `content_type_for`，不产响应头。
-      ★ 唯一的 CSP 是 `src-tauri/tauri.conf.json:22` 的 app 级 CSP，那是**宿主主窗口**的，不是插件页的。
-- [ ] 插件 WebView 初始化脚本（token 闭包注入）—— **未做**：全仓 0 处 `initialization_script`，
-      0 处 `Object.freeze`。`InjectionContext` 里**根本没有 token/nonce 字段** ——
+- [x] 插件 WebView 初始化脚本（token 闭包注入）—— **部分做了**（2026-10-18）：
+      `commands::plugin_ui::initialization_script(label, token)` 生成脚本、`open_request` 组装、`plugin_ui_open` 建窗口；
+      **仍缺**协议 handler（`register_uri_scheme`）与 CSP，所以页面还打不开。
       不是"没实现闭包"，是还没有可以闭包的东西。
 - [ ] 导航范围限制（`on_navigation`）—— **未做**，全仓 0 命中。
 - [ ] 前端 stores：`ui`/`devices`/`pairing`/`plugins`/`intent`/`transfers`/`config`/`diagnostics` —— **1/8**。

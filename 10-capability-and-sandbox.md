@@ -869,8 +869,8 @@ pub struct AuditEntry {
       过期清扫(`:232`)；proptest `session/proptests.rs:66`
       `a_revoked_nonce_is_indistinguishable_from_an_unknown_one`。
       ★ **Tauri initialization script 注入完全没有**：`synra-rust-app/src-tauri/Cargo.toml`
-      **根本没有依赖 `synra-plugin-ui`**，全仓 0 处 `initialization_script`。注册表实现了，app 没用它。
-- [x] 环形缓冲 + 无 payload + UI 查询接口 —— **C/A**：真名 `AuditRing`
+      ★ **Tauri initialization script 注入：2026-10-18 已做了一半**——注册表在 core、`AppState.ui_sessions` 在壳、
+      `initialization_script(label, token)` 生成脚本并由 `plugin_ui_open` 使用。**仍缺**协议 handler 与 CSP。
       （`synra-observe/src/audit.rs:179`，不是 `AuditLog`）。`MEMORY_CAPACITY = 10_000` 与 §7 一致；
       无 payload 是**构造性**的（`AuditEntry` 的字段没有一个能装内容，`audit.rs:437` 有断言）；
       UI 查询接口齐全（`for_plugin`/`refusals_for_plugin`/`PluginActivity::of`/`clear_plugin`/`clear`）。
