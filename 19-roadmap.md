@@ -553,6 +553,12 @@ M0 ──▶ M1 ──▶ M2 ──▶ M3
 ★ **最后那个未知也答了（2026-10-18）**：地址在 `devices_seen.address`（`synra-store/src/sqlite/devices.rs:71`，
 `SeenDeviceRow.address: Option<String>`，第 7 列），与 `first_seen_ms`/`last_seen_ms`/`source` 同一张表。
 所以 `transfer_send_file` 的取数路径是：`devices_seen` 里按 id 取 `address` → 解析成 `SocketAddr` → `dial_peer`。
+★ **但 `Dialled` 把结果挡住了（2026-10-18 查，`host/connections.rs`）**：它的四个字段全**私有**且**没有 impl 块**
+（`grep 'impl Dialled'` 与 `fn into_link`/`fn link` 都无结果），`stream` 字段是 `TcpStream` —— 也就是说拨完号的连接
+只有 `connections.rs` 内部能拿到。**壳里因此拿不到链路**，即使拨号成功。
+结论：`send_file` 不该在壳里拼装，而应在 core 里加一个小函数（`link::send_file(dialled, sender, announce)` 之类），
+壳只负责取地址与拨号参数。这比在壳里加访问器更好 —— 访问器会把"连接之后怎么用"的责任交给两个宿主。
+**这一步把工作从"壳里几十行"变成"core 里几十行 + 壳里十行"，而 core 那侧的测试可以用 `link.rs` 现成的 localhost 双端。**
 **传输发送侧已无未知**：地址表、`LocalPeer`、`Flags`、`LinkToken`、`dial_peer`、`TransferSender` 逐块方法、
 `snapshot_from`、`announce_transfer` 全部就位且各有出处；剩下的是把它们连起来的那几十行。
 **这是本会话对传输的最后一次决策**：发送在壳里做完，接收留待通道。
