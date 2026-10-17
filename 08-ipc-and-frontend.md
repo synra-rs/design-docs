@@ -833,21 +833,27 @@ Content-Security-Policy:
       ★ **仍然缺的：这个页面一条测试都没有。** 插件**命令**有十余条 Rust 测试，页面只有 `vue-tsc` 兜着：勾选后传
       什么参数、开关失败会不会显示错误，都没有断言。补它要先给 vitest 装 DOM 环境（现在 `environment: 'node'`，
       全仓零组件测试），那是一个独立决定。
-- [ ] **发现（`DeviceCardUpdated`）的发布点** —— **未做，而且不是一行**（2026-10-18 查过）。
+- [x] **发现（`DeviceCardUpdated`）的发布点 —— 扫描结束时播报卡片**（2026-10-18 落地）。
+      位置是 `devices_scan_start`：`discovery.scan(budget)` 返回、`scanning` 清掉之后，读一次 `devices_snapshot`
+      并把**每张卡片**逐条 publish 成 `DeviceCardUpdated`。三个理由：
+      * 卡片由 `devices_snapshot` 构建，所以事件里的卡片与下一次列表里的卡片是同一个东西，不会漂移；
+      * **一台设备一条事件**，而不是一条"列表变了"——新出现、掉线、改名是三个不同的事实，一条"变了"会把它们
+        压成一次全量重读；
+      * 顺序是"先 `ScanUpdated`（开始），后卡片（结束）"，界面先画进度、再拿结果。
+      ★ **没有直接测试**：现有扫描测试都走 `cached_only`，而那条 `return` 在发布之前；要覆盖它需要一个真的
+      绑定套接字的扫描，而 `synra-core` 已经测过同一件事。保护来自代码形状（发布用的是 `devices_snapshot`）。
+      ★ **仍然没做的**：worker 自己的即时播报。`Discovery::start` 加 `announce` 回调需要 `'static` 闭包，
+      而卡片构造要 `&AppState` —— 一次真正的重构。代价是"发现"只在扫描时播报：后台收到别的设备的公告时，
+      列表要等下一次扫描或重开页面。要做时按"宿主给回调、宿主造卡片"的形状（见下一段的取舍）。
+      —— 以下是当初判断"不是一行"的调查记录，保留下来是为了下次动它时不用重新查：
       worker 走 `discovery::start` → `synra_core::worker::run_recording(db, callback)`，回调里只有
-      `record(db, candidates)`，**没有总线**。看起来把 `Arc<EventBus<…>>` 传进去发一条就行，但 wire 事件里
-      "设备被发现"只有 `DeviceCardUpdated(Box<DeviceCard>)`：那张卡片要 deviceId、displayName、platform、paired、
-      online，由 `devices_snapshot` 从**数据库里已有的行**构造，而 worker 手里只有"刚看到的这一台"。
-      **两个形状只能选一个**：(a) worker 发**内部**事件（`synra_core::KernelEvent::DeviceSeen`，core 里已有），
-      由 app 的事件桥读一次库、构造卡片、再 `emit` wire 事件 —— 代价是桥里多一步 I/O；(b) worker 直接造卡片 ——
-      代价是卡片构造出现两份，而这张卡片是设备页的全部内容，漂移的后果是同一台设备在两个入口长得不一样。
-      **倾向前者**：桥本来就是"把内核的事实翻译成界面的事实"的地方，卡片的唯一作者仍是 `devices_snapshot`。
-      要做的事：`events.rs` 里一个 `DeviceSeen → DeviceCardUpdated` 的翻译 + 一条"改了名字的设备带来新卡片"的断言。
-      ★ **而这条路线要修正一处**：app 的 `EventBus` 里装的是 **wire** 事件（`synra_ipc::event::KernelEvent`），
-      不是 core 的 `KernelEvent` —— 所以"worker 发 `DeviceSeen`、桥再翻译"要么需要**第二条总线**（装 core 事件），
-      要么让 worker 调一个**宿主给的回调**（`announce(device_id)`），由宿主读库、造卡片、发 wire 事件。
-      **倾向前者之外的第三条：回调。** 它既不需要第二条总线，也不需要 worker 造卡片 —— 只把"谁发现了谁"交给宿主，
-      卡片的唯一作者仍是 `devices_snapshot`。
+      `record(db, candidates)`，**没有总线**。wire 事件里"设备被发现"只有 `DeviceCardUpdated(Box<DeviceCard>)`，
+      而 worker 手里只有"刚看到的这一台"。
+      **两个形状只能选一个**：(a) 宿主给一个回调 `announce(device_id)`，宿主读库、造卡片、发 wire 事件；
+      (b) worker 直接造卡片。代价：卡片构造出现两份，而这张卡片是设备页的全部内容，漂移的后果是同一台设备在
+      两个入口长得不一样。倾向前者 —— 卡片的唯一作者仍是 `devices_snapshot`。
+      ★ app 的 `EventBus` 装的是 **wire** 事件（`synra_ipc::event::KernelEvent`），不是 core 的 —— 所以
+      "worker 发 `DeviceSeen`、桥再翻译"这条路需要**第二条总线**，不推荐。
 - [x] **卸载（插件页 + 命令）** —— **做完了**（2026-10-18），四层各有一条测试。
       决定写在 [14 §2.9](./14-plugin-lifecycle.md)：`PluginFiles` 是与 `Sandbox` 并列的第二个删除所有者，
       只删"某个 id 的 artifact 目录 + `remove_data` 为真时的 data 目录"。
