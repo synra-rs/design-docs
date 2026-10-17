@@ -523,6 +523,11 @@ M0 ──▶ M1 ──▶ M2 ──▶ M3
 `send_chunk(chunk_id, data)`，另有 `ping()`/`pong()` 与读写超时（`set_read_deadline`/`set_write_deadline`，
 `Link` 上还有 `write_deadline()` 与 `supports(Feature)`）。
 **所以 worker 的主循环就是**：`receive_inbound()` → `Block { chunk_id, data }` 交 `receiver.absorb` / 或从 `sender`
+★ **`TransferRequest`（`synra-protocol/src/session.rs:506`）的字段**：`transfer_id`、`kind: TransferKind`、
+`byte_length: u64`、`chunk_size: u32`、`digest: SriDigest`、`sync_session_id: Option<SessionId>`、
+`meta: TransferMeta`（标了 `#[serde(flatten)]`，逐 kind 的元数据在里面）。
+**它不含对端的名字或 id** —— 那两个只有在建链时才知道，所以 `TransferSnapshot` 的 `peer_device`/`peer_name`
+必须由 worker 从链路一侧填，而不是从请求里读。这一点决定了 `snapshot_from` 的签名要收一个 `peer`，而不是只收请求。
 `read_block(chunk_id)` 后 `send_chunk` → `announce_transfer`；`Envelope` 交现有的消息分派（`messaging.rs` 已有）。
 壳里还缺的是**谁来建这个 link**（监听 + 拨号），而那正是 `discovery` 之外 `with_*_or_report` 还没写的那一个。
 ★ **2026-10-18 再补一条：`transfer_cancel` 也注册了（27 条），而且端到端。** 它从注册表移除并发布
