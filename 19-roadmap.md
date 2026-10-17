@@ -484,7 +484,15 @@ M0 ──▶ M1 ──▶ M2 ──▶ M3
 | --- | --- | --- | --- |
 | **配置事件**（`ConfigUpdated`） | 无 | 1 轮 | 完全可验证：wire 变体 + TS 类型 + `synra-js` 的 `dto-coverage` 守卫会盯着 |
 | **插件 UI 宿主** | 无（`plugin_ui_*` 三条命令、`plugin-ui` crate 已有 `check_path`/`content_type_for`） | 3–5 轮 | 部分：origin 注册与令牌签发可测；WebView 创建只能在 `tauri-shell` 下编译验证 |
-| **传输子系统** | `synra-net` + 04 章的帧 + 会话 | 6–10 轮 | 部分：帧与状态机可测；真实收发要靠 `synra-net` 既有测试 |
+| **传输子系统** | `synra-net` + 04 章的帧 + 会话 | ~~6–10 轮~~ → **1–3 轮**（见下） | 部分：帧与状态机可测；真实收发要靠 `synra-net` 既有测试 |
+
+★ **2026-10-18 更正**：这一行原来写"6–10 轮，前置是 `synra-net`"，依据是 `synra-net` 里只有 `backoff`/`liveness`/
+`write_queue`。**那个依据是错的** —— `synra-core` 里早就有整套传输：
+`link.rs`（`TcpStream` 的 `LinkStream` 实现 + localhost 双端的测试）、`listener.rs`、`socket.rs`、`network.rs`、
+`messaging.rs`、`routing.rs`、`transfer/{sender,receiver}.rs`、`plugin_sync.rs`。帧也在 `synra-protocol/src/frame.rs`
+（`FRAME_HEADER_LEN`、`MAX_FRAME_LEN`、`encoded_len`）。
+真正缺的只有**壳**：`synra-rust-app` 至今没有 listener/link（`with_discovery_or_report` 只起了 UDP 发现），
+所以 `transfer_*` 四条命令没有东西可接。那不是"做一个子系统"，是"像发现那样起一个 worker 并接上四条命令"。
 
 **配置事件**是最便宜的一件，也是唯一"完全可验证"的一件：加一个 `ConfigUpdated(Box<ConfigSnapshot>)` 变体、在
 `config_set` 之后发布、`ui.ts` 与 `index.ts` 各加一处、前端 store 加一个 handler。它同时让设置页不必靠重读。
