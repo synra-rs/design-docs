@@ -778,24 +778,25 @@ Content-Security-Policy:
       `.github/workflows/ci.yml`（core：clippy / test / MSRV / guards / matrix；app：test / build / shapes 与
       `--no-default-features` 的 shell）。**但它跑的是测试与守卫，不是生成物 diff** —— `types-check` 仍然不存在，
       因为没有生成物可 diff。所以这一条的状态从"没有 CI"变成"有 CI，缺的是生成这一步"。
-- [ ] `KernelEventEnvelope`（带 `seq`）+ Tauri emit 桥 —— **一半**。
-      `KernelEventEnvelope` + `SequenceTracker` 是真货（`crates/synra-ipc/src/event.rs:193`、`:243`）。
-      ★ **emit 桥不存在**：`synra-rust-app` 下所有 `.rs` 搜 `emit`/`Emitter`/`listen`
-      只命中 `build.rs` 的一句注释 —— envelope 没有生产者。
-      ★ **本次补上了前端那一半，于是这个缺口现在是"一半对一半"而不是"两头都没有"。**
-      新增 `synra-rust-app/src/ipc/tauri.ts` 的 `TauriKernel`：实现 `Bridge` 的
-      `invoke` / `listen`，用 `@tauri-apps/api`（**不是** `window.__TAURI__` 全局，
-      理由见那个文件的头部：全局是注入到**页面**里的，而这个页面是宿主界面，
-      将来要托管第三方插件 UI；一个"只在某功能还没做时才安全"的决定不算决定）。
-      `kernel.ts` 现在按 **`window.__TAURI_INTERNALS__` 是否存在**选择
-      `TauriKernel` 还是 `FakeKernel` —— 这一句此前是注释里的承诺（"is not written yet"），
-      现在是有两个分支、且两个分支都有测试的代码。
-      ★ **但仍然不出声**：`src-tauri` 下依然 0 处 `emit`，
-      所以 `TauriKernel.listen('kernel-event', …)` 会订阅到一个**永远不触发的通道**。
-      后果具体：`DevicesPage.vue:194` 与 `injection.ts:270` 都真的调用了 `subscribe`，
-      所以打包后的应用会画出快照、然后**再也不更新** —— 而页面看起来是正常的。
-      补上它需要 shell 侧有一个事件源（本机内核的发现/传输回路）并把 envelope `emit` 到 WebView，
-      那不是这一轮的范围，记在这里。
+- [ ] `KernelEventEnvelope`（带 `seq`）+ Tauri emit 桥 —— **有了**（2026-10-18）。
+      `KernelEventEnvelope` + `SequenceTracker` 是真货（`crates/synra-ipc/src/event.rs`、`:243`）。
+      ★ **emit 桥不存在**那句曾经是真的：`src-tauri` 下 0 处 `emit`，envelope 没有生产者，页面画出快照后再不更新。
+      ★ **现在有生产者了**：`synra-rust-app/src-tauri/src/events.rs` 订阅 `AppState.events`（内核自己的
+      `EventBus`），把每个 delivery 变成 `KernelEventEnvelope` 并 `emit` 到 `kernel-event` —— 与
+      `src/ipc/channel.ts` 的 `KERNEL_EVENT_CHANNEL` 同一个字符串。接线时发现两件事：
+      * **总线把序号扔掉了**：`emit` 返回它，`Delivery` 却只带事件，于是订阅方无法判断"少了几个"。
+        现在 `Delivery` 带 `first_seq`（队列连续，`first_seq + i` 就是第 i 个的序号），`missed` 说明断口在
+        `first_seq` 之前 —— 这正是总线一直在数数的理由，只是此前没有交给读者。
+      * **发布什么形状**：发的是 **wire** 事件（`synra-ipc::event::KernelEvent`），不是内核内部的
+        `synra_core::KernelEvent`。界面是这条流唯一的消费者，用 wire 形状就不需要一层枚举映射。
+      ★ **历史，保留下来因为它解释了这条为什么重要**：前端那一半更早一轮就补上了 —— `src/ipc/tauri.ts` 的
+      `TauriKernel` 实现 `invoke`/`listen`（用 `@tauri-apps/api` 而不是 `window.__TAURI__` 全局），
+      `kernel.ts` 按 `window.__TAURI_INTERNALS__` 选择真内核还是假内核。而 `DevicesPage.vue` 与 `injection.ts`
+      真的调用了 `subscribe`，所以当时的后果是：**页面画出快照、然后再也不更新，而页面看起来是正常的。**
+      ★ 三个命令开始发布：`plugins_enable` / `plugins_disable` / `plugins_consent_respond`（`PluginUpdated`）
+      与 `plugins_install`。测试 `enabling_a_plugin_tells_the_interface` 断言的是**序号来自总线**（第一次是 1）。
+      ★ 仍然缺的：后端 `EventDispatcher` 在生产代码里**依然只有测试在 `new` 它**（页面走的是 `kernel.subscribe`），
+      以及设备/意图/传输那几类事件还没有发布点 —— 桥接的是通道，不是每一类事实。
 - [x] 前端 `event-bridge.ts`（未知事件 → 全量刷新、`seq` 断裂 → 全量刷新）——
       **逻辑是真的，也仍然是"接不上"**。真名 `EventDispatcher`（`src/ipc/dispatcher.ts`）：
       未知事件 → `#refresh('unknown')`，`seq` 断裂 → `#refresh('gap')`，两个都有测试。
