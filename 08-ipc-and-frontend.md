@@ -900,10 +900,16 @@ Content-Security-Policy:
       * 顺序是"先 `ScanUpdated`（开始），后卡片（结束）"，界面先画进度、再拿结果。
       ★ **没有直接测试**：现有扫描测试都走 `cached_only`，而那条 `return` 在发布之前；要覆盖它需要一个真的
       绑定套接字的扫描，而 `synra-core` 已经测过同一件事。保护来自代码形状（发布用的是 `devices_snapshot`）。
-      ★ **仍然没做的**：worker 自己的即时播报。`Discovery::start` 加 `announce` 回调需要 `'static` 闭包，
-      而卡片构造要 `&AppState` —— 一次真正的重构。代价是"发现"只在扫描时播报：后台收到别的设备的公告时，
-      列表要等下一次扫描或重开页面。要做时按"宿主给回调、宿主造卡片"的形状（见下一段的取舍）。
-      —— 以下是当初判断"不是一行"的调查记录，保留下来是为了下次动它时不用重新查：
+      ★ **worker 的即时播报：做完了**（2026-10-18，按方案 (a)）。形状是：
+      `Discovery::start` 多收一个 `Announce = Arc<dyn Fn(&str) + Send + Sync>`，回调里
+      `for id in record(&db, candidates) { announce(&id) }`；`shell.rs` 构造闭包，捕获 `db` / `host` / `events`
+      三个 `Arc` 克隆，用 `commands::devices::card_for(db, host, id)` 造卡后 `events.emit(DeviceCardUpdated)`。
+      **卡片仍然只有一个描述**：`card_for` 复用的是 `devices_snapshot` 用的那两个函数（`card_from_paired` /
+      `card_from_seen`），所以方案 (b) 的"两份实现会漂移"没有发生。`card_for` 挂在 `#[cfg(feature = "tauri-shell")]`
+      下 —— 只有壳用它，无默认 feature 下它就该不存在。
+      ★ **验证**：默认 feature（含 `shell.rs`）与 `--no-default-features`（含测试）**都要跑 `cargo check`**。这一点
+      上一轮被我误判成"本机做不到"，记在 [21 §7](./21-testing-strategy.md) 里。
+      —— 以下是当初判断"不是一行"的调查记录，保留下来是为了看清最后是怎么绕过它的：
       worker 走 `discovery::start` → `synra_core::worker::run_recording(db, callback)`，回调里只有
       `record(db, candidates)`，**没有总线**。wire 事件里"设备被发现"只有 `DeviceCardUpdated(Box<DeviceCard>)`，
       而 worker 手里只有"刚看到的这一台"。
