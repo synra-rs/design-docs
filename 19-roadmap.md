@@ -597,6 +597,15 @@ M0 ──▶ M1 ──▶ M2 ──▶ M3
    于是把一个"三行构造"的活儿估成了"跨 crate 重构"。
    **修正后的切片**：壳照 `discovery` 的形状起 listener 线程 → `serve(host, cancel, data_dir, desk, &router, &on_finished)`
    → `on_finished` 里写 `sync_records`。`plugins` 是 `Option`（壳可以没有插件宿主），为 `None` 时用一个空的 `PluginSet` 构造 Router 即可。
+   ★★★★★ **接收侧已经实现（2026-10-18，同一会话）**：`src-tauri/src/listener.rs` 的 `spawn(app)` 做完全部四件事 ——
+   `Host::new(identity, local_peer)`、`listener::bind(&mut host, 0)`、`PairingDesk::new` + `Router::new(state.plugins, state.board)`、
+   起线程跑 `serve`。`shell.rs` 的 `setup` 在 `manage(state)` 之后调它并 `manage` 返回的取消令牌。
+   `on_finished` 现在是真回调：只对 `bundle.is_some()` 的传输调 `record_sync(plugin, peer, version, digest, now)` ——
+   **`sync_records` 因此第一次有了生产写入方**，同步计划不再是空表上的猜测。
+   两条刻意的边界写在模块文档里：(1) **没有插件宿主就不监听**（`PluginSet::new` 拒绝在没有 host 时存在，
+   而一个接了 share 却路由不到任何地方的监听器是"答应了却什么也不做"）；(2) **令牌今天没人调用** ——
+   它是给进程内停止准备的，退出进程会自己释放端口，注释里写明了这一点而不是假装有关窗取消。
+   **剩下的**：两个进程互发的端到端测试（今天只有构造与编译验证）。
 2. **`plugins_sync_plan`**：策略函数 `decide(ours_version, ours_digest, theirs: &RemoteState, policy)`（`plugin_sync.rs:188`）
    与 DTO `SyncPlanDto { plugin_id, targets }`（`dto/plugin.rs:200`）都已存在。**要决定的是**：对端"已有什么"存在哪 ——
    (a) 建一张 `peer_plugins` 表，会话交换清单时写入；还是 (b) 只在会话内计算，命令不持久化。今天的 `RemoteState`
