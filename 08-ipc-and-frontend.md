@@ -895,6 +895,16 @@ Content-Security-Policy:
       之后 `plugin_ui_ready(label)` 才能查表、`validate`、记录就绪。
       这张表在没有 WebView 创建代码之前只能是空的，而"表永远是空的"命令和 (a) 一样是假的 —— 所以这一片必须与
       **WebView 创建**一起做，成为一轮完整的工作，而不是两半。
+      ★ **2026-10-18：中间那两块已经落地，注册与窗口创建仍然待做。**
+      已完成（`synra-app` 已推送）：`AppState.ui_sessions` 与 `AppState.hosted_ui`（`HostedUi { plugin_id, version,
+      nonce, ready }`）、`commands::plugin_ui::plugin_ui_ready(state, label)`，以及三条测试（未登记标签拒绝 /
+      令牌不认识拒绝且不标记就绪 / 有效会话标记就绪）。
+      两处刻意：两个拒绝**用同一个错误码**（区分它们等于让页面能枚举哪些标签存在）；先复制三个字段、**释放表锁**再
+      `validate`（持两把锁而第三方可能反序获取就是造死锁 —— clippy 的 `significant_drop_tightening` 两次指出来）。
+      ★ **为什么还没注册 `plugin_ui_ready`**：`src/ipc/injection/index.ts` 的 `ready()` 现在**不带参数**，注册后
+      `shapes` 的 `command-arguments` 会立刻报"缺 label"，而那正是对的 —— 页面的 label 只能由创建它的窗口知道。
+      所以注册要等窗口创建，两者是同一件事。下一步：`WebviewWindowBuilder`（`synra-plugin://` + CSP +
+      `initialization_script` 注入 token 与 label），然后 wrapper + `generate_handler!` + 清单移动一起提交。
 - [x] **事件 → store 的四个读者**（2026-10-18 落地，第四个是配置）。
       ★ **第四个 store：`settings`。** 内核现在发布 `ConfigUpdated(Box<ConfigSnapshot>)`（整份快照，不是补丁 ——
       补丁是**写入方**的输入，不是结果的描述），前端 `events.ts` 把它交给 `useSettingsStore`，设置页是它的读者。
