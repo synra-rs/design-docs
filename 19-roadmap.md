@@ -547,6 +547,15 @@ M0 ──▶ M1 ──▶ M2 ──▶ M3
 `open(path, chunk_size)` 与 `open_bundle(..)`，而 `TransferMeta` 只有 `PluginBundle` 与 `Attachment`。
 所以 `transfer_send_text` 必须是"把文本写成临时文件、按 `Attachment` 发、发完删掉"，而临时文件的名字、清理时机
 （成功/取消/失败三种）与 `file_name` 展示规则都是要定下来的东西，不是一行代码。
+★ **2026-10-18 决定这些规则**（写清楚再动手，因为每一步都有一个容易忽略的约束）：
+1. **文件放哪**：`paths.tmp`（或数据目录下的 `tmp/`）里的 `<transfer_id>.txt`。**不建子目录** —— 清理时只需删一个文件，
+   而删目录要 `remove_dir_all`，那是守卫只允许沙箱调用的操作（本会话已经在 installer 那里撞过一次）。
+2. **展示名**：`open()` 从路径推 `file_name`，所以磁盘上的名字就是对方看到的名字 —— 用 `message-<yyyymmdd>.txt`
+   而不是裸 uuid。**代价**：同一天两条文本会在对方那里同名，可接受（对方会自己加后缀，那是接收侧的事）。
+3. **清理**：三条退出路径（成功、拨号失败、块被拒）都删那个文件；`transfer_cancel` 目前只能删注册表里的行，
+   **删不到文件** —— 所以取消一条文本传输会留一个孤儿文件。**这是已知缺口**，记在这里而不是假装它不存在：
+   正解是让注册表多存一个"这个传输的临时文件路径"，由 worker 在取消时删。
+4. **契约**：`SendTextRequest { to, text, context_id }`，返回 `TransferId`，与 `send_file` 同形。
 **`LocalPeer` 的六个字段**（`peer/host.rs:13`）：`device_id`、`display_name`、`platform`、`app_version`、`features`、`requires`；
 `Flags::production()` / `Flags::no_timeout()`（`peer/config.rs`），`LinkToken::from_bytes([u8; 32])`。
 这些是 `dial_peer` 与 `LocalPeer` 的全部输入面 —— 剩下的未知只有"已配对设备的地址从哪张表取"。
