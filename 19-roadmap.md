@@ -500,8 +500,14 @@ M0 ──▶ M1 ──▶ M2 ──▶ M3
 **插件 UI 宿主**的正确起点不是 WebView，而是 `synra-plugin-ui` 里"这个 URL 允许不允许"与"令牌怎么签发"——那两件事
 是纯逻辑，可以像 `consent` 一样先在内核里做成有测试的函数，再由壳去用它。WebView 的创建留给最后的壳层适配。
 
-**传输子系统**不该在一轮里开工：它的第一个切片应该是"一个本机回环的传输计划"（`plugins_sync_plan` 已存在但未注册），
-先把计划与状态机跑通，再谈真正的收发。
+★ **零件的名字（2026-10-18 查过，免得下一轮再找一遍）**：`synra_core::transfer` 公开
+`TransferSender`、`TransferReceiver`、`plan_blocks`、`Block`、`ObjectDigest`、`DEFAULT_CHUNK_SIZE`/`MAX_CHUNK_SIZE`、
+`TransferError`；`synra-protocol::frame` 提供帧常量与 `encoded_len`；`synra-core/src/link.rs` 的 `LinkStream` 已为
+`TcpStream` 实现，并在 localhost 双端有测试。**壳侧缺的是一个 `AppState.transfers`（`TransferId → TransferSnapshot`）
+与一个像 `discovery` 那样起 worker 的地方** —— worker 用 `TransferSender`/`Receiver` 推进，每次状态变化发布
+`TransferUpdated`（前端 store 与事件类型都已就绪），`transfer_list` 从那张表答。
+
+**传输子系统**不该在一轮里开工：它的第一个切片应该是"一个本机回环的传输计划"（`plugins_sync_plan` 已存在但未注册），先把计划与状态机跑通，再谈真正的收发。
 
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
