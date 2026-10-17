@@ -820,7 +820,7 @@ Content-Security-Policy:
       推送的通道通了，但"每一类事实"还没用完它。
       ★ **2026-10-18（第二轮）：设备侧有了第一个发布点。** `devices_forget` → `DeviceRemoved`：
       忘记一台设备之后，列表上的那张卡片不该等到页面重开才消失。测试 `forgetting_a_device_tells_the_interface`
-      断言序号来自总线、且事件点名的是那一台。仍然没有发布点的是**扫描**与**发现**（`ScanUpdated` /
+      断言序号来自总线、且事件点名的是那一台。**扫描**也有了：`devices_scan_start` 在开始时就发布 `ScanUpdated`（结束那半仍是快照 —— 发现数是数据库的回答，不是那个函数的）。仍然没有发布点的是**发现**（`DeviceCardUpdated`，
       `DeviceCardUpdated` 由 discovery worker 产生，而它现在还没有总线）。
 - [ ] `PluginUiOp` 枚举 + 方法白名单 + `plugin_ui_rpc` —— **未做**。
       `PluginUiOp` 全仓 0 处；`plugin_ui_rpc` 只作为注释出现在 `command.rs:39`。
