@@ -181,6 +181,9 @@ pub fn verify_effective_caps(
 > 而用它的管线 `synra_plugin_host::verify::verify` **全仓没有生产调用者** ——
 > 于是"导入了一个 manifest 从未声明的 host function"的 wasm 会被正常装载并运行，
 > 唯一的症状是之后某次调用在闸门被拒，而那时已经离装载很远了，作者也无从据以修改。
+> ★ **2026-10-18：这半条也补上了** —— 那条管线现在有生产调用者：守护进程的 `plugin install`
+> （`runtime/install.rs`）先跑完 11 步再落盘，装载期的 `undeclared_imports` 因此是**第二道**，
+> 而不是唯一的一道。
 > **本次接上**：`PluginSet::load` 在编译之后用
 > `undeclared_imports(compiled.imports(), &spec.grants)` 检查并拒绝
 > （`PluginSetError::UndeclaredImport`）。
