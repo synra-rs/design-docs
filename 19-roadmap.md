@@ -570,6 +570,16 @@ M0 ──▶ M1 ──▶ M2 ──▶ M3
 3. **`transfer_send_text` 的成功路径测试**：需要把链路注入命令层（`MemoryStream::pair_with_capacity` 已证明可行，
    见 `send/tests.rs` 的 `the_blocks_arrive_over_a_real_link`）。**要决定的是**：注入点放在 `send_over` 的签名上
    （多一个 `Link` 参数，生产代码传真实链路），还是在测试里替换 `dial_peer`。
+   ★ **已决定并已实现（2026-10-18）**：选第一种，而且切得比"多一个参数"更利落 —— `send_over` 只保留"查地址 + 拨号 +
+   `into_link`"，之后的一切搬进 **`send_ready(state, to, &mut PeerLink, sender, row)`**。
+   理由：`send_ready` 才是需要测试的一半，而"必须拨号的测试跑不起来"。测试
+   `a_send_over_a_connected_link_reports_every_block_and_finishes` 用内存链路跑通了整条成功路径
+   （逐块到达 + `TransferFinished` + 注册表清空）。副作用：`finish` 闭包提成了模块级 `finish_transfer`，
+   因为"删行"与"通知"必须成对，闭包让它们在两个地方各写一遍。
+   ★ **第 2 条也一并决定（同日）**：选 (b) 的变体 —— **按需计算**。`SyncSession` 本来就要一条链路才能开，
+   所以可以把"拿对端状态"与"算计划"放在同一次短会话里：`plugins_sync_plan(device_id)` 拨号 → 交换清单 → `decide` →
+   返回 `SyncPlanDto`，会话结束即丢。**代价是每次计划要一次拨号**；好处是不建表、不过期、不需要"上次同步时对方有什么"这种
+   会撒谎的状态。**第 1 条（接收侧）仍未决定** —— 它需要一条壳↔daemon 通道，那是比这两条都大的问题。
 
 三条都写在这里，是为了让下一轮**先选一个、写清理由、再动手**，而不是试探着写一半。
 2. **展示名**：`open()` 从路径推 `file_name`，所以磁盘上的名字就是对方看到的名字 —— 用 `message-<yyyymmdd>.txt`
