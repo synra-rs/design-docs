@@ -896,6 +896,17 @@ Content-Security-Policy:
       两个入口长得不一样。倾向前者 —— 卡片的唯一作者仍是 `devices_snapshot`。
       ★ app 的 `EventBus` 装的是 **wire** 事件（`synra_ipc::event::KernelEvent`），不是 core 的 —— 所以
       "worker 发 `DeviceSeen`、桥再翻译"这条路需要**第二条总线**，不推荐。
+- [x] **lint 与守卫的分歧**（2026-10-18）。
+      `pnpm run lint` 早就在 `package.json` 里，却从未进过 CI；第一次跑是 **17 error / 25 warning**，几乎全在最近几轮
+      写的文件里。真正有价值的是里面藏着的一处**修复器与检查器互相打架**：
+      `eslint --fix` 的 `object-shorthand` 把 `{ pluginId: pluginId }` 改写成 `{ pluginId }`，而 `check-shapes` 的
+      `command-arguments` 只认冒号形式 —— 于是"格式化过的、完全正确的调用"被守卫读成"漏传参数"。
+      修的是**守卫**：扫描前先把简写展开（`{ pluginId }` → `{ pluginId: pluginId }`）。第一版还错了 ——
+      正则把分隔逗号一起吃掉，`{ pluginId, removeData }` 只展开第一个，守卫把自己刚改写的第二个参数报成缺失；
+      改成**前瞻**保留分隔符后才对。
+      `lint` 现在在 CI 的 `interface` job 里（Test 与 Build 之间），规则与检查器终于在同一处运行。
+      两个教训：**(a)** 一条规则和一个检查器意见不一致，只有它们**在同一处运行**时才看得见；
+      **(b)** 自动修复会破坏检查，属于最难察觉的一类缺陷 —— 单独看每个工具都是对的。
 - [x] **卸载（插件页 + 命令）** —— **做完了**（2026-10-18），四层各有一条测试。
       决定写在 [14 §2.9](./14-plugin-lifecycle.md)：`PluginFiles` 是与 `Sandbox` 并列的第二个删除所有者，
       只删"某个 id 的 artifact 目录 + `remove_data` 为真时的 data 目录"。
