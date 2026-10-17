@@ -833,6 +833,17 @@ Content-Security-Policy:
       ★ **仍然缺的：这个页面一条测试都没有。** 插件**命令**有十余条 Rust 测试，页面只有 `vue-tsc` 兜着：勾选后传
       什么参数、开关失败会不会显示错误，都没有断言。补它要先给 vitest 装 DOM 环境（现在 `environment: 'node'`，
       全仓零组件测试），那是一个独立决定。
+      ★ **2026-10-18：试过了，而且失败了，这里记下为什么，免得下次重走。**
+      装了 `jsdom` + `@vue/test-utils`，并给 `vitest.config.ts` 加了 `@vitejs/plugin-vue`（不加的话报的是
+      "content contains invalid JS syntax"，指向模板里的 `{{ }}`，与真实原因无关）。
+      页面能挂载、能断言"挂载时请求了 `plugins_list`"和"渲染出标题/版本"——**但只有前两条通过**：
+      * 第 3、4 条换成任何内容都失败，挂载钩子里抛未处理的错误 —— antd 组件依赖 `matchMedia`、
+        `ResizeObserver` 与 teleport，jsdom 都没有；
+      * 把 `ant-design-vue` 整体 stub 成"渲染 slot 的 div"之后列表**整个不渲染**：`AList` 的内容来自
+        `renderItem` **作用域插槽**，普通 stub 不调用它。
+      结论：组件测试不是"装两个包"，而是要给这套 antd 用法写一套**认识插槽的 stub 层**（或引入官方测试适配），
+      并接受它只覆盖渲染、不覆盖交互。这是一次独立的工具链决定，不该夹在功能轮里做完。已回退（依赖、配置、
+      测试文件都删了，`pnpm test` 仍是 148 条全绿）。
 - [x] **发现（`DeviceCardUpdated`）的发布点 —— 扫描结束时播报卡片**（2026-10-18 落地）。
       位置是 `devices_scan_start`：`discovery.scan(budget)` 返回、`scanning` 清掉之后，读一次 `devices_snapshot`
       并把**每张卡片**逐条 publish 成 `DeviceCardUpdated`。三个理由：
