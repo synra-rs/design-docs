@@ -769,7 +769,10 @@ Content-Security-Policy:
 - [ ] `ts-rs` 派生 + `tauri-specta` 绑定生成 + CI `types-check` —— **未做，且选型换了**。
       全仓 0 处 `ts-rs`/`tauri-specta`；真实机制是 `synra-ipc/src/ts_export.rs` **手写**生成两个 TS union
       （只导出 `ErrorCode` 与 `SuggestedAction`），靠 `serde_json::to_value` 反推变体名。
-      所有 DTO 与命令绑定一个都没生成。CI 那半彻底没有：core 与 app 都没有 `.github/`，也没有 `justfile`。
+      所有 DTO 与命令绑定一个都没生成。★ **而 2026-10-18 起"CI 那半"不再是零**：core 与 app 都有了
+      `.github/workflows/ci.yml`（core：clippy / test / MSRV / guards / matrix；app：test / build / shapes 与
+      `--no-default-features` 的 shell）。**但它跑的是测试与守卫，不是生成物 diff** —— `types-check` 仍然不存在，
+      因为没有生成物可 diff。所以这一条的状态从"没有 CI"变成"有 CI，缺的是生成这一步"。
 - [ ] `KernelEventEnvelope`（带 `seq`）+ Tauri emit 桥 —— **一半**。
       `KernelEventEnvelope` + `SequenceTracker` 是真货（`crates/synra-ipc/src/event.rs:193`、`:243`）。
       ★ **emit 桥不存在**：`synra-rust-app` 下所有 `.rs` 搜 `emit`/`Emitter`/`listen`

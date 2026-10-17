@@ -725,8 +725,12 @@ fn event_routing_does_not_allocate() {
 
 > ★ 这一节在实现之前写就，长期整节未勾选。逐条核对源码后，它是**两类东西混在一起**：
 > **已经做了的测试**（夹具、协议 fixture、敏感数据断言、迁移测试）与
-> **完全没建的 CI 基础设施**（nextest 配置、benches、fuzz、覆盖率门禁、性能门禁、justfile、`.github`）。
-> 前一类里几条只是**位置和文档写的不一样**；后一类是**一个都没有**，而且它们全都依赖同一个不存在的东西：CI。
+> **仍然缺的基础设施**（nextest 配置、benches、fuzz、覆盖率门禁、性能门禁、justfile）。
+> 前一类里几条只是**位置和文档写的不一样**；后一类是**一个都没有**，而它们曾经共有一个缺失的前提：CI。
+>
+> ★ **那个前提在 2026-10-18 补上了一半**：`synra-core` 与 `synra-app` 各有一个 `checks` workflow，跑的是
+> clippy / test / MSRV / guards / matrix（app 另加 test / build / shapes）。所以下面几行里"没有 CI"之类的理由
+> 已经过期 —— 缺的不再是"能不能自动跑"，而是**每一项自己的门槛**（覆盖率没有测、基准不存在、fuzz 不存在）。
 
 - [ ] `cargo nextest` 配置（超时、retries、test groups）—— **未做**：
       `.config/nextest.toml` 与 `justfile` 都不存在。测试现在靠 `cargo test` 跑，
@@ -815,8 +819,10 @@ fn event_routing_does_not_allocate() {
       已发布的迁移不被改写（`a_published_migration_is_never_edited`）、
       以及列清单与迁移 schema 一致（`records.rs:766`）。
       ★ 实际迁移数是 **7** 个（`migrations.rs` 的 `version: 1..=7`），不是 [17 §2.2](./17-storage-and-config.md) 写的 5 个。
-- [ ] 覆盖率门禁（CI）—— **未做**：无 `.github/`，无 `justfile`。
-- [ ] 性能门禁（CI，iai-callgrind）—— **未做**，同上，且连基准本身都没有。
+- [ ] 覆盖率门禁（CI）—— **未做**：CI 有了（2026-10-18），但**没有任何地方测量覆盖率**，所以还没有一个可以
+      设成门槛的数字。加一个 `cargo llvm-cov` 的 job 是第一步，第二步才是选一个阈值。
+- [ ] 性能门禁（CI，iai-callgrind）—— **未做**：CI 有了，但基准本身仍然不存在（见上一条 `benches/`），
+      所以门禁没有可比较的东西。
 - [x] 手工 checklist（§10）—— **A**：§10「手工 / 探索性测试清单」在本文 L562 起，已经写在文档里。
       这一条要的是"清单存在"，它存在。
 - [x] `just docs-check`（文档链接与锚点校验）—— **已有**（第 102 轮）
