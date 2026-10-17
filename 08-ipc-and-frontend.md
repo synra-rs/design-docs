@@ -1024,9 +1024,17 @@ Content-Security-Policy:
       **但 app 侧 0 处调用**。
       ★ `injection.ts` 的 `BACKED` 布尔表不是这个方法白名单：它答的是"这个功能实现了没有"，
       不是"这个调用允许不允许"。
-- [ ] UI 插件自定义协议 handler（`synra-plugin://`）+ CSP（`connect-src 'none'`）—— **未做**。
-      全仓 0 处 `synra-plugin://`、`register_uri_scheme`、`WebviewWindowBuilder`。
-      `plugin-ui/src/artifact/serving.rs` 只有 `check_path` 与 `content_type_for`，不产响应头。
+- [x] **协议 handler 做了，CSP 受框架限制**（2026-10-18）。
+      `builder()` 里 `register_uri_scheme_protocol("synra-plugin", …)`（Tauri 2.12 的方法名是
+      `register_uri_scheme_protocol`，handler 收的是 `UriSchemeContext` 而不是 `AppHandle` —— 猜一次就错，读
+      `tauri-2.12.1/src/app.rs:2267` 一次就对），handler 是 `commands::plugin_ui::serve`：
+      已知 id 取自 `hosted_ui`（页面只能点名宿主开过窗口的插件）→ `split_ui_url` → `ui_file` →
+      `200`（带 content-type）/ **`403`**（路径规则拒绝）/ **`404`**（包缺文件）。
+      ★ **CSP 的结论是"继承"，不是"独立"**：Tauri 2.12 **没有公开的 per-window CSP**（`set_csp` 是 `pub(crate)`，
+      见 `tauri-2.12.1/src/…/mod.rs:53`），所以插件页拿到的就是 `tauri.conf.json` 的全局策略
+      `default-src 'self'; connect-src 'none'; img-src 'self' data:; style-src 'self' 'unsafe-inline'`。
+      这比设计要求的（插件页 `connect-src 'none'`）**更严**，方向是对的；但 `'self'` 在 `synra-plugin://` 这个 origin 下
+      具体意味着什么，只能由一次真实运行确认 —— 这是本仓库唯一无法用 `cargo check` 回答的问题，记在这里而不是假装它已解决。
 - [x] 插件 WebView 初始化脚本（token 闭包注入）—— **部分做了**（2026-10-18）：
       `commands::plugin_ui::initialization_script(label, token)` 生成脚本、`open_request` 组装、`plugin_ui_open` 建窗口；
       **仍缺**协议 handler（`register_uri_scheme`）与 CSP，所以页面还打不开。
