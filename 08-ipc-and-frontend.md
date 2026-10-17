@@ -585,6 +585,13 @@ Content-Security-Policy:
 
 ## 9. 实现清单
 
+> ★ **2026-10-18：传输的四条命令已经全部注册**（`transfer_list`、`transfer_cancel`、`transfer_send_file`、
+> `transfer_send_text`，壳侧注册总数 29），发送路径端到端可调。明细在 `19 §8.6`：注册表 `Transfers`、
+> `announce_transfer`、`snapshot_from`、`address_of`、`send_over`；测试 5 条（未配对拒绝 ×2、死地址不留行、
+> 文本拒绝不留文件、内存链路端点）。
+> **仍未做**：worker（拨号与循环在命令线程里跑，两次发送会排队）与接收侧（`listener::serve` 要
+> `Host`/`PairingDesk`/`Router`，那三样在 daemon 里）。
+
 > ★ 这一节在实现之前写就，长期整节未勾选。逐条核对源码后：**这一节目前没有一条可以勾。**
 > 三样东西是真的（`IpcError` 三件套、`KernelEventEnvelope` 带 `seq`、`EventDispatcher` 的 gap/unknown 逻辑），
 > 但三样都缺"接上去"的那一半；其余九条是从未开工。
