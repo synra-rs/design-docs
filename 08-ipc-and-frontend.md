@@ -905,6 +905,21 @@ Content-Security-Policy:
       `shapes` 的 `command-arguments` 会立刻报"缺 label"，而那正是对的 —— 页面的 label 只能由创建它的窗口知道。
       所以注册要等窗口创建，两者是同一件事。下一步：`WebviewWindowBuilder`（`synra-plugin://` + CSP +
       `initialization_script` 注入 token 与 label），然后 wrapper + `generate_handler!` + 清单移动一起提交。
+      ★ **2026-10-18 晚些：窗口与策略都做完了，剩下的是"文件从哪里来"。**
+      已落地并推送（`synra-app`）：`open_request`（读 manifest、申请令牌、写 `hosted_ui`、算 `synra-plugin://<id>/<page>`）、
+      `initialization_script(label, token)`（token 是**字符串**，因为 `u128` 超出 JS 数字精度）、`ui_file(root, path)`
+      （`check_path` + `is_within` 双重守卫，`../identity.toml` 有测试拒绝）、`split_ui_url`（按**宿主打开过的 id**
+      最长前缀切分 —— URL 解析器会把 `@acme/hello` 切成 host `@acme`）、`plugin_ui_open` 命令并**注册**（契约先加了
+      `"plugin_ui_open" => PluginUi, Host, Unit, true`，插件接口不可达）。
+      **缺的是一件设计决定，不是代码**：`synra-plugin://` handler 要读的是**解压后的 UI bundle**，而
+      `synra-plugin-ui` 的 `artifact/expand.rs` 只提供**限额与条目**（`ArchiveLimits`、`expands_too_far`），没有一个
+      把 zip 落到 `plugins/<id>/ui/` 的东西 —— 也就是说**安装时没有解压 UI 包**。所以 handler 的落点取决于三选一：
+      (a) 安装时解压（`synra_core::install` 里加一步，与 wasm artifact 同处），目录 `plugins/<id>/ui/`；
+      (b) 首次打开时解压（懒，但要考虑并发与失败重试）；
+      (c) 直接从 zip 读（每次请求解一个条目，I/O 换实现简单）。
+      **倾向 (a)**：它与现有安装管线的失败语义一致（装不上就是装不上），而且 `ui_file` 现在就能直接吃那个目录。
+      定下来之后，剩下的就是 `builder()` 里 `register_uri_scheme("synra-plugin", …)` 十行，加上注册
+      `plugin_ui_ready`（注入端已带 label）。
 - [x] **事件 → store 的四个读者**（2026-10-18 落地，第四个是配置）。
       ★ **第四个 store：`settings`。** 内核现在发布 `ConfigUpdated(Box<ConfigSnapshot>)`（整份快照，不是补丁 ——
       补丁是**写入方**的输入，不是结果的描述），前端 `events.ts` 把它交给 `useSettingsStore`，设置页是它的读者。
