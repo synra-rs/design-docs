@@ -844,6 +844,18 @@ Content-Security-Policy:
       结论：组件测试不是"装两个包"，而是要给这套 antd 用法写一套**认识插槽的 stub 层**（或引入官方测试适配），
       并接受它只覆盖渲染、不覆盖交互。这是一次独立的工具链决定，不该夹在功能轮里做完。已回退（依赖、配置、
       测试文件都删了，`pnpm test` 仍是 148 条全绿）。
+- [x] **事件 → store 的三个读者**（2026-10-18 落地）。
+      `src/events.ts` 是界面里**唯一**订阅 `KERNEL_EVENT_CHANNEL` 的地方：它按序号判定（应用 / 忽略重复 / 重读
+      快照），再分给三个 store —— `devices`（`deviceCardUpdated`、`deviceRemoved`）、`plugins`（`pluginUpdated`）、
+      `intents`（`intentUpdated`、`intentFinished`、`transferUpdated`、`transferFinished`）。页面是读者：不再自己
+      订阅，也不持有副本（`plugins` 页原来既订阅又持有 `ref`，两处都去掉了）。
+      **契约**：每个 store 的 `apply(event)` 返回 `boolean` —— `false` 不是"什么都没发生"，而是"我放不下这个"，
+      调用方据此重读快照。这让"未知类型"与"不需要处理"在类型上分开，而不是靠调用方猜。
+      ★ 只有一条路没有事件：**卸载**。`pluginRemoved` 不存在（不存在的插件没有卡片），所以命令成功之后页面调
+      `plugins.forget(id)` 再重读一次 —— 先忘掉，即使随后的读取失败，那张卡片也已经不在了。
+      ★ 三处 `applySnapshot` 只用于**首次读取**（`devices_snapshot` / `plugins_list` / `intent_list`），此后只有事件。
+      ★ 一条测试因此改了含义：`events.test.ts` 里"未知类型触发重读"曾拿 `pluginUpdated` 当例子，而它现在是已知
+      类型；现在用了一个**虚构**的类型名，因为这条测的是"本文件没注册处理器"，是接线的性质而非内核枚举的性质。
 - [x] **发现（`DeviceCardUpdated`）的发布点 —— 扫描结束时播报卡片**（2026-10-18 落地）。
       位置是 `devices_scan_start`：`discovery.scan(budget)` 返回、`scanning` 清掉之后，读一次 `devices_snapshot`
       并把**每张卡片**逐条 publish 成 `DeviceCardUpdated`。三个理由：
