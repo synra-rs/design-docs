@@ -114,7 +114,7 @@
 #[tauri::command] async fn plugins_publishers(state: State<'_, AppState>) -> Result<Vec<PublisherDto>, IpcError>;
 #[tauri::command] async fn plugins_publisher_decide(state: State<'_, AppState>, publisher_id: String, trust: String) -> Result<(), IpcError>;
 #[tauri::command] async fn plugins_preview(state: State<'_, AppState>, plugin_id: String, version: Option<String>) -> Result<InstallPreviewDto, IpcError>;
-#[tauri::command] async fn plugins_audit(state: State<'_, AppState>, plugin_id: PluginId, limit: u32) -> Result<Vec<AuditEntryDto>, IpcError>;
+#[tauri::command] async fn plugins_audit(state: State<'_, AppState>, plugin_id: PluginId, limit: u32, offset: Option<u32>) -> Result<Vec<AuditEntryDto>, IpcError>;
 #[tauri::command] async fn plugins_audit_clear(state: State<'_, AppState>, plugin_id: PluginId) -> Result<(), IpcError>;
 #[tauri::command] async fn plugins_request_registry_search(state: State<'_, AppState>, query: String) -> Result<Vec<CatalogItem>, IpcError>;
 
@@ -756,8 +756,9 @@ Content-Security-Policy:
       >   新→旧），`pages/plugins/actions.ts` 不再反转。
       > * ★ **清空也接上了**：`plugins_audit_clear`（`Unit`）同时删 `plugin_audit` 的行与 `PluginSet` 环里的记录，
       >   只清一个插件；界面上它只在那一节有行时出现，且不弹确认。
-      > * ★ **读的也是表了**（同日更晚）：`plugins_audit` 走 `audit_trail_for(plugin, limit)` 而不是环，所以重启之后
-      >   的历史仍然在；没有引擎的构建也能答。命名的解析（`AuditOutcome::from_stable_name`）放在 `synra-observe`，
+      > * ★ **读的也是表了**（同日更晚）：`plugins_audit` 走 `audit_trail_for(plugin, offset, limit)` 而不是环，所以重
+      >   启之后的历史仍然在；没有引擎的构建也能答。`offset` 是**可选**参数（第一次请求不带它），"查看完整历史"因此是
+      >   沿同一索引的下一页而不是重新查询。命名的解析（`AuditOutcome::from_stable_name`）放在 `synra-observe`，
       >   表的拼写因此只有一份，未知名字被报成拒绝而不是猜成“allowed”。
       > * ★ **而一个“清单”差点被我删错**：`commands/mod.rs` 的 `pub use`
       >   列表看起来无人使用且缺了七个命令，我删了它——而 `diag/tests.rs` 确实在用
