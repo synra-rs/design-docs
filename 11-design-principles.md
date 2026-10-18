@@ -585,7 +585,7 @@ pub enum ProbeOutcome {
       页面随后显示 “removed; 1.5 KiB freed, and its data was deleted”。`plugins/actions.test.ts` 从动作层断言两个取值都
       发得出去，并断言命令的 `RemoveReport` 原样传回。壳的卸载测试断言 `bytes_freed`：保留数据时只算 artifact，
       删除时 artifact + sandbox。
-      **仍然缺**：对话框里显示数据目录路径（需要 `PluginSnapshot.dataPath`）。
+      **仍然缺**：无（这一条闭环）。
 - [x] GC 的测试断言“用户数据未被触碰” —— **已有**（第 92 轮）：
       `apps/synra-daemon/src/runtime/tests.rs` 的 `the_sweep_takes_only_what_it_is_for`。
       ★ **而它比试试看更强在两点**：它用 `counts()`（**产品自己的机制**，

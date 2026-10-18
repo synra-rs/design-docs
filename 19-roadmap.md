@@ -1987,6 +1987,23 @@ shapes 8 项、guards 12 项。
 guards 12 项。
 **仍然缺**：对话框里显示数据目录路径（需要 `PluginSnapshot.dataPath`）。
 
+### 8.85 删除之前，先看见路径
+
+★ 卸载对话框有两个结果，其中一个删掉一个目录。上一轮它问“要不要删数据”，但**没有说删的是哪个目录** —— 一个关于
+删除的问题却让用户看不见删除对象。
+
+★ `PluginSnapshot` 增加 `data_path`（`String`），壳用 `Paths::plugin_sandbox_dir` 构造它 —— 与
+`plugins_uninstall` 里 `PluginFiles::remove` 用的是同一个函数。两份“数据在哪”的推导就是两个答案，而其中一个会在
+某个 `sanitise_component` 改动后开始说谎。
+
+★ **契约改动照例三处**：`synra-ipc` 的 DTO（带 `#[serde(default)]`，旧的序列化数据仍读得回来）、`@synra/protocol`
+的镜像（`dto-coverage` 逐字段对照，34 个 DTO 全对）、壳的映射与两个夹具（`fake-kernel-fixtures` 的两张卡、页面测试的
+`card()`）。页面的对话框把路径用等宽字体显示在勾选框上方。
+
+★ 测试：壳 259 条（`a_card_says_what_the_plugin_asks_for` 增加断言：卡片的 `data_path` 等于
+`plugin_sandbox_dir(ID)`）、core 123 条、前端 258 条（对话框里出现 `Data folder: <path>`）、js shapes 14 项、
+两种配置 clippy、build、lint 0 error、guards 12 项。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
