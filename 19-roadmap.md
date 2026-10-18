@@ -874,14 +874,24 @@ core 的响应把重定向后的地址丢掉了。门面把 host 的纯文本 bo
 - 两个小决定：`dist`/`src-tauri/gen` 之外，eslint 也忽略 `src-tauri/inject`（压缩产物的风格不是本仓库的风格）；
   `sdkVersion` 取 manifest 的 `sdk.preferred`（没写才退回 `min`）——`min` 是兼容下限，报它会告诉插件它是对更老的宿主构建的。
 
-**仍然缺的**：transfer.*、self.invoke/actions 两个命名空间（都在方法表里、都以 `Unsupported` 回答），
-以及插件页的导航范围限制。
-
 ★ **插件卡上的"打开"入口接上了**：`PluginSnapshot` 增加 `hasUi`（读 manifest 的 `runtime.ui`），它与 `hybrid`
 **不是**一件事 —— 只有 UI 的插件有页面、没有 headless 半，用 `hybrid` 做门会漏掉这个形态。按钮只在 `hasUi` 为真时
 出现，点击走 `plugin_ui_open`（窗口的 label / origin / token 仍由宿主在开窗前决定）。
 ★ 顺带修了守卫：`check-shapes` 的 `command-arguments` 原来只把 `state` 当作"宏注入、调用方不传"，`app: tauri::AppHandle`
 被当成必填键 —— 而它和 `state` 一样由 `#[tauri::command]` 从调用上下文解析，页面只该传 `pluginId`。
+
+★ **`self.actions` / `self.invoke` 接上了，顺序是先有声明**：`Host::action_declare` 现在把声明写进 `plugin_actions`
+（按 `(plugin_id, name)` upsert，schema 必须是 JSON，否则 `badArgument`），`action_list` 读出来并展开成
+`ActionDescriptor`。RPC 的 `self.invoke` 先查这张表 —— **action 必须属于本插件**，这正是设计要求的检查；然后以
+`Work::InvokeAction` + `CallBudget::from_quota` 调 `PluginSet::call`。结果映射：`Ok` 解析 payload，`Failed` 保留插件
+自己的错误码（`ipc_code` 先认 host-call 的 camelCase，再让 `ErrorCode` 反序列化认协议拼写 —— 不再维护第二张码表），
+`Timeout` 是 `PluginTimeout`，其余是 `PluginTrapped`。跨插件的 `action_invoke(target)` 仍拒绝：那是
+`action:invoke:*` 的另一条权限路径，host 够不到 `PluginSet`。
+★ 前端 `self` 命名空间随之实现；同时修了 `command-names` 守卫的一个误判：它原来匹配**任何** `.call(`/`.invoke('x')`，
+把测试里的 `synra.self.invoke('clear')`（插件 action，不是命令）当成了命令；现在只认 `kernel` / `client` / `bridge`
+三个接缝对象，并允许 `call<T>(...)` 的类型参数。被调用命令数从 11 修正为 16。
+
+**仍然缺的**：transfer.*（需要 WebView 到内核的大文件通道），以及插件页的导航范围限制。
 
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 

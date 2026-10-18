@@ -1082,6 +1082,10 @@ Content-Security-Policy:
       ★ **插件卡的"打开"入口接上了**：`PluginSnapshot.hasUi` 读 manifest 的 `runtime.ui`，与 `hybrid` 分开
       （只有 UI 的插件有页面、没有 headless 半）；按钮只在 `hasUi` 时出现，点击调 `plugin_ui_open`。
       `check-shapes` 的 `command-arguments` 也修了：`app: tauri::AppHandle` 与 `state` 一样是宏注入的，不该被当成必填键。
+      ★ **`self.actions` / `self.invoke` 接上了**：先有 `Host::action_declare`（写 `plugin_actions`，schema 必须是
+      JSON）与 `action_list`，RPC 再按"action 属于本插件"检查后以 `Work::InvokeAction` 调 `PluginSet::call`；
+      失败码保留插件自己的，超时是 `PluginTimeout`，其余是 `PluginTrapped`。`command-names` 守卫也修了：只认
+      `kernel` / `client` / `bridge` 的 `call`/`invoke`，不再把 `self.invoke('clear')` 当成命令。
       ★ **两处顺带修掉的、比枚举更重要的事**：
       1. `open_request` 原来用 `issue_placeholder` 签令牌，而它是**计数器**（注册表自己的文档写着 not for production）——
          一个页面能猜到另一个页面的令牌。现在用 `uuid::Uuid::new_v4().as_u128()`（122 位随机）；
@@ -1098,7 +1102,7 @@ Content-Security-Policy:
       要求 token 在闭包里；作为参数它只活在构造门面的那次调用中。
       **生成物为什么提交**：Rust 构建不依赖 Node；`scripts/check-shapes.ts` 的 `facade-fresh` 用 Vite 的 `build()`
       在临时目录重建并逐字节比较（CRLF 归一化），所以"提交了过期产物"是一个红门而不是一次事故。
-      **仍然缺的**：transfer.*、self.invoke/actions，以及插件页的导航范围限制。
+      **仍然缺的**：transfer.*，以及插件页的导航范围限制。
 - [x] **协议 handler 做了，CSP 受框架限制**（2026-10-18）。
       `builder()` 里 `register_uri_scheme_protocol("synra-plugin", …)`（Tauri 2.12 的方法名是
       `register_uri_scheme_protocol`，handler 收的是 `UriSchemeContext` 而不是 `AppHandle` —— 猜一次就错，读
