@@ -546,6 +546,11 @@ pub struct UpdateInfo {
       测试 `publisher_tests.rs:276-346`、`verify_tests.rs:184-232`。
       ★ **纯内存**：所有生产调用点都传 `PublisherTrustStore::new()`（`run.rs:207` 等），
       也就是**默认谁都不信任、撤销集永远为空**，每次进程启动都回到这个状态。
+      ★ **持久化了（migration v12）**：`publishers` 表（publisher_id / fingerprint / pubkey / trust / first_seen_ms /
+      decided_ms）。安装时从表构建 store（`trusted` 进 trusted map，`revoked` 进 revoked set）；安装成功后把签名发布者
+      记成 `seen`，`INSERT ... DO NOTHING` 保证一次安装既不会把 key 升成 trusted、也不会把用户的决定重置。
+      撤销的 key 现在真的会在 `publisher-trust` 阶段被拒（daemon 测试 `a_revoked_publisher_is_refused_even_with_a_valid_signature`）。
+      **仍然缺**：没有命令/界面把 `seen` 变成 `trusted`/`revoked`，也没有指纹确认 UI —— 表只能被安装写入，用户还不能做决定。
 - [x] 撤销清单的内置分发与生效（停用已装的被撤销版本）—— **已实现**（第 78 轮）：
       `synra_plugin_api::revocation`（上面那个文档格式）+ 守护进程的加载路径。
       ★ **两个行为均已落地**：已安装的被撤销版本被**拒绝加载并写入** `enabled = false`

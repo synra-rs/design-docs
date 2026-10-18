@@ -1025,6 +1025,17 @@ worker 出现时忘记它。discovery 的 `stop` 只持有 supervisor 的 **shut
 ★ 为什么不用 `on_finished`：它的语义是“文件到了”，一个没有文件的传输不能借用它；而 abort 需要一个“结束”的信号，
 `aborted` 就是那个信号。
 
+### 8.19 发布者信任：先记住，再决定
+
+★ `publishers` 表（migration v12）记 `publisher_id`、`fingerprint`、`pubkey`、`trust`（`seen` / `trusted` / `revoked`）、
+`first_seen_ms`、`decided_ms`。`pubkey` 必须存：指纹不能反推出 key。
+★ `install::from_directory` 每次从表构建 `PublisherTrustStore`（trusted → map，revoked → set）再交给 `verify`，
+所以一个被撤销的 key 会在 `publisher-trust` 阶段被拒 —— 签名本身是真的，撤销不是密码学事实，只能从表里来。
+★ 安装**成功后**把签名发布者记成 `seen`；失败不记（一次被拒的安装不该让下次提示说“见过”）。`DO NOTHING` 保证
+一次安装既不会把 key 升成 trusted，也不会把用户的决定重置。
+**仍然缺的**：表只有安装这一个写者。没有 `plugins_publisher_trust` / `plugins_publisher_revoke` 命令，也没有指纹确认
+UI —— 用户还不能把 `seen` 变成 `trusted`，TOFU 的后半段（“首次使用即信任”）还没接上。
+
 ### 8.15 发送提前返回与取消
 
 ★ `transfer_send_file` / `transfer_send_text` 不再等传输结束：准备（解析地址、打开 sender、建行）仍同步完成，失败仍是
