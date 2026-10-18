@@ -252,6 +252,12 @@ UI 显示：
 
 **内联 manifest 的价值**：安装前就能展示权限、体积、截屏等（不下载 artifact）。
 
+> ★ **`synra-plugin pack` 产出的就是这种 tarball**：`package/` 前缀，里面是 `manifest.json`、manifest 点名的
+> artifacts、以及 `signature.json`（有签名时）；mode 固定 `0644`、mtime 固定 0，所以同样的输入两次打包字节相同（注册表的
+> 摘要不会因为构建时钟而变）。只打包 manifest 点名的文件，不把源码/测试带进分发。
+> 发布：`npm publish dist/@acme-hello-1.2.3.tgz`（或把同一个 tarball 上传到自建/兼容 registry）。**仍然缺**的是
+> `publish` 子命令：账号、scope、registry 策略都属于发布目标，不属于归档。
+
 
 ```rust
 pub struct RegistryConfig {

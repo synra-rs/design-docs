@@ -1254,6 +1254,16 @@ registry 可达。结果存在页面本地的 `updates` map 里，显示版本�
 ★ 测试：daemon 两条（同权限保留 enabled/trusted；多一个 capability 则两者都清），更新后 active 版本与 digest 已换、无备份残留。
 **仍然缺**：安装前的 `synra-plugin pack`（npm 兼容 `.tgz`）还没有，registry 发布仍是手工。
 
+### 8.37 `pack`：作者侧的最后一步
+
+★ `synra-plugin pack [--dir] [--out] [--dry-run]`：读 `manifest.json`，只打包 manifest 点名的 artifacts + 可选的
+`signature.json`，写成 `package/` 前缀的 `.tgz`；默认输出 `dist/<id>-<version>.tgz`。
+★ 可复现：mode `0644`、mtime `0`、成员顺序固定 —— 同样的输入两次打包字节相同，registry 的摘要不会因为构建时钟变化。
+★ 测试 4 条：用 **`synra_registry::extract_tgz`**（registry 安装实际用的解包器）读回三个文件；两次打包字节相等；缺 artifact
+时点名拒绝；默认文件名是 `@acme-hello-2.0.0.tgz`。
+★ 发布仍然不在这个工具里：`npm publish dist/*.tgz` 或上传到自建 registry；账号、scope、策略属于发布目标。
+**仍然缺**：`publish` 子命令、静态 index 适配层。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
