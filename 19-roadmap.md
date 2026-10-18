@@ -2408,8 +2408,24 @@ daemon 220、store 227、app shell 262/261、前端 259、workspace clippy、gua
 
 ★ 测试：store **228**（+1）、CLI **90**（+1：带有 leftover 的报告句子）、daemon 221、core 674、app shell 262/261、
 前端 259、`pnpm run lint` 0 error、build、shapes 8、workspace clippy、guards 12。
-**仍然缺**：leftover 不会自动重试（下次卸载/重启后手工清理）；`size_of` 仍按删除前的目录大小报告，留下的字节数没有从
-“freed”里扣掉 —— 这一点写在报告的字段语义里，不假装精确。
+**仍然缺**：leftover 不会自动重试（下次卸载/重启后手工清理）；freed 的字节口径见 §8.108（现在只算真的走了的）。
+
+### 8.108 freed 只算真的走了的字节
+
+★ §8.107 的 leftover 暴露了下一处不诚实：`bytes_freed` 是**删除前**量的目录大小。一个被锁住的目录留在磁盘上，报告却
+说那几 KB 已经释放 —— 旁边的 leftover 列表是唯一与这个数字矛盾的东西。
+
+- **`Removal` 结构**：`PluginFiles::remove` 返回 `Removal { bytes_freed, leftovers }`。`bytes_freed = before - 还剩下的
+  大小`，而“还剩下的”是 leftovers 里那些目录**当前**的大小。
+- **调用者不再自己量**：daemon 与窗口都删掉了删除前的 `size_of` 调用；报告的数字来自同一个函数，两个宿主不可能各算一份、
+  各差一次。
+- **测试的断言因此更强**：锁定文件时 `bytes_freed == 0` 且 leftover 正是那个目录；关掉句柄后第二次删除 `bytes_freed == 4`
+  且 leftovers 为空。“删不掉”与“没释放”在同一个返回里互相印证。
+- 旧限制（“留下的字节数没有从 freed 扣掉”）从 §8.107 移除，因为它已经不成立。
+
+★ 测试：store 228（锁定用例增加 0/4 两个数字断言）、daemon 221（`bytesFreed` 5 的既有断言不变）、CLI 90、core 674、
+app shell 262/261、前端 259、workspace clippy、guards 12。
+**仍然缺**：leftover 不会自动重试；freed 是“目录树当前字节”，不包含文件系统块对齐的开销。
 
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 

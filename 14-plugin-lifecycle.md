@@ -704,6 +704,9 @@ pub async fn remove(&self, plugin_id: &PluginId, opts: RemoveOptions) -> Result<
 > ★ **同日更晚：`leftovers` 不再恒空（19 §8.107）。** `PluginFiles::remove` 改为**尽力删除**：一个目录删不掉
 > （Windows 上被进程打开、权限拒绝）不再让整个卸载失败 —— 数据库行已经删了，拒绝只会让文件留在磁盘上而且没人知道。
 > 它返回删不掉的路径，两个宿主都把它放进 `RemoveReport.leftovers`；CLI 的句子列出路径，插件页报告条数。
+> ★ **同日更晚：`bytes_freed` 也只算真的走了的（19 §8.108）。** 删除前量的字节数会把留下的目录算成“已释放”；现在
+> `PluginFiles::remove` 返回 `Removal { bytes_freed, leftovers }`，字节数是删除前减去 leftovers 当前大小。锁定文件的
+> 用例断言 `bytes_freed == 0`，关掉句柄后第二次删除才变成 4。
 
 ## 3. 更新（Update）
 
