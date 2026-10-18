@@ -1773,6 +1773,22 @@ clippy `-D warnings`、guards 12 项。
 **仍然缺**：`links_closed_total` / `reconnect_attempts_total`；拨号侧的**帧**计数（Host 的 `send` 不在那条路径上）；
 `transfer_throughput_bps`。
 
+### 8.74 传输的吞吐：两个已有的数相除
+
+★ `transfer_throughput_bps{kind}` 不需要新的测量，只需要把 `transfer_bytes` 与 `transfer_duration_ms` 已有的两个数
+相除 —— 它们都在 `record_attempt` 里，所以吞吐也在那里，前提是**字节确实移动了**（`record_bytes`）且**有时长可除**
+（`elapsed` 是 `Some` 且非零）。
+
+★ **窗口是整次尝试，发送含拨号**：所以这是端到端速率，不是链路线速。这个选择要写出来，因为两个数都能叫“传输速度”，
+而读者拿它和探测到的带宽比较时，差别来自拨号与握手。取消/abort **不记**速率：它们没有搬完自己的字节，一个“失败的
+传输有多快”的直方图只会让失败的慢速重传看起来像网络问题。
+
+★ 测试：成功发送的用例断言 `transfer_throughput_bps{kind=attachment}` 的 `count == 1` 且 `sum > 0`（速率的具体值取决
+于内存链路花了多久，硬编码它会是测试时钟的测试）；abort 的用例断言这条序列**不存在**。壳 253 条、两种配置 clippy
+`-D warnings`、`cargo check`（含 Tauri）、shapes 8 项、guards 12 项。
+**仍然缺**：`transfer_retries_total`（没有重传机制）、`links_closed_total` / `reconnect_attempts_total`、拨号侧的帧计数、
+`plugin_fuel_consumed` / `plugin_memory_bytes` / pool 命中、存储与进程两组。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |

@@ -803,8 +803,8 @@ pub fn install_panic_hook(paths: &Paths, version: &str) {
       不是本进程载入了几个）。测试：守护进程那条计数器测试多断言一次直方图；壳两条（意图的 outcome/无处理/时长、
       两个 gauge 分别为 2 与 1）。
       **仍然没有生产者**（写这一句时）：壳侧的网络、发现两组（核心/守护进程侧已有部分），以及 §4.1 的
-      `plugin_calls_total`、`transfer_throughput_bps`、存储与进程那几组。传输与发现随后在同一会话里接上，见下面两段；
-      网络那一组仍然没有。
+      `plugin_calls_total`、`transfer_throughput_bps`、存储与进程那几组。传输、发现与插件调用随后在同一会话里接上，
+      见下面的段；存储与进程两组仍然没有。
       ★ **2026-10-19 晚些时候补上了壳的传输组**：`transfers_total{kind,outcome=delivered|cancelled|failed}`、
       `transfer_bytes{kind}`（只在 delivered 时记 —— 一次取消或失败没有“文件多大”的答案，记计划大小等于描述没有
       发出的字节）、`transfer_duration_ms{kind}`（含拨号时间）。记录点是**每个开始的传输都汇合的两处**：
@@ -817,6 +817,9 @@ pub fn install_panic_hook(paths: &Paths, version: &str) {
       `transfers_total{kind,outcome=received}`、`transfer_bytes{kind}` 与 `transfer_duration_ms{kind}`；
       `aborted` 的那条 progress 事件记 `outcome=aborted`、**不记 size**，时长从第一次 progress 算起
       （若 abort 在第一次 progress 之前到达，就没有时长可记，而不是记 0 把它塞进延迟分布）。
+      ★ **吞吐也接上了**：`transfer_throughput_bps{kind}` 由同一处 `record_attempt` 从字节数与时长算出来，只在
+      “字节确实移动了”且“有时长可除”时记。窗口是整次尝试（发送含拨号），所以它是**端到端**速率而不是链路线速 ——
+      那是用户问“这次传输多快”时的答案；取消/abort 没有速率，因为它们没有搬完自己的字节。
       ★ **可验证性的边界**：`listener::spawn` 要一个 `AppHandle`，所以记录逻辑抽成 `record_received` 并由单测断言，
       而“它真的被那两个回调调用”目前只有编译期证据（与 `frames_received_total` 在 listener 里的处境相同）。
       ★ **发现组也接上了（同日更晚）**：`scans_total{result=ran|unavailable}`、`scan_duration_ms`、
@@ -834,7 +837,7 @@ pub fn install_panic_hook(paths: &Paths, version: &str) {
       的区别。
       **仍然缺（网络组）**：壳的**拨号**链路走的是 `dial_peer` + `PeerLink`，绕开了 `Host::send`，所以那些**帧**仍然不
       计数（`frames_received_total` 在 listener 的 `handle_within` 一支里，拨号侧的对称位置没有）；`links_closed_total`、
-      `reconnect_attempts_total` 两个宿主都还没有；`transfer_throughput_bps`。
+      `reconnect_attempts_total` 两个宿主都还没有。
       ★ **字节数也接上了（同日更晚）**：`bytes_sent_total` / `bytes_received_total` 在 `PeerLink` 上 —— 链接是唯一
       拿着 payload 的地方（Host 只数帧，加不出一个它从没取过的数）。计的是 **payload 字节**，不是线上字节：帧头是
       传输层自己的账，而读者问的是“这台设备搬了多少”。计数在写成功之后 / 解析成功之后，失败的写一个字节都没动；
