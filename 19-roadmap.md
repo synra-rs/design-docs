@@ -1402,6 +1402,13 @@ artifact 的摘要；签名后改过 wasm 或 manifest 都会被拒绝。测试�
 ★ 测试：第二次 `open_request` 返回 `AlreadyOpen`、`ui_sessions.issued()` 不变、`hosted_ui` 仍只有一条。
 **仍然缺**：聚焦本身无 GUI 不可测；上传本身。
 
+### 8.53 回读失败时点名重传
+
+★ `publish --verify` 在失败时，对每个被点名的版本追加 `re-upload <version> <local file> -> <url>`，并加一行
+`upload these again:`。本地路径按 index 目录/`--base` 解析，URL 按远端 index 解析 —— 两个值都由工具算，作者只复制。
+★ 测试：桶里 tarball 改一个字节时，输出同时含 `different bytes` 与 `re-upload … 1.0.0`。
+**仍然缺**：自动重传；上传本身。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |

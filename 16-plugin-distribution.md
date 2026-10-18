@@ -413,6 +413,8 @@ pub struct CatalogItem {
 > ★ **发之后可以回读**：`publish --verify --base <url>` 再 GET `{base}/{pluginId}.json` 与每个 tarball，用同一个
 > `parse_static_index` 解析、按 SHA-256 比对字节；任何版本不同都点名。网络走宿主的 `NetworkGuard`（https；http 仅 loopback），
 > 所以“宿主拒的地址”在这里也会被拒。
+> ★ **失败时说“重传哪个”**：回读不一致的版本会在末尾列出 `re-upload <version> <local file> -> <url>`，作者不需要再从
+> index 反推路径。
 **仍然缺**：客户端还没有把 `plugins.registry` 指向静态 index（目前只解析，不接网络）；`index.json` 的缓存与 ETag 也
 留给接入时处理。
 > ★ **接上了**：`plugins.registry` 里以 `static:` 开头的地址表示静态 index（如 `static:https://bucket.example/plugins`）。
