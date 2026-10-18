@@ -560,6 +560,9 @@ pub struct UpdateInfo {
       `InstallReport` 多 `publisherId` / `fingerprint`（都可以缺失 = 无签名）。插件页在安装成功后、列表重读之后，
       如果该 key 还没被 `trusted`，显示一个带指纹的提示（Trust this key / Not now）。不是模态：插件是关的、没有东西
       在跑，指纹可以按自己的节奏比对。**仍然缺**：没有“永远不要这个发布者”的一键拒绝（要去列表里 Revoke）。
+      ★ **一键拒绝也有了**：提示里三个答案 —— Trust this key / Never trust this publisher / Not now；后两个都关闭提示，
+      但只有前者写 `trusted`，中间那个写 `revoked`（之后这个 key 的包会在 `publisher-trust` 阶段被拒）。
+      **仍然缺**：设置页里 `ui.theme` 仍是只读 —— 界面目前只有暗色一套 token。
 - [x] 撤销清单的内置分发与生效（停用已装的被撤销版本）—— **已实现**（第 78 轮）：
       `synra_plugin_api::revocation`（上面那个文档格式）+ 守护进程的加载路径。
       ★ **两个行为均已落地**：已安装的被撤销版本被**拒绝加载并写入** `enabled = false`

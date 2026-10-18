@@ -1046,6 +1046,11 @@ UI —— 用户还不能把 `seen` 变成 `trusted`，TOFU 的后半段（“�
 的包都不会多问一次。指纹来自安装时验证过的那一份，不是页面自己再从包里解析的。
 **仍然缺**：提示里只有 Trust / Not now，没有“永远拒绝这个发布者”的一键入口（要去 Publishers 列表 Revoke）。
 
+★ **补上了，并顺手清掉一处假设置**：提示现在有 Trust / **Never trust this publisher** / Not now；中间那个写
+`revoked`，之后同一 key 的安装会在 `publisher-trust` 阶段被拒。设置页删掉了“这些还不能改”的整段说明 —— 自动同步开关
+是真的会写的，一段全局的“都不能改”对它是假话；`ui.theme` 仍是只读（界面只有暗色一套 token），它自己的说明留在控件旁。
+**仍然缺**：主题仍不可切换，因为 `@synra/theme` 只提供暗色。
+
 ### 8.15 发送提前返回与取消
 
 ★ `transfer_send_file` / `transfer_send_text` 不再等传输结束：准备（解析地址、打开 sender、建行）仍同步完成，失败仍是
