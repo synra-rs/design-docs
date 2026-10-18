@@ -849,8 +849,10 @@ pub fn install_panic_hook(paths: &Paths, version: &str) {
       `Work::interface`（`share`/`actions`/`lifecycle`），不在这里再列一遍；trap/超时/内存超限已经在
       `is_misbehaviour` 里判断过，`plugin_faulted_total` 只是把它记下来并带上 `outcome`（`trap`/`timeout`/…）。
       两个宿主都把记录器交给了 `PluginSet`（`with_metrics`），所以这条对 daemon 与窗口同时生效。
-      **仍然缺**：`plugin_fuel_consumed`、`plugin_memory_bytes`（引擎没有把这两个读数交给调用方）、
+      **仍然缺**：`plugin_fuel_consumed`（引擎没有把读数交给调用方）、
       `plugin_pool_hit_total` / `plugin_pool_miss_total`（`pool.acquire` 不回答命中与否）。
+      ★ **`plugin_memory_bytes{plugin}` 也接上了**：`PluginSet::call` 在 `run_on` 返回之后、池释放句柄之前读
+      `PluginInstance::memory_bytes()` —— 那是唯一能看见“这个插件占了多少”的时刻。记 gauge 而不是增量：内存会被还回去。
       ★ **`plugin_install_total` 也接上了**：`plugin_install_total{stage,result}` 在 `run_install` 的出口记一次 ——
       成功是 `stage=complete,result=ok`，失败用**拒绝自己命名的阶段**（`source`/`manifest`/`verify`/…）加
       `result=refused`。一次尝试一个样本，不是每步一个：计数器回答的是“安装停在哪”，若把中途成功的步骤也记上，每次

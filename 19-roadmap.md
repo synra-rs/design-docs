@@ -2004,6 +2004,23 @@ guards 12 项。
 `plugin_sandbox_dir(ID)`）、core 123 条、前端 258 条（对话框里出现 `Data folder: <path>`）、js shapes 14 项、
 两种配置 clippy、build、lint 0 error、guards 12 项。
 
+### 8.86 插件占了多少内存：读实例，不估引擎
+
+★ `PluginInstance::memory_bytes()` 一直存在（scripted 与 wasm 两个后端都实现了），而指标里没有它。现在
+`PluginSet::call` 在 `run_on` 返回之后、池 `release` 句柄之前读一次，记 `plugin_memory_bytes{plugin}`。
+
+★ **为什么必须是那一刻**：句柄归还后实例可能被复用、回收或下一次调用才重建；调用结束后、释放之前是集合唯一还能看见
+“这个插件的实例现在占多少”的时刻。
+
+★ **gauge 而不是 hist/counter**：内存会被还回去。一个只增的计数器会把“峰值一次”记成“一直这么多”。
+
+★ **顺手的一处 clippy**：两层 `if let` 被 `collapsible_if` 拒绝，改成 let-chain（edition 2024 支持，仓库里已有先例）。
+
+★ 测试：core 671 条（扩展现有的调用计数用例：scripted 实例每次调用加 4096 字节，断言
+`plugin_memory_bytes{plugin=@synra/aaa-notes}` 恰为 4096 —— 一个恒为 0 的实现也能让“序列存在”通过，而这里断言的是
+实例自己的读数到达了记录器），clippy `-D warnings`、guards 12 项。
+**仍然缺**：`plugin_fuel_consumed`（引擎没把读数交出来）、pool 命中/未命中。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
