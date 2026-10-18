@@ -348,6 +348,9 @@ pub struct CatalogItem {
 > 插件 id 的结果被丢掉 —— 一个按关键词返回的索引仍可能给出这台设备装不了的东西。`capability_count` 在搜索阶段是 0：
 > 搜索响应没有 manifest，真正的权限列表在预览里显示。插件页的搜索结果带 **Preview**，走的还是同一个确认框。
 > **仍然缺**：排序/分页、镜像与回退（§4.2）。
+> ★ **分页与排序有了**：`CatalogQuery` 多 `offset`（翻页，映射到 npm 的 `from`）与 `sort`（`CatalogSort`：`Relevance`
+> 是索引自己的顺序，`Name` 在本地按标题排序 —— npm 搜索没有 `sort` 参数，所以只提供搜索端点能兑现的两种）。
+> 插件页用 20 条一页，最后一页满才显示 **Load more**；下一页的 offset 是已显示条数，重复的结果按 pluginId 去重。
 
 
 ---
