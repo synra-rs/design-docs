@@ -1185,6 +1185,19 @@ capabilities、runtime、发布者声称的体积）。`choose()` 被预览与�
 `offset: 20` 且新结果被追加。
 **仍然缺**：镜像已做（§8.27），排序里的下载量/更新时间要等搜索端点提供数字。
 
+### 8.30 接收端也能取消
+
+★ 以前 `transfer_cancel` 只停发送端的 worker；接收中的行只能等对端放弃。现在两条路径分开：
+- 发送端：有 worker 的取消令牌 → 停 worker、删临时文件、发 `TransferFinished`（原行为）。
+- 接收端：连接线程独占那条链路，命令**不能**从外面写 abort。`AppState.inbound_cancels` 收下 transfer id，listener 在
+  两条消息之间消费它，调 `Inbox::cancel`：发 `UserCancelled` abort、删半成品、清状态，再发一个 `aborted` 进度事件 ——
+  `withdraw_received` 由这个事件关掉行，所以行不会在“还没告诉发送者”时先消失。
+★ `serve_with`/`handle_within_with` 多一个 `CancelCallback`（`Fn(&str) -> bool`），`serve`/`handle` 包装传“永不取消”；
+检查在 `absorb` **之前**，所以取消不会再多写一个 block。
+★ 测试：接收方向的 `transfer_cancel` 只把 id 放进集合、行保留；已有发送测试补上“登记取消令牌”，否则它们现在会被当成
+接收方向（正是这两个测试先失败，才发现“有 token 才是发送端”这条区分）。
+**仍然缺**：界面还没有取消按钮（发送与接收都没有），这条命令目前只有 API 可达。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
