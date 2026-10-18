@@ -1000,6 +1000,11 @@ worker 出现时忘记它。discovery 的 `stop` 只持有 supervisor 的 **shut
 不闪提示。**拒绝从不被记住** —— "不"是对这个文件的，不是对这台设备的。存储失败是静默的：下一次再问一次，而不是丢文件。
 **仍然缺的**：没有移除入口（设置页还没有这一项），也没有按设备显示“已信任”的列表。
 
+★ **移除入口和列表都做了**：设置页新增 “Files without asking”，读 `transfers.acceptFrom`，每行一个 “Ask again”；
+移除最后一个时**unset 整个键**（空数组和“没有偏好”是同一件事，不该让界面去解释）。设备名从 devices store 来，
+查不到就显示 id —— 偏好仍然是真的，藏掉一行等于藏掉一个用户改不了的设置。
+★ **忘记设备会一并忘记信任**：`devices_forget` 调 `forget_sender`，否则同一个 id 再出现时会静默恢复信任。
+
 ### 8.15 发送提前返回与取消
 
 ★ `transfer_send_file` / `transfer_send_text` 不再等传输结束：准备（解析地址、打开 sender、建行）仍同步完成，失败仍是
