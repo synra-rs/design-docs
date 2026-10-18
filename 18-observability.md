@@ -850,8 +850,11 @@ pub fn install_panic_hook(paths: &Paths, version: &str) {
       `is_misbehaviour` 里判断过，`plugin_faulted_total` 只是把它记下来并带上 `outcome`（`trap`/`timeout`/…）。
       两个宿主都把记录器交给了 `PluginSet`（`with_metrics`），所以这条对 daemon 与窗口同时生效。
       **仍然缺**：`plugin_fuel_consumed`、`plugin_memory_bytes`（引擎没有把这两个读数交给调用方）、
-      `plugin_pool_hit_total` / `plugin_pool_miss_total`（`pool.acquire` 不回答命中与否）、
-      `plugin_install_total`（安装路径没有按阶段上报）。
+      `plugin_pool_hit_total` / `plugin_pool_miss_total`（`pool.acquire` 不回答命中与否）。
+      ★ **`plugin_install_total` 也接上了**：`plugin_install_total{stage,result}` 在 `run_install` 的出口记一次 ——
+      成功是 `stage=complete,result=ok`，失败用**拒绝自己命名的阶段**（`source`/`manifest`/`verify`/…）加
+      `result=refused`。一次尝试一个样本，不是每步一个：计数器回答的是“安装停在哪”，若把中途成功的步骤也记上，每次
+      失败的尝试都会看起来像一串成功。
       ★ **存储组的两项也接上了**：`db_size_bytes` 在 `diag_metrics` 读取时从数据库文件采样（没有哪个写入点知道最终大小，
       文件在进程运行期间会增长；读不到就是 0 —— 内存数据库或尚未建库），`plugin_data_bytes{plugin}` 在 `plugins_list`
       读列表时逐个插件遍历沙箱目录（不存在或不可读记 0：大小是诊断，不是让列表失败的理由）。两者都是**采样**而不是

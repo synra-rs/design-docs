@@ -1931,6 +1931,21 @@ CPU gauge 比没有更糟。构造时先刷新一次作为基线，之后每次 
 guards 12 项。
 **仍然缺**：`db_write_duration_us`（写路径没有计时钩子）。
 
+### 8.82 安装停在哪：一个计数器的两种标签
+
+★ `plugin_install_total{stage,result}` 在 `run_install` 的出口记**一次**：成功是 `stage=complete,result=ok`，失败用
+拒绝自己命名的阶段（`source`/`manifest`/`read`/`verify`/`write`/`record`/`update`）加 `result=refused`。阶段名不是这里
+另起的词表 —— 它来自 `InstallRefusal::stage`，也就是同一个 `IpcError` 的 `params.stage`，所以日志、错误与指标说的是同一个
+阶段。
+
+★ **一次尝试一个样本，不是每步一个**：计数器回答的是“安装停在哪”。如果把中途成功的步骤也记上，每次失败的尝试都会看
+起来像一串成功，而“九步成功、一步失败”与“九次成功安装”在面板上不可区分。
+
+★ 测试：壳 259 条。成功路径扩展已有的 `installing_a_directory_records_it_switched_off`（报告说成功，记录器也要说）；
+新增拒绝路径：装一个不存在的目录 → `params.stage == "source"`，记录器出现
+`plugin_install_total{result=refused,stage=source}`。两种配置 clippy、check、guards 12 项。
+**仍然缺**：`plugin_fuel_consumed`、`plugin_memory_bytes`（引擎没把读数交出来）、pool 命中/未命中。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
