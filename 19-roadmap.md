@@ -910,6 +910,12 @@ Blob 编码成 base64，内核解码到 `cache/plugin-transfers/<uuid>/<fileName
 
 **仍然缺的**：分块/流式通道（大文件）、接收端的接受/拒绝 UI。
 
+★ **入站传输也进同一张表了**：`listener::serve` 一直只把"完成"交回来，接收中的传输在界面上不可见。现在新增
+`serve_with` / `handle_within_with`，用 `ProgressCallback` 在 `Decision::Accepted` 与每个 `Decision::Stored` 上报
+`InboundProgress`（字节、块、文件名、是否 bundle）。`FinishedTransfer` 补了 `transfer_id`（完成事件原本只有路径与长度，
+没有 id，壳无法关掉它开的行）；壳的接收回调先 announce `completed` 快照、再 `TransferFinished`。
+两个旧入口（`serve` / `handle`）以空回调委托，daemon 不需要改。
+
 ★ **`env.platformSupports` 接上了真实答案**：宿主在开窗前用 `CommandPlatform::supported_actions()` 生成
 `platformCapabilities` 放进 seed，门面同步查表。两层映射是刻意的：`PlatformAction → 客户端拼写`
 （`open_url`/`clipboard_read`/…）与能力拼写（`platform:open-url`）**不是**一套；`simulate_keys` 只在策略允许时出现，

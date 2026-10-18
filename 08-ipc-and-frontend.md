@@ -1106,6 +1106,9 @@ Content-Security-Policy:
       在临时目录重建并逐字节比较（CRLF 归一化），所以"提交了过期产物"是一个红门而不是一次事故。
       **仍然缺的**：分块/流式大文件通道、接收端的接受/拒绝 UI。
 
+      ★ **入站传输的进度也接上了**：`listener::serve_with` 用 `ProgressCallback` 上报接受与每个块，壳把接收中的传输写进
+      同一张 `Transfers` 表；`FinishedTransfer.transfer_id` 让完成时能关掉那行（announce `completed` → `TransferFinished`）。
+
       ★ **`transfer.*` 第一版**：base64 走 `plugin_ui_rpc`（不新增 Tauri 命令），内核解码到临时文件后复用
       `transfers::transfer_send_file`；上限 4 MiB，`send` 在传输结束后返回，门面缓存最终状态供晚到的
       `onProgress` 回放。理由与限制见 19 §8.10。
