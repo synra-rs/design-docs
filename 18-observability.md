@@ -827,7 +827,14 @@ pub fn install_panic_hook(paths: &Paths, version: &str) {
       “看了一眼”混成一个数字。
       ★ 测试：一个用 60ms 预算的真实扫描断言三个指标（`ran`、`candidates_found` 的 `count == 1`、duration 存在），
       拒绝的那条断言 `unavailable`；集合去重单独一条（同一 id 两次只算一台）。
-      **仍然缺**：壳侧的网络一组（`links_*`/`frames_*`/`bytes_*`）；`transfer_throughput_bps`。
+      ★ **壳的 Host 也拿到记录器了（同日更晚）**：`Host::with_metrics` 一直存在，但窗口构造 `Host` 时没传 ——
+      于是 `frames_sent_total{event}`、`frames_received_total{event}`、`links_opened_total` 在**桌面宿主**里是零。
+      现在 `AppState::new` 先建记录器再把它交给 `state.host`，listener 自己那个 `Host` 也一样（一个进程两个 Host，
+      两处都要）。单测直接调 `Host::count_frame_sent`，断言**壳的记录器**里出现那一行 —— 这正是"接上了"与"函数存在"
+      的区别。
+      **仍然缺**：壳的**拨号**链路走的是 `dial_peer` + `PeerLink`，绕开了 `Host::send`，所以那些帧仍然不计数
+      （`frames_received_total` 在 listener 的 `handle_within` 一支里，拨号侧的对称位置没有）；`bytes_*`、
+      `links_closed_total`、`reconnect_attempts_total` 两个宿主都还没有；`transfer_throughput_bps`。
 - [x] 设置页的"性能"面板（实时指标）—— **有了（2026-10-19）**。
       ★ `diag_metrics` 从“注册了、没有调用方”变成设置页底部的一节：挂载时读一次、之后每 5 秒重读一次
       （卸载时清掉 interval），Refresh 按钮是立刻读一次。行是**内核渲染的那个键**（`name{label=value}`，与日志、

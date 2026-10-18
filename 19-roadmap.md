@@ -1686,6 +1686,28 @@ worker 启动时还不存在。
 两种配置 clippy `-D warnings`、`cargo check`（含 Tauri）。
 **仍然缺**：壳侧网络组（`links_*`/`frames_*`/`bytes_*`）；`transfer_throughput_bps`。
 
+### 8.70 桌面宿主的 Host 终于记账了
+
+★ `Host::with_metrics` 从第 76 轮起就在 core 里，守护进程用了它，而**窗口没有**：`AppState::new` 里那行是
+`Host::new(identity, peer)`，listener 里那行也是。于是 `frames_sent_total`、`frames_received_total`、
+`links_opened_total` 在桌面宿主里从来没被写过 —— 指标清单上"网络三项已接"说的是 daemon，不是这个进程。
+
+★ **修法是两行，但顺序有讲究**：`AppState::new` 原来在结构体字面量里内联建记录器，而 Host 也在字面量里；要让两者
+指向同一个 `Arc`，记录器必须先于 `Host` 建立。现在先 `let metrics = Arc::new(RingRecorder::new())`，再
+`Host::new(..).with_metrics(Arc::clone(&metrics))`，最后 `metrics` 作为字段。listener 的 `bind` 用同一份
+`state.metrics`。
+
+★ **测试接在公开方法上**：`Host::count_frame_sent` 是公开的，所以测试可以调它再断言 `state.metrics.snapshot()` 里
+出现 `frames_sent_total{event=kernel.test}`。不这样做的话，"Host 有 metrics 字段"与"壳的 Host 有 metrics"看起来
+一样，而只有后者是这次要修的东西。
+
+★ **仍然缺（写清楚，别让计数看起来完整）**：壳的拨号链路用 `dial_peer` + `PeerLink`，绕开 `Host::send`，所以拨出去
+的帧仍不计数；`bytes_*`、`links_closed_total`、`reconnect_attempts_total` 两个宿主都没有；`transfer_throughput_bps`
+仍是清单上的名字。
+
+★ 测试：壳 251 条通过（新增 1 条），两种配置 clippy `-D warnings`、`cargo check`（含 Tauri）通过。
+**仍然缺**：拨号侧帧计数、bytes/关闭/重连三类、吞吐直方图、审计保留期配置键。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
