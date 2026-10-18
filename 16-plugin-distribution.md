@@ -260,6 +260,8 @@ UI 显示：
 > ★ **有签名就核对签名**：存在 `signature.json` 时，pack 用安装侧同一个 `sign::verify` 核对 manifest 与每个 artifact 的摘要；
 > 不匹配就不出包。这里传的是**空 trust store** —— 只问“这把钥匙签的是不是这些字节”，不问“用户信不信这个钥匙”，后者是
 > 安装那台设备的决定。
+> ★ **`--registry <url>` 只做形状校验**：`https`、只有 scheme+host（无路径）、`http` 仅允许 loopback（本地 Verdaccio）；
+> 通过后打印 `npm publish --registry <url> <file>`，**不上传**。账号、scope、策略属于发布目标，不属于归档。
 > 发布：`npm publish dist/@acme-hello-1.2.3.tgz`（或把同一个 tarball 上传到自建/兼容 registry）。**仍然缺**的是
 > `publish` 子命令：账号、scope、registry 策略都属于发布目标，不属于归档。
 

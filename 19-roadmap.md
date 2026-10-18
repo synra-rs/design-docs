@@ -1265,6 +1265,8 @@ registry 可达。结果存在页面本地的 `updates` map 里，显示版本�
 ★ **签名覆盖检查**：存在 `signature.json` 时，pack 调安装侧同一个 `sign::verify`（空 trust store）核对 manifest 与所有
 artifact 的摘要；签名后改过 wasm 或 manifest 都会被拒绝。测试三条：正确签名随包、换 wasm 拒绝、改 manifest 拒绝。
 ★ 发布仍然不在这个工具里：`npm publish dist/*.tgz` 或上传到自建 registry；账号、scope、策略属于发布目标。
+★ **`--registry <url>`**：只校验形状（https、scheme+host、无路径；http 仅 loopback），通过后把地址变成
+`npm publish --registry <url> <file>` 一行，**不发请求**。
 **仍然缺**：`publish` 子命令、静态 index 适配层。
 
 ## 9. 每阶段的"退出条件"（不允许跳过的）
