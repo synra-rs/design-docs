@@ -838,6 +838,14 @@ M0 ──▶ M1 ──▶ M2 ──▶ M3
 （协议没有 quota 专用码，而 `RateLimited` 会让插件"等一会儿"—— 错的方向）。门面把值编码成 JSON；读到一个
 headless 半写入的裸字符串时按原样返回，而不是抛 `SyntaxError`。
 
+★ **桌面动作也接上了**：`clipboard.read/write`、`platform.openUrl/notify` 走同一通道，grant 是
+`platform:read-clipboard` / `platform:write-clipboard` / `platform:open-url` / `platform:notify`。
+`CommandPlatform` 从 `DesktopHost` 里提出来、放进 `AppState.platform` 共享 —— 它带**每实例**的通知限流，
+每次调用新建一个就等于给插件第二个小时配额。`PlatformError` 的映射是显式的：rate → `RateLimited`、
+quota → `RateLimited`（这一次"等一会儿"就是正确的动作）、过长 → `PayloadTooLarge`、坏 URL → `InvalidArgument`。
+前端同时修了一个拼写：旧代码检查 `clipboard_read`，而能力表里是 `platform:read-clipboard` —— 一个声明了真实能力的
+插件仍然会被拒。测试用一个记录型 `CommandRunner` 替换真实程序，所以不会真的打开浏览器、改剪贴板或弹通知。
+
 **仍然缺的**是把 `createInjection(context)` 装进插件页。初始化脚本只放 label 与 token；可行的做法是把注入门面
 单独构建成一份资源（Vite 的第二个 entry），开窗时**拼进 `initialization_script`** —— 这样 `window.synra` 在页面
 任何脚本之前就存在，插件作者也不必改 HTML。要先决定生成物放哪（提交生成物 + 守卫，还是随安装包发资源），
@@ -859,7 +867,7 @@ headless 半写入的裸字符串时按原样返回，而不是抛 `SyntaxError`
 - 两个小决定：`dist`/`src-tauri/gen` 之外，eslint 也忽略 `src-tauri/inject`（压缩产物的风格不是本仓库的风格）；
   `sdkVersion` 取 manifest 的 `sdk.preferred`（没写才退回 `min`）——`min` 是兼容下限，报它会告诉插件它是对更老的宿主构建的。
 
-**仍然缺的**：network / transfer / clipboard / self 四个命名空间（都在方法表里、都以 `Unsupported` 回答），
+**仍然缺的**：network.fetch、transfer.*、self.invoke/actions 三个命名空间（都在方法表里、都以 `Unsupported` 回答），
 以及插件卡上的"打开"入口。
 
 ## 9. 每阶段的"退出条件"（不允许跳过的）
