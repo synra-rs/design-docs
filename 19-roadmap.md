@@ -2021,6 +2021,24 @@ guards 12 项。
 实例自己的读数到达了记录器），clippy `-D warnings`、guards 12 项。
 **仍然缺**：`plugin_fuel_consumed`（引擎没把读数交出来）、pool 命中/未命中。
 
+### 8.87 插件花了多少指令：在调用前后各读一次油箱
+
+★ `PluginInstance` 新增默认方法 `last_fuel_consumed() -> Option<u64>`（scripted 后端不覆盖，返回 `None`）。wasm 后端在
+`dispatch` 之前读一次 `store.get_fuel()`（此刻油箱刚被设为预算或 `u64::MAX`），调用结束再读一次，差值就是这次调用花掉的
+指令数。
+
+★ **`None` 不是 0**：没有指令计数器的后端（scripted）保持“什么都没记”。`PluginSet::call` 只在 `Some` 时记
+`plugin_fuel_consumed{plugin}` 直方图 —— 记一个 0 会把“不知道”说成“没花指令”，而这正是设计里 `plugin_fuel_consumed`
+与 `plugin_calls_total` 要分开的原因。
+
+★ **读的位置**：`if let (Some(granted), Ok(remaining))` 在 match 之后。一个**没启动**的调用（dispatch 之前就失败）不写
+读数，`last_fuel` 保留上一次的值而不是编一个零。
+
+★ 测试：plugin-host 316 条（返回的 guest：`last_fuel_consumed` 大于 0；被 fuel 停下的 guest：恰好等于预算 `100_000`，
+在第二次调用覆盖读数之前断言），core 671 条（新增断言：scripted 后端**没有** `plugin_fuel_consumed` 序列 —— `None`
+分支的测试），两种 clippy、guards 12 项。
+**仍然缺**：plugin pool 命中/未命中（`pool.acquire` 不回答）。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
