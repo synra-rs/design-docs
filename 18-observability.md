@@ -912,6 +912,10 @@ pub fn install_panic_hook(paths: &Paths, version: &str) {
       下一页的 offset 并**追加**；只有上一页**满页**时才出现 —— limit-only 查询唯一能给的“可能还有”信号。
       页短即到底，按钮消失。
       **仍然缺的**：`trace_id` 仍是 `None`（行里没有 trace）。
+      ★ **2026-10-19：`trace_id` 有了值（19 §8.102）。** 三处一起改：`PluginSet::call_traced` 在排空审计条目时把当次动作的
+      trace 盖上（`can-handle` 与生命周期调用没有动作，保持 `None`，不编造）；`plugin_audit` 增加可空列（迁移 13；旧行
+      没有 trace 可回填，NOT NULL 会让迁移无法添加）；DTO 与插件页从行里读它。于是重启之后“这条调用属于哪个动作”仍然
+      可答，页面上的 trace 也能直接粘进 `synra logs --trace`。
       ★ **仓库里有两个审计环，只有一个有生产者。**
       * `PluginSet` 的环（`crates/synra-core/src/dispatch/plugins.rs:312`）**有**：每个实例被装上 session，
         调用记录了能力与结果，`drain_audit` 把 session 记下的排进环，`audit_for`/`refusals_for` 读回来。

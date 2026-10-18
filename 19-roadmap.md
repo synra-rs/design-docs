@@ -2296,6 +2296,28 @@ workspace clippy、guards 12 项。
 workspace clippy、guards 12。
 **仍然缺**：`--follow` 只跟当前文件（轮转时读旧句柄剩余字节，但不主动读 `.1` 已有历史）；`.1` 的 mtime 不参与选择。
 
+### 8.102 审计行终于知道自己的 trace
+
+★ `AuditEntryDto.trace_id` 从第一版就在 DTO 里，而**行里没有这一列、会话里没有这个值**，所以它永远是 `None`：“这条调用
+属于哪个动作”在重启之后无法回答。三处一起补：
+
+- **入口**：`PluginSet::call_traced` 是唯一同时知道“动作 trace”和“本次调用排空的条目”的地方；`drain_audit` 在把条目送进
+  环与 sink 之前，把 `trace` 盖到 `None` 的条目上。`can-handle`（匹配时对每个插件都跑）和生命周期调用走 `call`，没有
+  动作，保持 `None` —— 给它们编一个 trace 会让每次匹配都看起来像同一个用户动作。
+- **存储**：迁移 13 `ALTER TABLE plugin_audit ADD COLUMN trace_id TEXT`。可空而不是回填：旧行没有 trace 可恢复，NOT NULL
+  会让这一列无法加到已有行的表上。`AuditRecord`/`from_columns`/`record_audit`/`columns::AUDIT` 全部跟着走。
+- **两个宿主**：daemon 与窗口的 sink 都把 `entry.trace` 写成文本；窗口的 `record_card` 从行里读它，插件页在调用行上显示
+  `trace <id>`（等宽、可复制）—— 用户拿它直接 `synra logs --trace`。
+
+★ **顺带补上窗口的一处空位**：窗口宿主的 `serve_with` 也没装 `KernelEventCallback`，所以“把动作发给窗口”同样只会被记一个
+事件名然后丢掉。现在窗口用与 daemon 相同的 `accept_remote`/`accept_cancel` 实现它；没有插件引擎时回答 `Refused` 并写清
+原因（不是静默丢弃）。
+
+★ 测试：core 674（+1：`call_traced` 盖 trace、无动作调用保持 None，环与 sink 两份都断言）、store 226（+1：带 trace 的
+行往返，无 trace 的行保持 None）、daemon 219、app shell 261（默认特性）/260（`--no-default-features`）、前端 259
+（插件页显示行上的 trace、且没有 trace 的行不显示）、js shapes 14、两套 clippy、guards 12。
+**仍然缺**：审计里插件调用的**内容**仍不记录（设计如此：能力只描述目的地）；trace 仍未覆盖插件内部执行细节。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
