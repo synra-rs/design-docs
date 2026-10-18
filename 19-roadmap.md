@@ -1866,6 +1866,30 @@ js 34 条 + `pnpm run check`，两种配置 clippy、build、shapes、guards 12 
 `wasm_backend` 仍在），build、lint 0 error、shapes 8 项、guards 12 项。
 **仍然缺**：`DoctorReport` 自己的排版与退出码语义（窗口看原始结果，不看 doctor 的过滤参数）。
 
+### 8.79 存储组的两项：采样而不是计数
+
+★ 设计里存储组有三个名字，其中两个是**大小**：`db_size_bytes` 与 `plugin_data_bytes{plugin}`。大小不适合在写入点累加 ——
+数据库文件的大小取决于页、WAL、VACUUM，插件沙箱里的字节可能被插件自己删掉。所以两者都在**读的时候采样**：
+
+- `db_size_bytes`（Gauge）：`diag_metrics` 每次读快照前从 `paths.db_path()` 取文件元数据；读不到就是 0（内存数据库、
+  尚未建库），不是错误。
+- `plugin_data_bytes{plugin}`（GaugeVec）：`plugins_list` 读列表时逐个插件遍历 `plugin_sandbox_dir`；不存在的目录是 0，
+  不可读的目录也是 0 —— 大小是诊断，不该让列表失败。
+
+★ **遍历写的是递归而不是只读顶层**：测试特意在沙箱里放了一个嵌套文件（10 + 5 字节），只读顶层会漏掉 5 字节而测试仍然
+会绿。
+
+★ **一次顺手的清理**：`diag.rs` 的 `diag_metrics` 文档注释里有一处提交进来的模板残渣 `""" + S + """`，改成正常句子。
+
+★ **一条旧测试因此变了意思**：`an_empty_shell_reports_no_metrics_rather_than_refusing` 断言空快照，而 `db_size_bytes`
+让空壳也有一个样本。测试没有删，改成断言“只有这一个样本”，并把规则（回答而不是拒绝、不编答案）留在注释里 ——
+断言应该描述新的真相，而不是被删掉。
+
+★ 测试：壳 256 条（新增 2：沙箱 15 字节的嵌套文件 → `plugin_data_bytes{plugin=@synra-plugin/chat}=15`；32 字节的
+“数据库文件” → `db_size_bytes=32`），两种配置 clippy、check、前端 255 条、shapes 8 项、guards 12 项。
+**仍然缺**：`db_write_duration_us`（写路径没有计时钩子）；进程组四项（`memory_rss_bytes`/`cpu_percent`/`threads`/
+`uptime_seconds`）需要平台读数。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |

@@ -804,7 +804,7 @@ pub fn install_panic_hook(paths: &Paths, version: &str) {
       两个 gauge 分别为 2 与 1）。
       **仍然没有生产者**（写这一句时）：壳侧的网络、发现两组（核心/守护进程侧已有部分），以及 §4.1 的
       `plugin_calls_total`、`transfer_throughput_bps`、存储与进程那几组。传输、发现与插件调用随后在同一会话里接上，
-      见下面的段；存储与进程两组仍然没有。
+      见下面的段；存储的两项也接上了，进程组仍然没有。
       ★ **2026-10-19 晚些时候补上了壳的传输组**：`transfers_total{kind,outcome=delivered|cancelled|failed}`、
       `transfer_bytes{kind}`（只在 delivered 时记 —— 一次取消或失败没有“文件多大”的答案，记计划大小等于描述没有
       发出的字节）、`transfer_duration_ms{kind}`（含拨号时间）。记录点是**每个开始的传输都汇合的两处**：
@@ -852,6 +852,12 @@ pub fn install_panic_hook(paths: &Paths, version: &str) {
       **仍然缺**：`plugin_fuel_consumed`、`plugin_memory_bytes`（引擎没有把这两个读数交给调用方）、
       `plugin_pool_hit_total` / `plugin_pool_miss_total`（`pool.acquire` 不回答命中与否）、
       `plugin_install_total`（安装路径没有按阶段上报）。
+      ★ **存储组的两项也接上了**：`db_size_bytes` 在 `diag_metrics` 读取时从数据库文件采样（没有哪个写入点知道最终大小，
+      文件在进程运行期间会增长；读不到就是 0 —— 内存数据库或尚未建库），`plugin_data_bytes{plugin}` 在 `plugins_list`
+      读列表时逐个插件遍历沙箱目录（不存在或不可读记 0：大小是诊断，不是让列表失败的理由）。两者都是**采样**而不是
+      写入点计数，所以面板每 5 秒的轮询就是它们的刷新。
+      **仍然缺（存储/进程）**：`db_write_duration_us`（写路径没有计时钩子）、`memory_rss_bytes`、`cpu_percent`、
+      `threads`、`uptime_seconds`（进程组需要一个平台读数，窗口目前没有）。
 - [x] 设置页的"性能"面板（实时指标）—— **有了（2026-10-19）**。
       ★ `diag_metrics` 从“注册了、没有调用方”变成设置页底部的一节：挂载时读一次、之后每 5 秒重读一次
       （卸载时清掉 interval），Refresh 按钮是立刻读一次。行是**内核渲染的那个键**（`name{label=value}`，与日志、
