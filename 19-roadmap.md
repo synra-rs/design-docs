@@ -995,6 +995,18 @@ worker 出现时忘记它。discovery 的 `stop` 只持有 supervisor 的 **shut
 `state === "offered"` 的第一行；HomePage 的按钮撤掉，免得同一个问题有两个回答入口。一次只显示一个 —— 一张提示
 对应一次等待中的连接。仍然没有"记住这个对端"的偏好。
 
+### 8.15 发送提前返回与取消
+
+★ `transfer_send_file` / `transfer_send_text` 不再等传输结束：准备（解析地址、打开 sender、建行）仍同步完成，失败仍是
+命令的错误；之后 `start_send` 把 sender + 行 + 临时文件交给一个具名线程，命令立刻返回 `transferId`。行和取消 token
+在返回**之前**就存在，所以紧接着的 `transfer_cancel` 有东西可停。
+★ 取消：`Transfers` 多一张 `cancels` 表；`transfer_cancel` 先 `stop()`（取走 token 并 cancel），再 `forget()` 与
+`TransferFinished`。发送循环在**每个块之前**检查 token，取消时先给对端发 `file.transfer.abort`（`UserCancelled`）再走
+`finish_transfer` —— 不然发送端会把自己的传输窗口等完。
+★ 临时文件（文本发送的 outbox）由 worker 在**每条退出路径**删除；`finish_transfer` 同时 `untrack` token，避免一张只增不减的表。
+★ **仍然缺的**：插件页的 `transfer.send` 还是同步等结束（`plugin_ui_rpc` 直接调同步函数），分块/流式上传也还没有；
+取消的 worker 在阻塞的 `link.send_chunk` 里要等当前块写完才会看到 token。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
