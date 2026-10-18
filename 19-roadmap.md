@@ -1088,6 +1088,8 @@ worker（桌面命令已经是这样，见 §8.15）。
 不显示 —— 空列表上方的过滤框是无意义的控件。
 ★ 过滤是客户端行为（`visible = installed.filter(...)`），不新增命令；`plugins_catalog_search` 仍只在契约里，
 `InstallSourceDto::Registry` 仍按名拒绝。
+★ **2026-10-19 更正：后半句早已不成立。** registry 客户端与安装路径后来都做了（§8.23、§8.113 附近），
+`InstallSourceDto::Registry` 现在会下载、校验摘要并安装；这一行是历史记录，不是当下状态。
 
 ### 8.21 Registry 的第一步：字节响应
 
@@ -1112,6 +1114,8 @@ worker（桌面命令已经是这样，见 §8.15）。
 ★ 测试 10 条：latest 与指定版本、标签缺失、非 packument；正常解包、`../` 逃逸（用手写 tar 头构造，因为 `tar::Builder`
 自己就拒绝写这种条目）、符号链接、单文件上限、前缀不匹配、gzip 损坏。
 **仍然缺**：没有网络客户端与命令 —— `plugins_catalog_search`、`InstallSourceDto::Registry` 还是拒绝的。
+★ **2026-10-19 更正：这一句同样过时了。** 后来 `synra-fetch` 的客户端、`plugins_catalog_search`、`plugins_install` 的
+registry 分支都做了；这条“缺”已经被后续条目填上，保留原文是为了看见当时的状态。
 
 ### 8.23 Registry 的第三步：真的能装
 
@@ -2679,9 +2683,25 @@ app shell 262/261、workspace clippy、`api-guard`、guards 12。
 
 ★ 测试：daemon **227**（+5）、control 67、CLI 103、core 675、store 236、app shell 262/261、workspace clippy、`api-guard`、
 guards 12。
-**仍然缺**：**shell 的 `plugins_install` 仍按名字拒绝 `Registry`**（08 §675）—— 管线在 daemon 侧，壳没有接（下一轮把它
-移到共享层，让两个宿主共用）；没有版本范围解析（只认精确版本或 `latest`）；不上传/发布；`dist.integrity` 的算法只由
-`Integrity` 支持的那几种。
+**仍然缺**：**两条 registry 安装链**（daemon 的是 §8.122 的 packument/镜像管线；壳的是 static index + packument 候选 +
+publisher 提示，见 §8.123）—— 都工作，但重复，统一到核心层是下一步；没有版本范围解析（只认精确版本或 `latest`）；
+不上传/发布；`dist.integrity` 只支持 `Integrity` 认识的算法。
+
+### 8.123 壳下载的 registry tarball 也要比对摘要
+
+★ 上一轮给 daemon 加了 registry 管线并核对 `dist.integrity`，随后读了壳的同名路径才发现：壳早就能从 registry 安装
+（packument 与 static index 都支持），但**下载的字节从未与文档声明的摘要比较**。文档由同一台服务器发出，所以“镜像给了
+别的字节”会被当成发布的包安装。
+
+- **先校验再解包**：`verify_tarball(declared, tarball, bytes)` 在 `extract_tgz` 之前调用 `check_integrity`。
+- **没有摘要就是拒绝**：`Unsupported` + “bytes nothing vouches for are not installed”。这不是跳过检查的许可。
+- **错误码**：不匹配 `IntegrityMismatch`，网络 `DeviceOffline`，其余 `Unsupported`；句子带 tarball URL 与原因。
+- **测试**：`verify_tarball` 的两个单元用例（无摘要、匹配/不匹配）；三处假 registry 的 packument/static index 补上
+  integrity，否则它们现在会在解包前被拒 —— 这正好说明检查在整条路径上生效。
+
+★ 测试：app shell **264/263**（+2/+2）、前端 259、workspace clippy、`api-guard`、guards 12。
+**仍然缺**：两条 registry 安装链没有合并（daemon 的 §8.122 与壳的这一条）；没有版本范围解析；static index 的 publisher
+键仍只是**警告**而不是拒绝（设计如此，见 `publisher_mismatch`）。
 
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 

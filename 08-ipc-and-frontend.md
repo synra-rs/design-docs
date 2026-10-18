@@ -674,9 +674,10 @@ Content-Security-Policy:
       （`HostFacts`）。在此之前，安装能力只有 CLI 有，而界面的插件页连"装一个"都无处可点。
       它同时是 `InstallSourceDto` 的第一个消费者：`Path` 走管线，`Registry` 被**按名字**拒
       （`Unsupported`，理由是没有取件客户端）—— 而不是报一个从未发生过的网络错误。
-      ★ **2026-10-19：daemon 侧有取件客户端了（19 §8.122）。** `synra plugin install @acme/chat` 走
-      `Request::PluginInstallPackage`，取 packument、校验 integrity、解包、交给同一安装器。**壳的 `plugins_install` 仍然
-      拒绝 `Registry`** —— 管线还只在 daemon 侧，下一轮移到共享层后两边共用。所以这一行不勾。
+      ★ **2026-10-19：壳的 registry 安装早就有，只是这一行写的是旧状态。** `plugins_install` 把 `Registry` 交给
+      `commands/registry.rs`：packument 或 static index → 镜像候选 → 取 tarball → **现在先比对 `dist.integrity`**（没有
+      integrity 就拒绝）→ `extract_tgz` → 同一个安装管线。daemon 侧另有 §8.122 的 npm packument 管线（CLI 用），两条实现
+      有重复，统一到核心层是下一步。
       ★ 而这个数字刚刚落后过一轮：第 104 轮把 `diag_metrics` 移了出去，
       而下面的散文记下了那件事、**这一行没有**。一个数字比一段散文更容易被忘，
       而它正是读者会当真的那个：“剩下十九条”与“剩下十八条”对一个想知道还差多少的人是两个答案。
