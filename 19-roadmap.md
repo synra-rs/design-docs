@@ -2501,6 +2501,24 @@ stability、guards 12。
 **仍然缺**：导入后的一键重装（设计第 4 步）；容器不加密（密钥按设计不进备份，但容器本身仍是明文 zip）；只读版本 1，
 没有旧格式。
 
+### 8.113 日志丢了行，命令要说出来
+
+★ §8.111 让日志不再阻塞，但丢行与写失败只是计数器里的两个数字，没有出现在用户读到的任何地方：满盘时日志停止增长，
+`synra logs` 输出很短，与“内核很安静”**完全一样**。
+
+- **worker 记失败**：`LogStats::write_errors` 在 `write_all` 或 `flush` 失败时加一。背景线程没有调用者可以返回错误，
+  计数就是报告 —— 下一次 `synra logs` 会说出来。
+- **回答带字段**：daemon 的 `logs` 回答新增 `dropped` 与 `writeErrors`，来自 writer 自己的 `LogStats`（`Runtime` 现在
+  持有 `Option<Arc<LogStats>>`，与 `verbosity` 同源、同理由：日志没开时是 `None`，不能假装在计数）。
+- **散文说人话**：CLI 在任一非零时追加 `the logger dropped N line(s) and could not write M on its way to the file`；两者
+  都为零时不加，普通输出保持原样。
+- **测试**：拒绝所有写入的 sink → `write_errors == 2`（失败的写 + 失败的 flush）；CLI 回答带 3/1 时最后一行说明，
+  健康日志不加行；daemon 的回答即使没有 writer 也有两个零字段（“零”与“这个构建不报告”必须能区分）。
+
+★ 测试：observe **289**（+1）、CLI **96**（+1）、daemon **222**（+1）、core 674、store 236、app shell 262/261、前端 259、
+workspace clippy、guards 12。
+**仍然缺**：被丢弃的行的**内容摘要**没有（只有计数）；写失败后不会自动降级/换文件；shell 侧的状态报告还没有暴露这两个数。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
