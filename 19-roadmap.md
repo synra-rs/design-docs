@@ -803,15 +803,19 @@ M0 ──▶ M1 ──▶ M2 ──▶ M3
 
 **剩下的一件**是 `plugins_sync_run`：计划说得出发什么，还没有东西真的发一个 bundle 并读回 `SyncResult`。
 `transfer_send_file` 走的是 `TransferSender::open`（附件），`core::send_bundle` 的调用者在 daemon，壳里没有。
-★★ **而它开工前有三个具体缺口，查过一次，下一轮不必再找**：
+★★ **而它开工前的缺口查过一次，下一轮不必再找**（其中第 2 条已在第 179 轮解决）：
 1. **artifact 路径没有读者**：`plugin_versions.artifact` 存的是文件名（如 `plugin.wasm`，相对于 `plugins/<id>/`），
    而 `active_plugin_version` 只返回 `(version, digest)`。发一个包需要路径，所以要加一个读者（或让它多返回一列）；
-2. **壳的 listener 收到包不安装**：daemon 的 `on_finished` 会跑安装并**返回 `SyncOutcome`**，壳的只写 `sync_records` 并返回 `None`。
-   所以壳发一个包给另一个壳，对端会收下、记录，但不安装、也不回 `SyncResult` —— 发起端的 `await_result` 会等到 deadline。
-   让壳安装要先决定：收下的单个 `plugin-<id>.wasm` 不是带 manifest 的包目录，而安装管线要的是目录；
+2. ~~**壳的 listener 收到包不安装**~~ —— **已解决（第 179 轮）**：`record_received` 搬进了 core，两个宿主共用一份；
+   壳现在写同样的三张表（历史、对端持有什么、`plugins` 行）并回 `SyncResult`。**仍然没有的是真正的解包**：
+   收下的单个 `plugin-<id>.wasm` 不是带 manifest 的包目录，而安装管线要的是目录 —— 这是包格式的缺口，不是宿主的缺口；
 3. **`send_bundle` 的同步轮次**：它要 `SyncRound { plugin_id, version, session: SessionId }`，
    而 `SessionId` 由发起端命名（第 166 轮的决定）—— 壳里还没有生成它的地方。
 这三件都不是"接线"，所以 `plugins_sync_run` 至少是两轮：先让壳能安装（或明确它只对 daemon 同步），再谈运行器。
+★ **第 179 轮之后只剩两件**（artifact 路径的读者、`SessionId` 的生成处），而"壳能不能安装"已经有了答案：
+它能做 daemon 做的那些（写三张表和一行插件），**不能**做真正的解包——那要等包格式。
+所以 `plugins_sync_run` 的第一步现在是"给 `active_plugin_version` 一个带 artifact 的兄弟"，
+而不是搬任何东西。
 
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 

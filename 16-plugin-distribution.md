@@ -1151,3 +1151,27 @@ clippy 的 `type_complexity` 是对的，而它的答案与第 166 轮的 `SyncR
 
 ★ 仍缺的是 `plugins_sync_run`：`send_bundle` 在 core 里、调用者在 daemon，壳里还没有一个
 「按计划发一个包并读回结果」的运行器。
+
+## 第 179 轮：接收那一半只有一个实现
+
+★ 第 178 轮最后说「壳的 listener 收到包不安装」。这一轮发现真正的问题不是「壳少写了一段」，而是**同一件事有两个实现**：
+daemon 的 `record_received` 写三张表（历史、对端持有什么、`plugins` 行）并返回 `SyncOutcome`；
+壳的闭包只写第二张并返回 `None`。于是壳收到一个包**不回 `SyncResult`**，发起端等到 deadline；也没有历史、没有安装行。
+
+★ 所以 `record_received` 搬进了 `synra_core::plugin_sync`（收 `&SynraDb` 与 `&FinishedTransfer`，返回 `Option<SyncOutcome>`），
+两个宿主各一行调用。壳的 listener 现在真的回结果了。
+
+★ 搬的过程中有两个**已经存在但没被看见**的错误：
+
+- **`activated` 与它旁边那行矛盾**：daemon 的 outcome 走 `ReceiverCheck::finish`，而 `decide_activation` 要求
+  `SessionComplete` —— 传输路径永远不做，所以 `activated` 是 `false`；可它刚写的行是 `enabled = true`。
+  现在 outcome 直接按那一行说 `true`，而 `performed` 仍然是空的（七项检查一项没跑，`is_fully_checked()` 是 false）。
+  这三件事第一次彼此一致。
+- **一条挂空的文档注释**：`serve_control` 的文档在函数消失之后留在文件里，紧贴着 `record_received` 的文档，
+  于是 rustdoc 把它算进了后者的说明。删函数时一起删掉了。
+
+★ 还有一处**版本**：第 150 轮说接收行「版本诚实地是空串」，因为元数据到不了接收端；第 163 轮已经让它到了
+（`FinishedTransfer::version`）。历史行现在也记下版本，而不是继续留空。
+
+★ 仍然没有的是**真正的解包**：收下的是单个 `plugin-<id>.wasm`，不是带 manifest 的包目录，而安装管线要的是目录。
+两个宿主现在做的是同一件「写行」的事，而它们都还没有做「校验包并落到 `plugins/<id>/`」——那要等包格式。
