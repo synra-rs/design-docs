@@ -1005,6 +1005,14 @@ worker 出现时忘记它。discovery 的 `stop` 只持有 supervisor 的 **shut
 查不到就显示 id —— 偏好仍然是真的，藏掉一行等于藏掉一个用户改不了的设置。
 ★ **忘记设备会一并忘记信任**：`devices_forget` 调 `forget_sender`，否则同一个 id 再出现时会静默恢复信任。
 
+### 8.17 后台线程都有停止条件
+
+★ 事件桥（`events::spawn`）与 pairing 监视线程（`pairing::watch`）以前是 `loop`，只随进程结束；现在各自拿一个
+`Cancellation`，`stop_background` 在 `ExitRequested` 里连同 listener、discovery 一起取消。两个 token 放在一个
+`Background { cancels }` 里由 `app.manage` 持有 —— 一个类型一个值，不必为每种线程起一个 newtype。
+★ 没有 join：两个循环各自在 `POLL` / 250 ms 的间隔里看到 token 后返回，而退出本来就不等任何人。**这是一个决定**：
+等一个可能正在 `emit` 的线程没有收益，而阻塞退出换来的“干净”只是进程结束时操作系统本来就会做的事。
+
 ### 8.15 发送提前返回与取消
 
 ★ `transfer_send_file` / `transfer_send_text` 不再等传输结束：准备（解析地址、打开 sender、建行）仍同步完成，失败仍是
