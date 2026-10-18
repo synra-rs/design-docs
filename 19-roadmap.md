@@ -2641,6 +2641,23 @@ version 1，新增字段靠 serde 默认值兼容；重装不恢复 `health` 等
 `api-guard`、guards 12。
 **仍然缺**：`synra logs`（daemon 侧）不 flush —— 它没有 guard，只能看到已经落盘的行；这是“稍后”语义的诚实残余。
 
+### 8.121 daemon 的 `synra logs` 也能拿到刚写的行
+
+★ §8.120 给了 `LogGuard::flush`，但守护进程的回答线程不持有 guard：guard 为了订阅者活到进程结束，而命令由 runtime 服务。
+所以 daemon 侧的 `synra logs` 仍然可能看不到一秒前写的那行 —— 而那一行往往正是用户在找的解释。
+
+- **`LogFlush` 句柄**：`LogGuard::flush_handle()` 返回一个只含 writer 与队列 sender 的克隆体；`LogFlush::flush()` 先排
+  脱敏 writer 的残余，再等 worker 的 ack。它不延长日志的生命，也不拥有文件。
+- **Runtime 持有它**：`log_flush: Option<LogFlush>`，与 `verbosity`/`log_stats` 同源；日志没开时是 `None`，命令不能假装
+  flush 过一个不存在的文件。
+- **读之前 flush**：`logs_value` 在取 tail 之前调用它，所以命令的答案包含“刚刚写下的”行，而不是“碰巧已经落盘的”行。
+- **测试走 daemon 的路径**：集成测试改用 `flush_handle()` 而不是 `guard.flush()`，所以被测的是命令真正持有的那个东西。
+
+★ 测试：observe 290（既有集成测试改走句柄）、daemon 222（88 个 runtime 测试）、core 675、store 236、CLI 103、
+app shell 262/261、workspace clippy、`api-guard`、guards 12。
+**仍然缺**：`--follow` 本来就按轮询读，不需要 flush；`diag_export`（shell）已有自己的 flush；日志写失败后仍然只计数，
+不降级。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |

@@ -633,6 +633,8 @@ pub fn install_panic_hook(paths: &Paths, version: &str) {
       追加一句“the logger dropped N line(s) and could not write M”。在此之前，满盘和一个安静的进程在命令输出里长得一模一样。
       ★ **同日更晚：读者可以按需 flush（19 §8.120）。** 异步写入让“写一行然后读文件”变成竞态；`LogGuard::flush()` 让
       worker 追平并等待 ack，集成测试与 shell 的诊断包都用它。
+      ★ **同一个问题的 daemon 版本（19 §8.121）：** 回答 `synra logs` 的线程不持有 guard，所以 `LogGuard::flush_handle()`
+      返回一个只含 writer 与队列 sender 的 `LogFlush`；runtime 持有它，`logs_value` 在读文件前调用。
       测试在 `crates/synra-observe/tests/logging.rs`（独立二进制，因为 `try_init` 是进程级的），
       且**只有一个 `init` 测试**：两次安装会互相冲突，两个测试各装一次就是竞态。
       它断言的是"行到了磁盘上"以及"**`hunter2` 没有到磁盘上**"—— 后者是脱敏唯一能失败的地方。
