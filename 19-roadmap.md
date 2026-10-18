@@ -1570,6 +1570,31 @@ app 侧设置页 2 条新测试（键/值/平均值、overflow 句子），全�
 前端 2 条跟随顺序变化；全量 245（壳）/ 246（前端）。
 **仍然缺**：保留期的配置键；UI 仍只显示最近 20 条（完整历史没有翻页）。
 
+### 8.65 意图与插件的指标：壳这一侧补两组
+
+★ **意图**：`intent_dispatch` 的计数与时长现在真的在写。原先它只是“路由 → 发布事件”，没有任何指标；而 18 §4.1 里
+`intents_total`、`intent_duration_ms`、`intent_no_handler_total` 三个名字一直只有清单。现在路由与计时分成
+`route()` + `record_dispatch()`：计时在**两个出口**都发生（成功与失败），因为一次被拒绝的分享也花了匹配的时间，
+只由成功构成的分布会用一个错误的问题的答案回答“分享有多慢”。
+
+★ **标签与守护进程对齐，这一条是本轮唯一一次返工**：第一版写的是 `intents_total{result=<Routed::state>}`
+（`noHandler`/`choosing`/…），查守护进程时发现它从第 14x 轮起就写 `intents_total{outcome=ok|refused}`。
+同一个计数器在两个宿主里各有一种拼写，正是这份文档反复记录的那种漂移。现在两个宿主都用 `outcome`；
+**settle 在哪个阶段**由卡片的 `state` 说，不由指标说。
+
+★ **时长也补到守护进程**：`intent_duration_ms` 原来是壳新加、守护进程没有 —— 那会让“两个宿主的同一件事”在快照里
+只有一半。守护进程的 share 路径同样在 `?` 之前 observe；那条已有的计数器测试多断言一次直方图的 `count >= 1`。
+（不用精确值：一次 dispatch 只 observe 一次，但断言“至少一次”不会因为夹具多做一次路由而碎。）
+
+★ **插件两个 gauge**：`plugins_installed` / `plugins_active` 在 `plugins_list` **读库时** set，而不是在每次写操作里
+increment：写失败半途不会留下一个要补正的计数，而被外部工具改过的数据库在下一次列表里就是对的。`active` 是用户
+的 `enabled` 开关，不是“本进程载入了几个”—— 一个 faulted 但 enabled 的插件仍然是开启的。
+
+★ 测试：壳 247 条（新增“一次 dispatch 写下 outcome/无处理/时长”与“两个 gauge 分别是 2 与 1”），
+守护进程的意图计数器测试扩了一条直方图断言；两边 clippy `-D warnings` 都过。
+**仍然没有生产者**：壳侧的网络、发现、传输三组；以及 §4.1 的 `plugin_calls_total`、`transfer_throughput_bps`、
+存储与进程那几组。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |

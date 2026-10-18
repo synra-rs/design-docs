@@ -793,9 +793,17 @@ pub fn install_panic_hook(paths: &Paths, version: &str) {
       ② **`bind(host, 0)` 报回来的地址不总是能拨的** —— 端口 0 让操作系统挑，而它可能报未指定地址；
       拨那个在 Windows 上不是「拨本机」。`transport/tests.rs` 为此有一个 `dialable` helper，
       这条测试做了同样的事而不依赖另一个测试模块的私有函数。
-      ★ 本行的状态：门三项 + 直方图两项（host 调用、意图）+ 传输两项；缺的是网络、发现那几组。
-      `RingRecorder` 只出现在 `synra-observe` 自己的测试里。§4.1 的指标名中只有
-      `frames_sent_total`/`links_open` 出现过，且只是 `metrics/tests.rs` 的测试夹具。
+      ★ 本行前面那些“本行的状态”是逐轮的快照；`RingRecorder` 在生产里有多个调用方（壳的 `AppState.metrics`、
+      守护进程的 `metrics`、`Host::with_metrics`），不再只出现在测试里。
+      ★ **2026-10-19 补上了意图的时长与插件两个 gauge**：`intent_duration_ms` 现在**两个宿主都写**
+      （守护进程的 share 路径与壳的 `intent_dispatch`，都在 `?` 之前 observe，失败的那次也计入）；
+      壳还写 `intents_total{outcome=ok|refused}` 与 `intent_no_handler_total` —— 标签与守护进程**同一套**，
+      起初写成 `result=<Routed::state>`，对着守护进程的 `outcome=ok|refused` 才发现那是同一件事的第二种拼写。
+      另外 `plugins_installed` / `plugins_active` 在 `plugins_list` 读库时 set 成 gauge（`active` 是用户的开关，
+      不是本进程载入了几个）。测试：守护进程那条计数器测试多断言一次直方图；壳两条（意图的 outcome/无处理/时长、
+      两个 gauge 分别为 2 与 1）。
+      **仍然没有生产者**：壳侧的网络、发现、传输那几组（核心/守护进程侧已有部分），以及 §4.1 的
+      `plugin_calls_total`、`transfer_throughput_bps`、存储与进程那几组。
 - [x] 设置页的"性能"面板（实时指标）—— **有了（2026-10-19）**。
       ★ `diag_metrics` 从“注册了、没有调用方”变成设置页底部的一节：挂载时读一次、之后每 5 秒重读一次
       （卸载时清掉 interval），Refresh 按钮是立刻读一次。行是**内核渲染的那个键**（`name{label=value}`，与日志、
