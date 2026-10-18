@@ -335,6 +335,11 @@ pub struct CatalogItem {
 > sizeBytes? }`。插件页的 registry 安装先调它，弹一个确认框（名称、版本、发布者、capabilities、runtime、发布者声称的体积），
 > 确认后才下载。它是**问题**不是批准：预览是发布者的说法，签名在字节上校验，装完仍然默认关闭。
 > **仍然缺**：catalog 搜索、镜像/回退。
+> ★ **搜索接上了**：`plugins_catalog_search`（已声明、现注册）请求 `{base}/-/v1/search?text=keywords:synra-plugin%20<词>&size=N`，
+> 把 npm 的 `objects[].package` 映射成已有的 `CatalogItem`（名称、版本、描述、publisher.username、是否已装）；名字不是
+> 插件 id 的结果被丢掉 —— 一个按关键词返回的索引仍可能给出这台设备装不了的东西。`capability_count` 在搜索阶段是 0：
+> 搜索响应没有 manifest，真正的权限列表在预览里显示。插件页的搜索结果带 **Preview**，走的还是同一个确认框。
+> **仍然缺**：排序/分页、镜像与回退（§4.2）。
 
 
 ---

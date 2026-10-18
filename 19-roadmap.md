@@ -1144,6 +1144,17 @@ capabilities、runtime、发布者声称的体积）。`choose()` 被预览与�
 清理；插件页挂载测试断言点 Install 只触发 `plugins_preview`、确认后才触发 `plugins_install`。
 **仍然缺**：catalog 搜索、镜像/回退。
 
+### 8.26 搜索也接上了
+
+★ `plugins_catalog_search` 从“已声明、未注册”变成真命令：请求 npm 的 `/-/v1/search`，查询固定带
+`keywords:synra-plugin`（空搜索就是它本身），映射到已有 `CatalogItem`。`publisher.username`、`installed` 来自本机插件表；
+名字不是插件 id 的结果被过滤 —— 搜索命中不等于可安装。
+★ `capability_count` 在搜索里是 0 而不是猜一个数：搜索响应没有 manifest，权限列表在**预览**里显示。插件页给每条结果一个
+**Preview** 按钮，走的还是 §8.25 的同一个确认框，所以搜索不能绕过权限确认。
+★ 测试：本地搜索响应里混入一个非法名字，断言只返回合法项、`installed` 为真；fake kernel 与契约 arity 表同步
+（`plugins_catalog_search` 现在注册，README 40/45/23）。
+**仍然缺**：排序/分页、镜像与回退。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
