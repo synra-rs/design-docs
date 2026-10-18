@@ -893,6 +893,19 @@ core 的响应把重定向后的地址丢掉了。门面把 host 的纯文本 bo
 
 **仍然缺的**：transfer.*（需要 WebView 到内核的大文件通道）。
 
+### 8.10 插件页的大对象传输（第一版）
+
+★ 决定的形状：**base64 走现有 `plugin_ui_rpc`**，而不是新增 Tauri 命令。理由：新增命令要同时改契约表、命令守卫和
+fake kernel，而发送路径已经完整（`transfers::transfer_send_file`：拨号、逐块发送、进度事件、错误映射）。页面把一个
+Blob 编码成 base64，内核解码到 `cache/plugin-transfers/<uuid>/<fileName>`，交给那条路径，结束后删除临时文件。
+**4 MiB 上限**：一条 IPC 消息里的 base64 不是大文件通道；分块/流式是下一版。
+`transfer.status` 读注册表；已完成的传输已被 `finish_transfer` 移出注册表，所以**门面缓存它自己发起的传输的最终状态**，
+`onProgress` 对晚订阅者回放它。
+已知限制：`send` 在传输**结束**后才返回（没有后台线程），因此 `onProgress` 只有在 `send` 之前订阅才能看到逐块进度；
+接收端沿用既有行为（落到 inbox），还没有"询问用户是否接收"的步骤。
+
+**仍然缺的**：分块/流式通道（大文件）、接收端的接受/拒绝 UI。
+
 ★ **`env.platformSupports` 接上了真实答案**：宿主在开窗前用 `CommandPlatform::supported_actions()` 生成
 `platformCapabilities` 放进 seed，门面同步查表。两层映射是刻意的：`PlatformAction → 客户端拼写`
 （`open_url`/`clipboard_read`/…）与能力拼写（`platform:open-url`）**不是**一套；`simulate_keys` 只在策略允许时出现，
