@@ -2318,6 +2318,27 @@ workspace clippy、guards 12。
 （插件页显示行上的 trace、且没有 trace 的行不显示）、js shapes 14、两套 clippy、guards 12。
 **仍然缺**：审计里插件调用的**内容**仍不记录（设计如此：能力只描述目的地）；trace 仍未覆盖插件内部执行细节。
 
+### 8.103 每一次数据库写都有耗时
+
+★ `db_write_duration_us` 一直缺，理由是“写路径没有计时钩子”。真的缺的是**谁来做记录**：store 在设计上位于诊断层之下，
+不能依赖 `synra-observe`；而每个写方法各包一层计时是三十处样板。
+
+- **观察者，不是记录器**：`SynraDb::observe_writes(WriteObserver)` 收一个 `Fn(&'static str, Duration)`，标签是操作名。
+  store 仍然不知道指标叫什么，宿主知道。
+- **一个宏包住每个公共写方法**：`timed_write!(self, "audit", { … })`。`?` 必须在写方法体内返回错误、同时仍然报告耗时，
+  所以宏里用闭包；**clippy 先拒绝了直接调用的闭包**（`redundant_closure_call`），改成先绑定 `&mut || …` 再调用才通过 ——
+  这条弯路记在这里，因为它是这类宏的固定坑。
+- **覆盖**：审计、意图、配置、插件存储、插件行/授权/版本、同步记录、设备、配对、发布者、身份。**不覆盖**迁移（启动时
+  schema 变更，不是用户等待的写）与 `backup_to`（写的是另一份文件，不是这个连接上的写）。这条边界写在观察者的文档里。
+- **两个宿主**：daemon 的 `runtime::observe_db_writes` 与 shell 的 `state::observe_db_writes` 是同一个形状的命名函数，
+  测试调的是同一个函数而不是自己再造一个同名直方图。窗口里最早出现的 `kind=audit` 是**真的**：建状态时写了身份与审计行，
+  所以 `an_empty_shell_reports_no_metrics_rather_than_refusing` 允许它，并写清为什么。
+
+★ 测试：store 227（+1：一次审计、一次配置、一次设备写的 kind 与耗时报到观察者）、daemon 220（+1：`serve` 用的那个安装
+函数把一次配置写记进 recorder）、app shell 262（默认特性）/261（`--no-default-features`，+1：窗口的 recorder 看到
+`db_write_duration_us{kind=config}`）、前端 259、core 674、workspace clippy、guards 12。
+**仍然缺**：迁移与备份的耗时；直方图的标签使设计里的“单一直方图”变成按 kind 分组（更有用，但确实是偏离，记在这里）。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |

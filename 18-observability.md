@@ -882,6 +882,11 @@ pub fn install_panic_hook(paths: &Paths, version: &str) {
       读列表时逐个插件遍历沙箱目录（不存在或不可读记 0：大小是诊断，不是让列表失败的理由）。两者都是**采样**而不是
       写入点计数，所以面板每 5 秒的轮询就是它们的刷新。
       **仍然缺（存储/进程）**：`db_write_duration_us`（写路径没有计时钩子）。
+      ★ **2026-10-19：`db_write_duration_us{kind}` 接上了（19 §8.103）。** `SynraDb` 增加 `observe_writes` 观察者 —— store
+      因此仍然不依赖 `synra-observe`，它只报告“一次写花了多久、是哪一种写”；每个公共写方法用 `timed_write!` 把自己
+      包起来（标签是操作名：`audit`/`intent`/`config`/`storage`/`plugin`/`sync`/`device`/`pairing`/`publisher`/`identity`）；
+      两个宿主在启动时把观察者指向自己的 recorder。**不覆盖**迁移（启动时的 schema 变更）与 `backup_to`（写的是另一份
+      文件），理由写在观察者与宏的文档里。
       ★ **`uptime_seconds` 也接上了**：`AppState` 存一个单调 `Instant`，`diag_metrics` 读时把“距上次采样的秒数”加进
       计数器（第一次加全部已运行时间）。**用 delta 而不是用 set**：这是设计里的 Counter，每次轮询把整个 uptime 写一遍会
       让它随刷新次数增长而不是随时间增长。它与 `started_at_ms` 分开：后者是调用方的墙钟（测试里固定），uptime 不能被
