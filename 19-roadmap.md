@@ -2574,6 +2574,26 @@ guards 12。
 **仍然缺**：重装不是事务（装到一半失败会留下前面成功的插件）；来源是本机路径，换设备后可能不存在；registry 安装仍
 没有来源字符串；容器的 `enabled` 状态没有在重装后恢复（安装本来就是 `enabled=false`，用户要再启用）。
 
+### 8.117 导入后的重装真的能装
+
+★ §8.116 的重装有一个在真实流程里必然踩中的缺陷：**导入恢复了数据库**，所以插件行说“已安装”，而 artifact 目录按设计
+不在备份里、根本不存在。安装器拒绝一个它认为已经安装的标识符 —— 于是对导入后的每一台设备，`plugin reinstall` 的第一个
+安装就会失败。
+
+- **先清行，再安装**：`reinstall_with` 先发 `Request::Plugins`，拿到已安装的 id 集合；对容器里有 `source` 且在集合里的
+  插件，先发 `PluginRemove { remove_data: false }`（保留 sandbox），再发 `PluginInstall`。不在集合里的直接安装，不发多余
+  的删除请求。
+- **顺序被测试**：断言恰好是 `list → remove @acme/a data=false → install …`，不是“两个请求都发生过”。
+- **拒绝也点名**：清行失败报 `@acme/a could not be cleared before reinstalling: …`；安装失败仍是
+  `@acme/a could not be reinstalled: …`。部分重装就是部分重装。
+- **清单失败即停**：`Plugins` 回答失败时报“the installed plugins could not be listed”，而不是猜集合为空然后让安装器
+  用“already installed”误导用户。
+
+★ 测试：CLI **100**（+1：清行→安装的顺序；另一条断言未安装的插件不会被删）、core 675、store 236、daemon 221、
+app shell 262/261、workspace clippy、`api-guard`、guards 12。
+**仍然缺**：删除行会级联删掉 grants（导入带来的同意记录），所以重装后要重新同意 —— 容器目前不携带 grants；容器里的
+`enabled` 状态没有恢复（安装按设计是 `enabled=false`）；重装仍不是事务。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
