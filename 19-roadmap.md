@@ -2184,6 +2184,19 @@ workspace clippy、guards 12 项。
 workspace clippy、guards 12 项。
 **仍然缺**：动作链其余步骤的 trace 字段；daemon 的 `eprintln!` 自述仍未进日志文件。
 
+### 8.96 决定的日志也带 trace：不另造 id
+
+★ 上一轮让路由那一行带 trace。这一轮把**决定**接上：`Decided` 增加 `trace`，在 `confirm` 的同一把锁里从板上读 ——
+不是新生成一个 id，也不是从调用方传进来；一个动作的 trace 只有板上那一个。
+
+★ `to_json` 输出 `"trace"`，daemon 在 `intent_decide` 结束时记
+`tracing::info!(trace_id = %decided.trace, intent, ok, …)`。`ok` 是执行结果，所以这一行同时是“决定了”和“跑完了”；
+插件的执行细节在调用内部，没有单独的 start/finish —— 写在这里，免得把一行读成完整的执行轨迹。
+
+★ 测试：daemon 216 条（`a_decided_share_runs_the_plugin_and_records_what_it_returned` 增加断言：决定的 `trace` 等于
+路由的 `trace`），core 672 条、workspace clippy、guards 12 项。
+**仍然缺**：远端完成（`apply_result`）没有 trace；daemon 的 `eprintln!` 自述仍未进日志文件。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |

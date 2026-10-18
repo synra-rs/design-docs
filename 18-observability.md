@@ -1024,6 +1024,10 @@ pub fn install_panic_hook(paths: &Paths, version: &str) {
       `intent_dispatch` 在路由成功后记一行 `tracing::info!(trace_id, intent, "share routed")`，所以
       `synra logs --trace <id>` 至少能过滤到这一行。**其余步骤（决定、执行、传输）还没有带上它** —— 这不是“trace 完成
       了”，而是“过滤从空变成了有一条可查”。
+      ★ **同日更晚：决定也带上了。** `Decided` 增加 `trace`（在 `confirm` 的同一把锁里从板上读，不另造），
+      `to_json` 输出它，daemon 在 `intent_decide` 结束后记一行
+      `tracing::info!(trace_id = …, intent, ok, "action decided")`。于是 `--trace <id>` 现在能把**路由**与**决定**两行串起来；
+      插件的执行细节仍在一次调用内部，没有单独的 start/finish 行，远端完成（`apply_result`）也还没有 trace。
 - [x] `synra logs --follow` —— **★ 2026-10-19 真的跟随了**。
       原状：标志解析、从不读取，命令照常打印尾部就退出，安静日志的快照与一个什么都没发生的实时日志输出完全一样。
       上一轮改成明确拒绝（“需要一个流式协议”），本轮换了实现路线并**删掉了那句拒绝**。
