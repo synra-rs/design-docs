@@ -1909,6 +1909,28 @@ uptime 问的是“这个壳开了多久”，时钟回拨不该让它倒退。
 `db_size_bytes` 与 `uptime_seconds`），两种配置 clippy、check、guards 12 项。
 **仍然缺**：`memory_rss_bytes`、`cpu_percent`、`threads`（需要平台读数）、`db_write_duration_us`。
 
+### 8.81 进程组的三项：把平台读数借进来
+
+★ `memory_rss_bytes`、`cpu_percent`、`threads` 需要一个只有平台知道的事实。用 `sysinfo` 0.38（本来就在锁文件里，是
+Tauri 自己的依赖），只开 `system` feature，所以它的磁盘/网络/用户读数不进这个二进制。
+
+★ **`System` 存在 `AppState`**：CPU 是两次刷新之间的差值；每次调用新建一个 `System` 会永远报 0，而一个永远为 0 的
+CPU gauge 比没有更糟。构造时先刷新一次作为基线，之后每次 `diag_metrics` 刷新。
+
+★ **`threads` 只在平台真的报告时写**：`Process::tasks()` 在有的平台上返回 `None`。用 0 表示“不知道”会被读成“没有
+线程”，所以干脆不写这条序列；平台不肯描述进程时三项都不写。
+
+★ **两把锁的顺序**：读 `System` 的锁在拷贝完三个数之后 `drop`，再去写记录器（记录器有自己的锁）。clippy 的
+`significant_drop_tightening` 又一次替我们指出了这一点 —— 上一轮的 `record_uptime` 是同一个形状。
+
+★ **一条旧断言**：`an_empty_shell_reports_no_metrics_rather_than_refusing` 现在看到四个样本（`db_size_bytes`、
+`uptime_seconds`、`memory_rss_bytes`、`cpu_percent`），于是从“长度等于 2”改成“包含这四个、且没有别的”，并允许
+`threads` 缺席 —— 断言描述的是新的真相，不是新代码的借口。
+
+★ 测试：壳 258 条（新增 1：`memory_rss_bytes` 是大于 0 的 gauge —— 具体值没有测试能知道），两种配置 clippy、check、
+guards 12 项。
+**仍然缺**：`db_write_duration_us`（写路径没有计时钩子）。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
