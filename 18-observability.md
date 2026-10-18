@@ -920,6 +920,8 @@ pub fn install_panic_hook(paths: &Paths, version: &str) {
       行数）+ Export，结果回显路径与 `included`/`excluded`。`DiagExportResult` 同时从壳的私有类型搬进
       `synra-ipc` 的 DTO，页面因此不再手抄形状（镜像由 `dto-coverage` 盯着）。**探针的展示仍然没有**：这一节调用
       的是导出，不是 `doctor`；`run_probes` 的界面调用方仍然不存在。
+      ★ **最近日志也接上了**：同一节里一个折叠区，展开时调 `diag_logs_tail { lines: 200 }`，关闭不重读、重开重读
+      （日志会增长，一次复制在用户看的时候就已经旧了）；“日志为空”与“还没读过”是两句不同的话。测试 1 条。
 - [x] `install_panic_hook` + `CrashReport` 落盘 —— **★ 本次补上了缺的那一半**。
       `CrashReport`(`crash.rs:54`)、`CrashStore::write`(`:254`) 原本就是真的，
       但 **`install_panic_hook` 不存在，全仓 0 处 `std::panic::set_hook`/`take_hook`** ——
