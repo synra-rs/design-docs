@@ -1041,6 +1041,11 @@ UI —— 用户还不能把 `seen` 变成 `trusted`，TOFU 的后半段（“�
 否则界面可以信任一个从未出现过的公钥。列表改成和 `plugins_list` 并行读（少一次等待），两个答案分别报错。
 **仍然缺**：安装后没有即时的指纹确认步骤。
 
+★ **即时确认接上了**：`Installed.signed_by` 与 `InstallReport.publisherId` / `fingerprint`（`skip_serializing_if`，
+无签名就缺失）；插件页在 `await load()` **之后**判断——签名 key 还没被 trusted 才显示提示，所以已信任的 key 与无签名
+的包都不会多问一次。指纹来自安装时验证过的那一份，不是页面自己再从包里解析的。
+**仍然缺**：提示里只有 Trust / Not now，没有“永远拒绝这个发布者”的一键入口（要去 Publishers 列表 Revoke）。
+
 ### 8.15 发送提前返回与取消
 
 ★ `transfer_send_file` / `transfer_send_text` 不再等传输结束：准备（解析地址、打开 sender、建行）仍同步完成，失败仍是

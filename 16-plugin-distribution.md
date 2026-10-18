@@ -556,6 +556,10 @@ pub struct UpdateInfo {
       **Publishers** 区：每个 key 显示 id、指纹、状态，带 “Trust key” / “Revoke key”；命令只改已经存在的行 —— 一个
       没被任何签名见过的 key 不能被“信任”，否则界面能信任一个从未出现过的公钥。
       **仍然缺**：安装签名包后没有即时的指纹确认步骤（用户要自己去列表里点）。
+      ★ **即时确认有了**：`install::Installed` 带 `signed_by: Option<SignedPublisher>{ publisher_id, fingerprint }`，
+      `InstallReport` 多 `publisherId` / `fingerprint`（都可以缺失 = 无签名）。插件页在安装成功后、列表重读之后，
+      如果该 key 还没被 `trusted`，显示一个带指纹的提示（Trust this key / Not now）。不是模态：插件是关的、没有东西
+      在跑，指纹可以按自己的节奏比对。**仍然缺**：没有“永远不要这个发布者”的一键拒绝（要去列表里 Revoke）。
 - [x] 撤销清单的内置分发与生效（停用已装的被撤销版本）—— **已实现**（第 78 轮）：
       `synra_plugin_api::revocation`（上面那个文档格式）+ 守护进程的加载路径。
       ★ **两个行为均已落地**：已安装的被撤销版本被**拒绝加载并写入** `enabled = false`
