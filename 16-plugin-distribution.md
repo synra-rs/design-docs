@@ -392,6 +392,10 @@ pub struct CatalogItem {
 ★ 仍会拒绝：空列表、同一版本列两次、`latest` 指向不存在的版本（文档说一件事、列另一件事时不做猜测）。
 **仍然缺**：客户端还没有把 `plugins.registry` 指向静态 index（目前只解析，不接网络）；`index.json` 的缓存与 ETag 也
 留给接入时处理。
+> ★ **接上了**：`plugins.registry` 里以 `static:` 开头的地址表示静态 index（如 `static:https://bucket.example/plugins`）。
+> 客户端按 `{base}/{pluginId}.json` 取文档并 `parse_static_index`；tarball 用文档给的完整 URL（可以是另一个 CDN 主机，仍受
+> https/loopback 策略约束）。**搜索**只在 npm 兼容的地址上做：静态 index 没有索引可搜，全部是静态时 `plugins_catalog_search`
+> 返回 `Unsupported`，而不是把 404 说成“没有匹配”。
 
 
 ---

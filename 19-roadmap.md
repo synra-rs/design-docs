@@ -1279,6 +1279,15 @@ artifact 的摘要；签名后改过 wasm 或 manifest 都会被拒绝。测试�
 ★ 测试 6 条（显式 latest、缺省最后一项、latest 缺失、重复、内联 manifest 解析、非 JSON）。
 **仍然缺**：客户端还没把 `plugins.registry` 接到静态 index；缓存/ETag 留给接入时处理。
 
+### 8.39 静态 index 接进客户端
+
+★ `plugins.registry` 的地址加 `static:` 前缀即静态 index：按 `{base}/{pluginId}.json` 取文档，`parse_static_index` 解析成
+`Packument`；安装/预览/更新走同一条路径。
+★ 静态 index 的 tarball 是完整 URL，允许在另一个主机（CDN）；npm 地址仍要求同 origin 或已配置镜像的同路径。
+★ 搜索只在 npm 兼容地址上做；全是静态时返回 `Unsupported`，不把“没有索引”说成“没有匹配”。
+★ 测试：本地服务 `hello.json` + `pkg.tgz`，配置 `static:http://…`，安装成功；全静态时搜索 `Unsupported`。
+**仍然缺**：`index.json` 的缓存/ETag、静态源的签名目录（signature 清单）。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
