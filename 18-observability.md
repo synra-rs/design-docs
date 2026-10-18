@@ -810,8 +810,15 @@ pub fn install_panic_hook(paths: &Paths, version: &str) {
       `send_over_with` 的拨号失败出口与 `send_ready_since` 的结束处；`send_ready_with` 把尝试开始时间传下去，
       所以直接调它的测试也会留下一条记录。两条已有测试各多断言一次：成功的那条计数 1 且 size 直方图的 sum 等于文件
       大小，取消的那条计数 1 且 **没有** size。
-      **仍然缺**：收件方向（listener 的 `FinishedCallback` 只知道“到了”，没有把字节数与耗时交给记录器）、
-      壳侧的网络与发现两组。
+      ★ **收件方向也接上了（同日更晚）**：`listener` 的 progress 回调第一次看到某个 transfer 时记下开始时间 —— 一张
+      `Arc<Mutex<HashMap<TransferId, Instant>>>`，由 finished 与 progress 两个回调共享，因为 `FinishedTransfer`
+      只有长度和落点、没有开始时间。`FinishedCallback` 在文件校验并（插件包时）安装之后记
+      `transfers_total{kind,outcome=received}`、`transfer_bytes{kind}` 与 `transfer_duration_ms{kind}`；
+      `aborted` 的那条 progress 事件记 `outcome=aborted`、**不记 size**，时长从第一次 progress 算起
+      （若 abort 在第一次 progress 之前到达，就没有时长可记，而不是记 0 把它塞进延迟分布）。
+      ★ **可验证性的边界**：`listener::spawn` 要一个 `AppHandle`，所以记录逻辑抽成 `record_received` 并由单测断言，
+      而“它真的被那两个回调调用”目前只有编译期证据（与 `frames_received_total` 在 listener 里的处境相同）。
+      **仍然缺**：壳侧的网络与发现两组；`transfer_throughput_bps`。
 - [x] 设置页的"性能"面板（实时指标）—— **有了（2026-10-19）**。
       ★ `diag_metrics` 从“注册了、没有调用方”变成设置页底部的一节：挂载时读一次、之后每 5 秒重读一次
       （卸载时清掉 interval），Refresh 按钮是立刻读一次。行是**内核渲染的那个键**（`name{label=value}`，与日志、

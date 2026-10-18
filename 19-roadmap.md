@@ -1641,6 +1641,31 @@ increment：写失败半途不会留下一个要补正的计数，而被外部�
 shapes 8 项、clippy 两种配置、guards 12 项。
 **仍然缺**：保留期的配置键；收件方向的传输指标；壳侧网络与发现指标。
 
+### 8.68 收件方向的传输指标
+
+★ 发送侧在 §8.66 接上后，`transfers_total{kind,outcome=...}` 只有三个值；现在补上 `received` 与 `aborted`。
+挂点只有两处，都在 listener 里：
+* **开始**：progress 回调第一次看到某个 transfer 时把 `Instant` 放进一张共享表。`FinishedTransfer` 只有长度与落点、
+  没有开始时间，而 progress 回调是唯一知道第一块到达的地方 —— 一张 `Arc<Mutex<HashMap<TransferId, Instant>>>`
+  由 finished 与 progress 两个闭包共享，一次传输只有一个开始（重复的 progress 不覆盖）。
+* **结束**：`FinishedCallback` 在文件校验并（插件包时）安装之后记 `received`、大小与时长；`aborted` 的 progress
+  事件记 `aborted`、**不记大小**。大小直方图描述的是“到达的文件”，与发送侧“取消的没有大小”是同一条规则。
+
+★ **时长可以缺**：abort 若在第一次 progress 之前到达，就没有开始可减。`record_attempt` 因此收 `Option<Duration>`，
+没有就**不 observe**，而不是记 0 —— 一个从未移动的传输出现在延迟分布里会让那个分布撒谎。
+
+★ **两个 helper 合并**：`record_send` 与 `record_received` 都走 `record_attempt(state, kind, bytes, elapsed, outcome,
+record_bytes)`，于是“哪些结果记大小”只有一个判断。名字仍与守护进程一致（`transfer_bytes{kind}`、
+`transfer_duration_ms{kind}`）；`transfers_total` 的 `outcome` 是壳自己的补充。
+
+★ **可验证性的边界（写清而不是假装）**：`listener::spawn` 需要一个 `AppHandle`，所以记录逻辑抽成
+`record_received` 由单测断言（`aborted` 无 size、`received` 有 sum 等于字节数）；“两个回调真的调用了它”只有编译期
+证据 —— 与 `frames_received_total` 在 listener 里的处境相同，而那是这份文档早先记录过的同一种缺口。
+另有一个 `#[cfg_attr(not(feature = "tauri-shell"), allow(dead_code))]`：没有外壳的构建里唯一调用者不存在，但测试还在。
+
+★ 测试：壳 249 条通过（新增 1 条）；两种配置的 clippy `-D warnings` 通过。
+**仍然缺**：壳侧的网络与发现两组；`transfer_throughput_bps`。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
