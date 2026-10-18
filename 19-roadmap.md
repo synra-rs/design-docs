@@ -2554,6 +2554,26 @@ guards 12。
 **仍然缺**：**一键重装**（下一步：读容器里的来源并调用安装器）；来源可能是本机路径，换一台设备后那个路径不一定存在；
 registry 安装还没有来源字符串（目前只有目录/包路径）。
 
+### 8.116 备份列出的插件可以一键重装
+
+★ 17 的恢复流程第 4 步一直是“一键重装”，而 §8.112 的导入只**报告**列表；§8.115 补上了来源，但还没有人使用它。现在：
+`synra plugin reinstall <container>`。
+
+- **读列表不动数据库**：`synra_store::plugins_in_backup(archive)` 只打开容器、校验 manifest 与版本、解析
+  `plugins-manifest.json` —— 导入要停内核，重装要跑内核，两者是同一个文件上的两个动作。
+- **一条命令遍历**：连上内核、握手，然后对每个有 `source` 的插件发 `Request::PluginInstall { path }`。没有来源的插件被
+  列出为 skipped（“the container recorded no source”），**不是**被静默略过。
+- **第一个拒绝就停**：报 `@acme/a could not be reinstalled: <kernel 的句子>`。部分重装就是部分重装；不回滚，也不把
+  之前的成功说成失败。
+- **可测试的形状**：`reinstall_with(entries, format, ask)` 把通道作为参数，所以决定（装/跳/停）能用一个闭包驱动，
+  不需要监听的内核；`reinstall` 只负责连接与握手。
+
+★ 测试：CLI **99**（+3：两个来源的遍历 + 无来源被跳过、拒绝点名插件、参数解析）、store 236（`plugins_in_backup` 在
+`import` 之外读出同一份列表且带 `source`）、core 675、daemon 221、app shell 262/261、workspace clippy、`api-guard`、
+guards 12。
+**仍然缺**：重装不是事务（装到一半失败会留下前面成功的插件）；来源是本机路径，换设备后可能不存在；registry 安装仍
+没有来源字符串；容器的 `enabled` 状态没有在重装后恢复（安装本来就是 `enabled=false`，用户要再启用）。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |

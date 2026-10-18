@@ -324,7 +324,7 @@ synra devices                       # 列出发现的设备
 synra status                        # 内核与链路状态
 synra send --to <id> --text "..."   # 发剪切板/文本
 synra send --to <id> --file a.txt   # 发文件
-synra plugin list|install|enable|disable|remove
+synra plugin list|install|reinstall|enable|disable|remove
 synra plugin dev --watch            # 本地插件开发
 synra logs --follow --trace <id>
 synra doctor                        # 环境诊断

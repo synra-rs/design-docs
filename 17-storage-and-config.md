@@ -648,6 +648,10 @@ impl GcTask {
 `path` 改写成**包文件**本身（否则重装说明指向一个已经不存在的临时目录）。`.synrabackup` 的
 `plugins-manifest.json` 现在带 `source` 字段（没有就缺省），导入时打印在需要重装的插件后面。
 **还没做的是“一键重装”** —— 现在给出的是从哪里重装的答案，不是替你重装的动作。
+★ **同日更晚：`synra plugin reinstall <container>` 做了（19 §8.116）。** 导入需要内核停着，安装需要内核跑着，所以这是
+两条命令、一个文件：`reinstall` 读容器里的 `plugins-manifest.json`（`plugins_in_backup`，不恢复任何东西），连接内核，
+按顺序对每个 `source` 发一条 `PluginInstall`。第一个拒绝会停下并点名插件；没有来源的插件被列为 skipped，而不是被静默
+跳过。部分重装就是部分重装，不回滚成一个“什么都没装”的谎。
 
 **导入/导出格式**（`.synrabackup`，zip）：
 ```
