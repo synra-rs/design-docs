@@ -2210,8 +2210,8 @@ workspace clippy、guards 12 项。
   `#[non_exhaustive]`），由 daemon 在 `serve` 里用 `accept_remote` / `accept_cancel` 实现。回信在**发起请求的那条连接**
   上发出 —— reply 属于提问者，换一条连接回答等于回答一个没人听的问题。
 - **应用结果**：`orchestrate::apply_result` 用 `reply_to` + `from` 找到 `Board::dispatched_to` 的意图并 `conclude`；
-  发送侧 `send_outbound(outbound, wait)` 在 invoke 后等 3 s（`REMOTE_RESULT_WAIT`），拿到就 checkpoint，`intent_decide`
-  用真实的 `ok/result/state` 回答。没等到就保持 `dispatching`，并写明**不会重试**、更慢的回信会丢。
+  发送侧 `send_outbound(outbound, wait)` 在 invoke 后等 `REMOTE_RESULT_WAIT`（见 §8.99），拿到就 checkpoint，
+  `intent_decide` 用真实的 `ok/result/state` 回答。没等到就保持 `dispatching`，并写明**不会重试**、更慢的回信会丢。
 - **一个真的 bug**：`remote::invoke` 造信封时新铸 request id，而板上 `Dispatching` 记的是 `confirm` 的 id ——
   `reply_to` 于是永远匹配不上，收信侧的幂等键也不同于本侧记录。现在信封携带 `confirm` 的 id；测试断言
   `outbound.envelope.request_id == decided.request_id`。这条 bug 只有在“真的等回信”时才会暴露，正是本轮做的原因。
@@ -2219,7 +2219,7 @@ workspace clippy、guards 12 项。
 ★ 测试：core 673（+1 `dispatched_to` 的两个半键与结束后不再命中）、daemon 218（+2：`apply_result` 把 dispatching
 变成 succeeded 且重复回答被忽略；一条真实 TCP 连接上 `INTENT_INVOKE` 得到同一链接上的 `INTENT_RESULT`，`reply_to`
 等于请求 id）、ipc 123、workspace clippy、guards 12。
-**仍然缺**：3 s 之外的迟到结果（无重试、无离线队列）；远端取消没有回执（取消本身不需要答案）。
+**仍然缺**：`REMOTE_RESULT_WAIT` 之外的迟到结果（无重试、无离线队列）；远端取消没有回执（取消本身不需要答案）。
 （控制 socket 的排队已在 §8.98 消掉：现在每连接一线程。）
 
 ### 8.98 控制连接：接受与伺候分开，每个客户端一条线程
@@ -2239,6 +2239,22 @@ workspace clippy、guards 12 项。
 ★ 测试：control 67（+1：`accept` 只交出连接、`serve_stream` 在另一个线程上把 `Status` 答完 —— 断言的是跨交接触发的
 回答，不是 `accept` 返回了一个 socket）、daemon 218、core 673、workspace clippy、guards 12。
 **仍然缺**：每条连接一个线程没有上限（本地 socket 的信任边界内）；shutdown 不 join 连接线程，进程退出时它们随进程结束。
+
+### 8.99 等的时长由插件预算决定，结果应用进入 trace
+
+★ §8.97 的等待写成了 3 s，但插件自己的执行预算是 5 s（`EXECUTE_BUDGET_MS`）—— 一个合法地跑了 4 s 的动作，收信端还在
+工作，发送侧已经放弃并把意图留在 `dispatching`。这不是网络慢，是两个数字没有关系。
+
+- `REMOTE_RESULT_WAIT = EXECUTE_BUDGET_MS + 3 s`（8 s）：5 s 执行、一次握手的网络、以及余量。两个数从各自的主人读，
+  而不是各写一份。
+- 测试 `the_remote_wait_outlasts_a_plugins_execution_budget` 断言这个大小关系，用两个常量本身 —— 改预算不改等待会红。
+- **结果应用也进 trace**：daemon 在 `apply_result` 成功、`checkpoint` 之后记一行
+  `tracing::info!(trace_id = %reply.trace_id, intent, ok, "remote outcome applied")`。此前 `--trace` 只有路由与决定两行，
+  唯一发生在另一台设备上的那一步反而查不到；trace 来自回信本身，不是重新生成的。
+- 控制连接已每连接一线程（§8.98），所以更长的等待只占调用者自己的时间，不再让别的命令排队。
+
+★ 测试：daemon 219（+1）、core 673、control 67、ipc 123、workspace clippy、guards 12。
+**仍然缺**：8 s 之外的迟到结果（无重试、无队列）；远端取消的回执。
 
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
