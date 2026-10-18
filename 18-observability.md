@@ -798,7 +798,9 @@ pub fn install_panic_hook(paths: &Paths, version: &str) {
       `frames_sent_total`/`links_open` 出现过，且只是 `metrics/tests.rs` 的测试夹具。
 - [ ] 设置页的"性能"面板（实时指标）—— **缺失**：`synra-rust-app/src/pages` 只有
       Devices/Home/Plugins/Settings。
-- [ ] 审计 UI（时间线 + 拒绝高亮 + 清空）—— **UI 仍然没有；但"后端无生产者"这句只对一半了**。
+- [ ] 审计 UI（时间线 + 拒绝高亮 + 清空）—— **时间线与拒绝高亮有了（2026-10-19）；清空还没有**。
+      ★ 插件卡的 “Recent calls” 折叠区在展开时调 `plugins_audit`（每次展开都读，不在挂载时扇出），拒绝行高亮并带
+      闸门的稳定结果名；“没有记录”与“读不到”分别是空态与 `ErrorNotice`。顺序在动作层翻成“最新在前”。
       ★ **仓库里有两个审计环，只有一个有生产者。**
       * `PluginSet` 的环（`crates/synra-core/src/dispatch/plugins.rs:312`）**有**：每个实例被装上 session，
         调用记录了能力与结果，`drain_audit` 把 session 记下的排进环，`audit_for`/`refusals_for` 读回来。

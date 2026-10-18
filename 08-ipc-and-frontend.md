@@ -750,6 +750,9 @@ Content-Security-Policy:
       > * ★ **两处契约缺口被记下**：`AuditEntryDto` 有 `trace_id`，而 `AuditEntry`
       >   **没有 trace**（session 没拿到 trace），所以永远是 `None` —— 是**记录**的缺口，不是映射的。
       >   `AuditEntry::new` 的字段里也确实没有可以当 trace 的东西。
+      > * ★ **而它现在有调用方了（2026-10-19）**：插件卡的 “Recent calls” 折叠区在展开时读这条记录，拒绝行高亮并带
+      >   `reason`；“没有记录”与“读不到”分别是空态与 `ErrorNotice`。命令答的是环的尾部、旧→新，
+      >   `pages/plugins/actions.ts` 的 `audit()` 因此翻成“最新在前”。清空与完整历史仍然没有命令。
       > * ★ **而一个“清单”差点被我删错**：`commands/mod.rs` 的 `pub use`
       >   列表看起来无人使用且缺了七个命令，我删了它——而 `diag/tests.rs` 确实在用
       >   其中一个。**我的 grep 模式里漏了 `config_set`，而我没有跑测试就提交。**
