@@ -2067,6 +2067,23 @@ clippy `-D warnings`、guards 12 项。
 这个断言抓住），clippy `-D warnings`、guards 12 项。
 **仍然缺**：`plugin_install_total` 的 daemon 侧（没有安装路径）。
 
+### 8.90 帧计数搬到链接：一条拨号链路的 offer 不再隐形
+
+★ `frames_sent_total{event}` 原先记在 `Host::send`，`frames_received_total{event}` 记在 listener 的 `Delivered` 分支。
+两者都只覆盖**经过某个特定函数**的帧：壳的四处拨号（传输的 offer、配对请求、同步计划/执行）直接 `link.send`，
+拨号链路收到的回答（配对响应、插件列表）也不经过 listener。于是最需要诊断的那条路径恰好没有数字。
+
+★ 现在由 `PeerLink::send` 与 `PeerLink::receive_inbound` 记。链接是**每一帧**都经过的唯一对象；代价是 `Host::send` 与
+listener 必须**不再**记，否则每条路由消息会变成 2。两个 `Host::count_frame_*` 方法保留（没有记录器的宿主、以及壳的接线
+测试仍用它），文档写明“不要与链接同时用”。
+
+★ **收件侧的语义因此变宽了一点**：链路记的是“解析并通过身份检查的帧”，listener 原先记的是“被投递的帧”。重复帧、
+被上层拒绝的帧现在也算收到 —— 这正是“frames received”的字面意思，而“投递”有自己的计数（审计、消息）。
+
+★ 测试：core 672 条（链接测试现在断言收发两个方向的事件计数；host 的帧测试改成钉住 Host 自己的方法，而不是假装它
+还在生产路径上），daemon 213 条、壳 259 条全部仍绿 —— 说明“从 Host 移走”没有让任何真实路径少计。clippy、guards 12 项。
+**仍然缺**：`links_closed_total`、`reconnect_attempts_total`。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |

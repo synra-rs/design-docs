@@ -835,9 +835,12 @@ pub fn install_panic_hook(paths: &Paths, version: &str) {
       现在 `AppState::new` 先建记录器再把它交给 `state.host`，listener 自己那个 `Host` 也一样（一个进程两个 Host，
       两处都要）。单测直接调 `Host::count_frame_sent`，断言**壳的记录器**里出现那一行 —— 这正是"接上了"与"函数存在"
       的区别。
-      **仍然缺（网络组）**：壳的**拨号**链路走的是 `dial_peer` + `PeerLink`，绕开了 `Host::send`，所以那些**帧**仍然不
-      计数（`frames_received_total` 在 listener 的 `handle_within` 一支里，拨号侧的对称位置没有）；`links_closed_total`、
-      `reconnect_attempts_total` 两个宿主都还没有。
+      **仍然缺（网络组）**：`links_closed_total`、`reconnect_attempts_total` 两个宿主都还没有。
+      ★ **帧计数搬到了链接上（同日更晚）**：`frames_sent_total{event}` / `frames_received_total{event}` 现在由
+      `PeerLink::send` 与 `PeerLink::receive_inbound` 记 —— 链接是**每一帧**都经过的唯一对象，而 `Host::send` 只看得见
+      路由过它的那些；拨号链路直写的 offer、配对请求、插件列表请求，以及拨号链路收到的回答，此前都是隐形的。
+      `Host::send` 不再调用 `count_frame_sent`，`listener` 不再调用 `count_frame_received`：两处都记会让每条路由消息
+      变成 2。两个 `Host::count_frame_*` 方法保留（测试与“链路没有记录器”的宿主仍可用），文档写明了不要两处同时用。
       ★ **字节数也接上了（同日更晚）**：`bytes_sent_total` / `bytes_received_total` 在 `PeerLink` 上 —— 链接是唯一
       拿着 payload 的地方（Host 只数帧，加不出一个它从没取过的数）。计的是 **payload 字节**，不是线上字节：帧头是
       传输层自己的账，而读者问的是“这台设备搬了多少”。计数在写成功之后 / 解析成功之后，失败的写一个字节都没动；
