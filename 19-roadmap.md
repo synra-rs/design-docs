@@ -2242,7 +2242,8 @@ workspace clippy、guards 12 项。
 
 ★ 测试：control 67（+1：`accept` 只交出连接、`serve_stream` 在另一个线程上把 `Status` 答完 —— 断言的是跨交接触发的
 回答，不是 `accept` 返回了一个 socket）、daemon 218、core 673、workspace clippy、guards 12。
-**仍然缺**：每条连接一个线程没有上限（本地 socket 的信任边界内）；shutdown 不 join 连接线程，进程退出时它们随进程结束。
+**仍然缺**：每条连接一个线程**有上限了**（§8.124：64 条，超出的连接被接受后立刻关闭）；shutdown 不 join 连接线程，进程
+退出时它们随进程结束。
 
 ### 8.99 等的时长由插件预算决定，结果应用进入 trace
 
@@ -2702,6 +2703,22 @@ publisher 提示，见 §8.123）—— 都工作，但重复，统一到核心�
 ★ 测试：app shell **264/263**（+2/+2）、前端 259、workspace clippy、`api-guard`、guards 12。
 **仍然缺**：两条 registry 安装链没有合并（daemon 的 §8.122 与壳的这一条）；没有版本范围解析；static index 的 publisher
 键仍只是**警告**而不是拒绝（设计如此，见 `publisher_mismatch`）。
+
+### 8.124 控制连接有上限了
+
+★ `serve` 的控制循环是一次 accept 一个线程，注释说“本地 socket、信任边界内” —— 但**信任不是有界**。一个有 bug 的本地客户端
+可以循环打开连接，每条都吃一个线程和栈，直到进程耗尽；那不是安全问题，是“下一个真正的命令连不进来”的问题。
+
+- **`ControlGate`**：`AtomicUsize` + `compare_exchange_weak` 的准入计数，`MAX_CONTROL_CONNECTIONS = 64`。超出的连接被
+  accept 后**立刻关闭**：拒绝一个请求要先读它，而一个超限的客户端不值得读；调用方看到“连接被关闭”的传输错误，这是事实。
+- **`Permit` 是 RAII**：连接线程提前返回或 panic 时槽位都会归还，计数不会泄漏。
+- **测试**：门本身两个用例（配额、归还后复用、max=1 拒绝第二个）。accept 循环的集成不在测试里 —— 起 64 条真实控制连接
+  的测试比被测的一行判断更贵，而这一行是 `try_enter() else { close; continue }`。
+
+★ 测试：daemon **229**（+2）、core 675、store 236、CLI 103、control 67、app shell 262/261、workspace clippy、`api-guard`、
+guards 12。
+**仍然缺**：shutdown 仍不 join 连接线程（进程退出时它们随进程结束）；没有“当前控制连接数”的指标；超限只写 `eprintln`
+不进日志文件。
 
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
