@@ -365,6 +365,34 @@ pub struct CatalogItem {
 > 是索引自己的顺序，`Name` 在本地按标题排序 —— npm 搜索没有 `sort` 参数，所以只提供搜索端点能兑现的两种）。
 > 插件页用 20 条一页，最后一页满才显示 **Load more**；下一页的 offset 是已显示条数，重复的结果按 pluginId 去重。
 
+### 4.4 静态 index（可选）
+
+一个桶（S3 / R2 / 静态站点）不能回答 packument，但能托管文件。`synra-registry` 因此接受一种更小的文档，并解析成与
+`Packument` 相同的结构：
+
+```jsonc
+{
+  "name": "@acme/hello",
+  "latest": "1.2.0",                 // 可选；缺省时取列表最后一项
+  "versions": [
+    {
+      "version": "1.2.0",
+      "tarball": "https://static.example.com/@acme/hello-1.2.0.tgz",
+      "integrity": "sha512-…",        // 可选，仍是声明
+      "manifest": { /* 内联 manifest */ }
+    }
+  ]
+}
+```
+
+★ 为什么要第二种形状：路径 A 假设 npm 兼容，而静态托管是作者最便宜的发布方式；解析成同一个 `Packument` 后，安装路径
+（下载 tarball → 解包 → 校验 → 写盘）**不需要知道**源是数据库还是桶。
+★ 为什么 `latest` 缺省取**最后一项**而不是比较版本字符串：这个 crate 没有 semver 实现，文本比较会把 `1.10.0` 排在
+`1.9.0` 前面；写 `latest` 是诚实的说法，回退顺序则由作者决定。
+★ 仍会拒绝：空列表、同一版本列两次、`latest` 指向不存在的版本（文档说一件事、列另一件事时不做猜测）。
+**仍然缺**：客户端还没有把 `plugins.registry` 指向静态 index（目前只解析，不接网络）；`index.json` 的缓存与 ETag 也
+留给接入时处理。
+
 
 ---
 

@@ -1269,6 +1269,16 @@ artifact 的摘要；签名后改过 wasm 或 manifest 都会被拒绝。测试�
 `npm publish --registry <url> <file>` 一行，**不发请求**。
 **仍然缺**：`publish` 子命令、静态 index 适配层。
 
+### 8.38 静态 index 的解析
+
+★ `synra-registry::parse_static_index`：把桶上能放的最小文档（`name` / 可选 `latest` / `versions[]`，每项带
+`version`、`tarball`、可选 `integrity`/`synra`/`manifest`）解析成与 packument 相同的 `Packument`，安装路径不需要知道源的
+形状。
+★ `latest` 缺省取**列表最后一项**：没有 semver 实现，文本排序会把 `1.10.0` 排在 `1.9.0` 前，回退顺序交给作者。
+★ 拒绝：空列表、重复版本、`latest` 指向未列出的版本。
+★ 测试 6 条（显式 latest、缺省最后一项、latest 缺失、重复、内联 manifest 解析、非 JSON）。
+**仍然缺**：客户端还没把 `plugins.registry` 接到静态 index；缓存/ETag 留给接入时处理。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
