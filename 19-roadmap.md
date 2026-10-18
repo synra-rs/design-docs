@@ -1306,6 +1306,15 @@ artifact 的摘要；签名后改过 wasm 或 manifest 都会被拒绝。测试�
 ★ 测试：第一次 200 + `max-age=0` + `etag: "v1"`；第二次**不带** `If-None-Match`、读到新版本 4.0.0。
 **仍然缺**：静态源的签名目录。
 
+### 8.42 目录可以声明发布者公钥
+
+★ 静态 index 多一个可选 `publishers`（发布者 id → fingerprint），`synra-registry` 的 `parse` 返回
+`StaticIndex { document, publishers }`；安装/预览走的仍是同一个 `Packument`。
+★ `InstallPreviewDto` 多 `publisherKey`；预览对话框在下载 tarball 之前就能显示“目录说这个发布者的钥匙是 …”。
+★ 它是**声明**而不是验证：真正的判断是对下载字节验签；目录与签名不一致时是一条给人看的事实，不是自动结论。
+★ 测试：解析 `publishers`；静态源 `plugins_preview` 返回该指纹；npm 源为 `None`。
+**仍然缺**：两侧不一致时的界面提示（现在只在预览里显示目录声明）。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
