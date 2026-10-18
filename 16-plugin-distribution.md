@@ -398,6 +398,9 @@ pub struct CatalogItem {
 > 写出两个值；界面把它跟在“装上但处于关闭状态”后面显示。它不是拒绝：两份文档都出自作者，任何一份都可能过期；但沉默会
 > 浪费目录提供的唯一第二个意见。
 ★ 仍会拒绝：空列表、同一版本列两次、`latest` 指向不存在的版本（文档说一件事、列另一件事时不做猜测）。
+★ **作者不用手写它**：`synra-plugin pack --index <base>` 在 tarball 旁边写 `<pluginId>.json`（如 `dist/@acme/hello.json`），
+`tarball` 是 `{base}/{文件名}`，`manifest` 取自 manifest 文件，`publishers` 取自刚刚核对过的签名（无签名则为空）。手写的 index
+是对同一份包的第二种描述，两份会漂移。
 **仍然缺**：客户端还没有把 `plugins.registry` 指向静态 index（目前只解析，不接网络）；`index.json` 的缓存与 ETag 也
 留给接入时处理。
 > ★ **接上了**：`plugins.registry` 里以 `static:` 开头的地址表示静态 index（如 `static:https://bucket.example/plugins`）。

@@ -1323,6 +1323,16 @@ artifact 的摘要；签名后改过 wasm 或 manifest 都会被拒绝。测试�
 提供的唯一第二个意见。
 ★ 测试 3 条：匹配静默、不同则句子含两个值、缺任一侧不算不一致。
 
+### 8.44 `pack` 顺手写静态 index
+
+★ `synra-plugin pack --index <base>`：在 tarball 旁边写 `<pluginId>.json`（`dist/@acme/hello.json`，与客户端的
+`{base}/{pluginId}.json` 同形）；`tarball` 用 `{base}/{文件名}`，`manifest` 取自 manifest 文件，`publishers` 取自刚核对过的
+签名（无签名则空）。
+★ `--index` 的 base 允许路径（桶前缀），仍要求 https / loopback http。
+★ 测试：签名包写出的 index 能被 `parse_static_index` 读回（latest、tarball URL、publisher key、内联 manifest）；无签名时
+`publishers` 为空。
+**仍然缺**：多版本 index 的累加（现在每次只写当前版本，发布多个版本需要作者合并）。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
