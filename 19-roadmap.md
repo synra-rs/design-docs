@@ -2462,6 +2462,24 @@ clippy、guards 12。
 **仍然缺**：`.synrabackup` zip 的导入/导出；恢复没有“确认”步骤（命令本身就是确认）；跨 schema 版本的回退/升级没有
 测试（更旧的备份靠 `open_read_only` 的版本检查与后续 `migrate`）。
 
+### 8.111 日志不再让调用者等磁盘
+
+★ 设计里“非阻塞 writer”一直没做：`tracing` 在产生事件的线程上调用 writer，同步写让每个记录日志的线程为文件系统付时间。
+健康磁盘上是微秒，满盘、网络盘、被杀软扫描的目录上不是 —— 一个写自己日志就卡住的产品，用户会把日志关掉。
+
+- **队列在脱敏之后**：`RedactingWriter<QueueWriter>`。字节在调用者线程上被脱敏，再入队；worker 只看到已脱敏的字节，
+  机密不在队列里等，队列的 bug 也绕不过策略。
+- **有界**：`DEFAULT_QUEUE_CAPACITY = 4096` 行。队列满就丢**新**行并 `LogStats::record_drop`，而不是阻塞或无限增长。
+  丢的是诊断，不是用户的工作；计数让这个选择在状态报告里可见，而不是静默。
+- **退出时排空**：`LogGuard` 的 drop 先 flush writer（把残余排入队列），`Worker` 的 drop 发 `Stop`（阻塞发送，保证在
+  已有行之后）并 join；worker 在 `Stop` 后 flush 文件 —— 最后一行仍然到磁盘。
+- **测试**：队列写入在 stop 前全部到达 sink；被卡住的 worker + 容量 2 + 10 行 → 恰好 8 行被计数丢弃、调用者不阻塞。
+  另加 `crates/synra-observe/tests/logging.rs` 的端到端 init 测试仍然通过（“行到了磁盘上、`hunter2` 没到”）。
+
+★ 测试：observe **288**（+2）、core 674、daemon 221、store 233、CLI 93、app shell 262/261、前端 259、workspace clippy、
+guards 12。
+**仍然缺**：满盘时的写失败只被忽略（这一层没有地方报告）；队列容量是常量，不随磁盘调节；被丢弃的行没有“丢了什么”的摘要。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |

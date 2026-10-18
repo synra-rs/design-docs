@@ -624,8 +624,10 @@ pub fn install_panic_hook(paths: &Paths, version: &str) {
         JSON 里级别是 `"level":"DEBUG"`，不是 token，那个过滤器会一行都认不出来。
       也就是说**文档要 JSON、读取端要文本**，两者是冲突的，而读取端是有测试的真代码。
       先把写入端做成文本（可离线、与现有读取端一致），并把冲突记在这里，而不是加一个 feature 去换格式。
-      ★ 仍未做的一半：**"非阻塞 writer"没有** —— 写入是同步的，没有 `tracing-appender` 的
-      `non_blocking`。轮转是**按大小**（`DEFAULT_MAX_BYTES = 8 MiB`，`DEFAULT_KEEP = 7`），不是按天。
+      ★ **2026-10-19：非阻塞 writer 做了（19 §8.111）。** 写入链变成 `tracing` → `RedactingWriter` → **有界队列** →
+      后台线程 → `RotatingFile`：脱敏仍在调用者线程上、入队之前完成，队列里只放已脱敏的字节。队列满 4096 行就**丢新的**
+      并计数（`LogStats::dropped`），不阻塞产生日志的线程；`LogGuard` 的 drop 先 flush writer 再让 worker 排空并
+      flush 文件，所以最后一行仍然到磁盘。轮转仍按大小（`DEFAULT_MAX_BYTES = 8 MiB`，`DEFAULT_KEEP = 7`），不是按天。
       测试在 `crates/synra-observe/tests/logging.rs`（独立二进制，因为 `try_init` 是进程级的），
       且**只有一个 `init` 测试**：两次安装会互相冲突，两个测试各装一次就是竞态。
       它断言的是"行到了磁盘上"以及"**`hunter2` 没有到磁盘上**"—— 后者是脱敏唯一能失败的地方。
