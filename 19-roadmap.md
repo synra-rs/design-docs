@@ -2148,6 +2148,25 @@ workspace clippy、guards 12 项。
 **仍然缺**：`--follow` 不处理日志轮转后的 `.1` 历史（只跟当前文件）；`--trace` 依然没有东西可过滤，因为日志行里
 还没有 trace id。
 
+### 8.94 链路为什么结束：三个出口与一组原因
+
+★ `links_closed_total` 一直没有生产者，因为“关闭”没有一个统一的地方。listener 的读循环有三个出口，而原因的词汇就在
+`LinkError` 里：`Decision::Idle` → `idle`；对端 `Bye` → `closed`；握手未完成 → `handshake`；其余错误按
+`timeout`/`transport`/`protocol` 分类，传输层错误 → `transfer`。
+
+★ **只在 listener 记**：`Host::count_link_closed` 的注释写明了范围 —— 它数的是 listener 服务过的连接。拨号链路是短暂的
+一问一答，没有“关闭”这个时刻；因此 `links_opened_total`（在 `adopt` 记、两个方向都算）与它不是一对必须相等的数。
+如果要让两者相等，需要给拨号链路的结束也定义语义，那是另一件事。
+
+★ **测试抓到的两处语义**：
+① 一个未握手的连接在 300ms 后结束，counter 是 `handshake` 而不是 `timeout` —— 握手失败发生在进入读循环之前。
+② 一个握手后挂断的连接是 `closed`（对端 FIN），不是 `idle` —— `idle` 要等读循环自己的 patience。测试因此按实际观察到
+的原因断言，而不是按我一开始以为的。
+
+★ 测试：core 672 条、daemon 215 条（transport 8 条：`closed` 与 `handshake` 各有断言，外加一条握手后挂断 → `closed`）、
+workspace clippy、guards 12 项。
+**仍然缺**：`reconnect_attempts_total`（没有重连机制）；拨号链路结束的语义。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |

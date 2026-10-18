@@ -835,7 +835,12 @@ pub fn install_panic_hook(paths: &Paths, version: &str) {
       现在 `AppState::new` 先建记录器再把它交给 `state.host`，listener 自己那个 `Host` 也一样（一个进程两个 Host，
       两处都要）。单测直接调 `Host::count_frame_sent`，断言**壳的记录器**里出现那一行 —— 这正是"接上了"与"函数存在"
       的区别。
-      **仍然缺（网络组）**：`links_closed_total`、`reconnect_attempts_total` 两个宿主都还没有。
+      **仍然缺（网络组）**：`reconnect_attempts_total`（没有重连机制）。
+      ★ **`links_closed_total{reason}` 也接上了（同日更晚）**：由 listener 在读循环结束的三个出口记一次 ——
+      `Decision::Idle` → `idle`，对端 `Bye` → `closed`，握手未完成 → `handshake`，其余错误按 `LinkError` 分类
+      （`timeout`/`transport`/`protocol`，传输层错误 → `transfer`）。**只覆盖 listener 服务过的连接**：拨号链路是短暂的
+      一问一答，没有“关闭”这个时刻可记 —— 这一点写在 `Host::count_link_closed` 的注释里，避免与 `links_opened_total`
+      （在 `adopt` 记、两个方向都有）被读成一对必须相等的数。
       ★ **帧计数搬到了链接上（同日更晚）**：`frames_sent_total{event}` / `frames_received_total{event}` 现在由
       `PeerLink::send` 与 `PeerLink::receive_inbound` 记 —— 链接是**每一帧**都经过的唯一对象，而 `Host::send` 只看得见
       路由过它的那些；拨号链路直写的 offer、配对请求、插件列表请求，以及拨号链路收到的回答，此前都是隐形的。
