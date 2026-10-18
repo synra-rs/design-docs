@@ -707,6 +707,8 @@ pub async fn remove(&self, plugin_id: &PluginId, opts: RemoveOptions) -> Result<
 > ★ **同日更晚：`bytes_freed` 也只算真的走了的（19 §8.108）。** 删除前量的字节数会把留下的目录算成“已释放”；现在
 > `PluginFiles::remove` 返回 `Removal { bytes_freed, leftovers }`，字节数是删除前减去 leftovers 当前大小。锁定文件的
 > 用例断言 `bytes_freed == 0`，关掉句柄后第二次删除才变成 4。
+> ★ **同日更晚：留下的目录在下一次启动被清扫（19 §8.109）。** `PluginFiles::sweep_orphans(installed)` 遍历 artifact 根，
+> 删掉任何不属于已安装插件的目录；sandbox 与散落文件不动。两个宿主在启动时、加载插件之前调用它。
 
 ## 3. 更新（Update）
 

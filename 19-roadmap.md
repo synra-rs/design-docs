@@ -2408,7 +2408,7 @@ daemon 220、store 227、app shell 262/261、前端 259、workspace clippy、gua
 
 ★ 测试：store **228**（+1）、CLI **90**（+1：带有 leftover 的报告句子）、daemon 221、core 674、app shell 262/261、
 前端 259、`pnpm run lint` 0 error、build、shapes 8、workspace clippy、guards 12。
-**仍然缺**：leftover 不会自动重试（下次卸载/重启后手工清理）；freed 的字节口径见 §8.108（现在只算真的走了的）。
+**仍然缺**：leftover 由启动时的清扫补上（§8.109）；freed 的字节口径见 §8.108（现在只算真的走了的）。
 
 ### 8.108 freed 只算真的走了的字节
 
@@ -2425,7 +2425,24 @@ daemon 220、store 227、app shell 262/261、前端 259、workspace clippy、gua
 
 ★ 测试：store 228（锁定用例增加 0/4 两个数字断言）、daemon 221（`bytesFreed` 5 的既有断言不变）、CLI 90、core 674、
 app shell 262/261、前端 259、workspace clippy、guards 12。
-**仍然缺**：leftover 不会自动重试；freed 是“目录树当前字节”，不包含文件系统块对齐的开销。
+**仍然缺**：leftover 由启动时的清扫补上（§8.109）；freed 是“目录树当前字节”，不包含文件系统块对齐的开销。
+
+### 8.109 启动时清扫卸载留下的目录
+
+★ §8.107/§8.108 让 leftover 可见、让 freed 诚实，但留下的目录仍然只能靠用户手工删。插件行已经没了，那个 artifact 目录
+不会再被任何代码引用 —— 下一次启动是完成它的时刻：持有文件的旧进程已经退出，新进程还没有加载任何插件。
+
+- **`PluginFiles::sweep_orphans(installed)`**：把已安装插件的 `plugin_dir` 做成集合，遍历 `plugins/` 下的**目录**，不在
+  集合里的就是孤儿。返回 `Sweep { removed, bytes_freed, leftovers }`。
+- **只扫 artifact 根**：sandbox 里没有对应行的目录是用户选择保留的数据，不是垃圾；根下的散落文件也不是我们的。这两条
+  都写进方法的文档，而不是留给读者推断。
+- **两个宿主在启动时调用**：daemon 在打开数据库、恢复意图之后、加载插件之前；窗口在 `AppState::new` 里。daemon 的这段
+  被抽成 `sweep_plugin_leftovers`，因为直接内联把 `serve` 推过了复杂度预算（30/25）—— 这个数字是测试之外的第一道反馈。
+- **清扫也是尽力而为**：仍被占用的目录进 `leftovers` 并打印路径；下一次启动再试。
+
+★ 测试：store **230**（+2：孤儿被清、已安装与 sandbox 与散落文件都不动；Windows 上被独占的孤儿 → `leftovers` 正是它、
+`bytes_freed` 0，关掉句柄后下一次清扫完成）、daemon 221、core 674、app shell 262/261、前端 259、workspace clippy、guards 12。
+**仍然缺**：清扫只在启动时发生（运行中产生的 leftover 要等下一次启动）；不扫 sandbox 与散落文件（设计如此）。
 
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
