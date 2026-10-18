@@ -429,6 +429,8 @@ pub struct CatalogItem {
 > ★ **条件请求**：文档的 `ETag`/`Last-Modified` 按 URL 缓存；下一次带 `If-None-Match`/`If-Modified-Since`，304 直接复用上次
 > 解析结果（`synra-fetch` 也因此不再把 304 当重定向）。进程内缓存，靠验证器续期，不设 TTL。**npm packument 与静态 index
 > 用同一机制** —— 验证器是注册表的，与它说什么协议无关。
+> ★ **跨进程**：文档与验证器写到缓存目录的 `registry-documents/<sha256(url)>.json`（带格式版本、URL、kind），下次启动先读它，
+> 再做条件请求；格式不认识、URL 不符或 `max-age` 已过期的文件被忽略/删除。写失败只让下次更慢，不会让安装失败。
 > ★ **`Cache-Control: max-age`**：有寿命的条目过期后不再发送验证器，直接重新读取；304 携带新的 `max-age` 时续期。
 > `no-store`/`no-cache` 被当作“没有寿命”，即每次都重新验证 —— 对这个客户端而言是保守的读法。
 
