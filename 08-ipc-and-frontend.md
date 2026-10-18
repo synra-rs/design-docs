@@ -96,6 +96,7 @@
 #[tauri::command] async fn transfer_send_file(state: State<'_, AppState>, req: SendFileRequest) -> Result<TransferId, IpcError>;
 #[tauri::command] async fn transfer_send_text(state: State<'_, AppState>, req: SendTextRequest) -> Result<TransferId, IpcError>;
 #[tauri::command] async fn transfer_cancel(state: State<'_, AppState>, transfer_id: TransferId) -> Result<(), IpcError>;
+#[tauri::command] async fn transfer_respond(state: State<'_, AppState>, transfer_id: TransferId, accept: bool) -> Result<(), IpcError>;
 #[tauri::command] async fn transfer_list(state: State<'_, AppState>) -> Result<Vec<TransferSnapshot>, IpcError>;
 
 // ─────────── plugins ───────────

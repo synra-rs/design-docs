@@ -971,12 +971,25 @@ worker 出现时忘记它。discovery 的 `stop` 只持有 supervisor 的 **shut
 `install::package_directory` 是发送侧：把已安装目录压成包，**跳过解包出的 `ui/`**（包里要的是 `ui.zip`，`ui/` 是本机产物），
 并检查 64 MiB 总量。
 ★ 本轮只到"装得进去"：接收端的同步回调仍发/收单个 wasm，`plugins_sync_run` 与 `record_received` 都还没换成包。
-
 ★ **接上了**：`plugins_sync_run` 把 `plugins/<id>/` 打成 `.synra`（一次一轮，用完删除），`send_to` 发的是包；
 接收侧窗口与 daemon 都在 `on_finished` 里先 `install::from_package`，成功后再 `record_received`。安装失败时回
 `SyncOutcome::refused`，不再写一条"已装"的历史。`proposed_name` 也从 `plugin-<id>.wasm` 改成 `.synra`。
 ★ 由此留下的一件事：`record_received` 里的 `insert_plugin` 在安装之后会失败（插件行已经由安装器写好），现在被
 `let _` 吞掉；它不是错的状态，但那行 `let _` 值得在下一轮收成一个显式的"已安装则跳过"。
+
+### 8.14 接收端的接受/拒绝
+
+★ `Inbox::absorb` 之外新增 `absorb_with`：在**写任何字节之前**把 `Offer`（对端、地址、请求、落点文件名）交给宿主，
+由它回答 `Accept` / `Refuse`。返回 `Refuse` 时先给对端发 `file.transfer.abort`（`UserCancelled`），再以
+`Decision::Failed` 结束连接 —— 不告诉发送端，它会把整个传输窗口等完。
+★ `OfferDecision` 是 `non_exhaustive`（稳定 crate 的公共枚举）；`auto_accept` 让所有旧入口保持原行为。
+★ **窗口侧**：`TransferDesk`（`AppState.transfer_desk`）在一张表上等答案，`ask` 先登记再**发布**
+`TransferUpdated(state = "offered")`，然后等；`transfer_respond` 命令写答案；监听线程在答案后发
+`TransferFinished` 把行收掉。**超时（120 s）按接受处理** —— 提示没人看见时不能变成"文件没人收"；这是旧的默认行为。
+★ **插件包不提问**：一轮同步是用户按过"同步"的决定，中途弹窗会让这一轮依赖有人看着窗口；只有 `Attachment` 会问。
+★ UI 先放在 HomePage 的 in-flight 列表：`state === "offered"` 的行显示文件名与 Accept / Reject，答案是命令，
+行的消失靠 `transferFinished` 事件（不在页面里提前删）。
+**仍然缺的**：提示不是全局浮层（用户在别的页面时看不到），也没有"记住这个对端"的偏好。
 
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
