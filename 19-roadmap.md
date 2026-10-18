@@ -2101,6 +2101,29 @@ listener 必须**不再**记，否则每条路由消息会变成 2。两个 `Hos
 两种配置 clippy、build、shapes 8 项、guards 12 项。
 **仍然缺**：`usage` 里的配额是整块 JSON，界面只展示档位与句子，没有把几个字段画出来。
 
+### 8.92 CLI 也能卸载：把“没人做过的决定”变成 `--data`
+
+★ `synra plugin remove` 一直解析、出现在文档清单里，然后回答“removing needs a decision about the plugin's stored data
+that nothing has made yet”。这个决定后来做过了（窗口的卸载对话框）：默认保留，只有明确要求才删。于是这句拒绝的理由已经
+不成立，剩下的只是**没有 request**。
+
+★ 这一轮把它接完：`Request::PluginRemove { plugin_id, remove_data }`、`Kernel::plugin_remove`（默认拒绝，理由与
+`plugin_install` 同）、守护进程实现、CLI 映射。守护进程**先量字节再删**：`PluginFiles::size_of`（store 新方法，artifact，
+加 `--data` 时的 sandbox），然后删行、删目录，答案 `{pluginId, bytesFreed, dataKept}`。字节数在删除之后量只能是 0，
+那是把“没有东西”伪装成“测量”。
+
+★ **`Runtime` 因此多了一个 `paths` 字段**：`PluginFiles` 需要 `Paths`（artifact 与 sandbox 是两个根），而 Runtime 原先只有
+`data_dir`/`plugins_dir` 两个字符串路径。让命令自己拼 `data_dir.join("plugin-data")` 就是把布局知识复制到第二个地方。
+
+★ **CLI 的 prose 现在有一句真话**：`removed X; N bytes freed; its data was kept/deleted`。把 `dataKept` 字段名丢给用户，
+等于让他们读一个字段来判断自己的设置有没有被删。JSON 输出不受影响。
+
+★ 测试：control 66 条（`every_request_round_trips` 增加 remove）、daemon 215 条（删行+artifact、数据默认保留、
+未安装即 `PluginNotInstalled`）、CLI 88 条（`--data` 进入请求；prose 句子）、store 225 条（`size_of` 的 4/8/0 字节），
+workspace clippy、guards 12 项。
+**仍然缺**：`plugin remove` 不报告“哪些文件没删掉”（`PluginFiles::remove` 要么整棵删掉要么拒绝）；守护进程仍不知道窗口
+是否正打开着这个插件。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |

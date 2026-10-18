@@ -517,6 +517,11 @@ pub async fn install_atomically(
 >   再写一份文件就是同一事实的第二个作者。
 > * **失败即回滚**：目录已就位而写库失败时删掉目录。反过来会让一行指向从未写下的文件，
 >   `load_installed` 会把它报成"插件坏了"，而不是"安装失败了"。
+
+> ★ **2026-10-19：卸载也有 CLI 入口了。** `Request::PluginRemove { plugin_id, remove_data }` →
+> `Kernel::plugin_remove`：守护进程先用 `PluginFiles::size_of` 量字节（artifact，加 `--data` 时的 sandbox），删行，
+> 再删目录，答案带 `bytesFreed` 与 `dataKept`。CLI `synra plugin remove <id> [--data]` 因此从"解析了但什么都没做"变成
+> 真的卸载；prose 输出一句话而不是 JSON 字段名。默认保留数据这一点没变 —— 与窗口的对话框是同一个默认值。
 > * **落点是 `enabled=false, trusted=false`**：第 5 步写的是"安装"，不是"批准"。同意仍然是 `plugins_consent_respond`
 >   （app 侧）与 `plugin enable` 那两步。
 >

@@ -802,6 +802,11 @@ Content-Security-Policy:
       > ★ **剩下两个仍然不做，但现在说的是真话**：`dispatch` 对 `Command::Plugin` 给出
       > "installing needs a registry client, and removing needs a decision about the plugin's stored data
       > that nothing has made yet"，而不是那句关于内核的假话。
+      > ★ **2026-10-19：这两个也做完了，上面那句假话被删掉了。** `plugin install` 已有 `Request::PluginInstall`；本轮新增
+      > `Request::PluginRemove { plugin_id, remove_data }`、`Kernel::plugin_remove` 与守护进程实现（先量字节、删行、删
+      > artifact，`--data` 才删 sandbox），CLI 的 `plugin remove <id> [--data]` 真的发请求，prose 输出一句话
+      > “removed …; N bytes freed; its data was kept/deleted”。`dispatch` 里那个兜底分支现在只覆盖“未来新增、还没有 request
+      > 的 plugin action”，并如实说这一点。
       39 个名字确实存在（**当时**；现在是 40 个，见上），但只在 `crates/synra-ipc/src/command.rs` 的 `commands!` 表里；
       `src-tauri/src/main.rs` 注册了 13 个（identity 2、devices 4、plugins 3、config 2、diag 2）。
       未实现的 26 个（**当时**；现在是 19 个）逐条列在 `synra-rust-app/src/ipc/registration.test.ts`
