@@ -2534,6 +2534,26 @@ workspace clippy、guards 12。
 0 error、build、shapes 8 项。
 **仍然缺**：这一行只读；配额改了以后卡片要等下一次 `plugins_list` 才更新；`burst` 与速率的关系没有画出来。
 
+### 8.115 插件记得自己从哪来
+
+★ 设计 17 §642 说插件 artifact 不备份、“只在 `source.json` 里记录来源” —— 而 `source.json` 此前从未被写过。备份容器因此
+只能列出插件 id，导入后的“请重装这些”是一条没有地址的指令。
+
+- **安装器写来源**：`from_directory_inner` 把 `source.json`
+  （`{ "path": <canonical path>, "installedAtMs": … }`）放进待写文件列表 —— 与 artifact 一起写、失败时一起 `discard`，
+  不会出现“目录没了、来源注记还在”的半成品。
+- **包安装改写来源**：`from_package` 解包到临时目录后调用同一安装器，临时目录随即删除；返回后把 `path` 改写成**包文件**
+  本身，否则重装说明指向一个已经不存在的路径。写失败不使安装失败：来源是元数据，不是安装的一部分（注释里写明）。
+- **容器携带**：`PluginEntry.source`（`#[serde(default, skip_serializing_if)]`）从 artifact 旁的 `source.json` 读取；
+  读不到就是 `None` —— 旧安装或旧容器不知道来源，这是诚实的答案，不是错误。
+- **导入打印**：CLI 的重装清单变成 `  @acme/hello 1.0.0 (from /path/to/hello.synra)`。
+
+★ 测试：core **675**（+1：目录安装的来源注记指向来源目录；包安装的注记指向 `.synra` 文件而非临时解包目录）、store 236
+（容器往返断言 `source == Some("/tmp/packages/hello")`）、CLI 96、daemon 221、app shell 262/261、workspace clippy、`api-guard`、
+guards 12。
+**仍然缺**：**一键重装**（下一步：读容器里的来源并调用安装器）；来源可能是本机路径，换一台设备后那个路径不一定存在；
+registry 安装还没有来源字符串（目前只有目录/包路径）。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |

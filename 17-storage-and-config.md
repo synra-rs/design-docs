@@ -643,6 +643,12 @@ impl GcTask {
 | 插件数据 `files/`   | 用户手动（或"导出插件数据"功能）              | 体积可能大                   |
 | 密钥              | 不备份（安全考虑）                            | 丢失即重新配对               |
 
+★ **2026-10-19：`source.json` 真的写了（19 §8.115）。** 安装器在 artifact 目录里写
+`{ "path": <canonical 来源>, "installedAtMs": … }`；从 `.synra` 包安装时，`from_package` 在临时解包目录被删除前把
+`path` 改写成**包文件**本身（否则重装说明指向一个已经不存在的临时目录）。`.synrabackup` 的
+`plugins-manifest.json` 现在带 `source` 字段（没有就缺省），导入时打印在需要重装的插件后面。
+**还没做的是“一键重装”** —— 现在给出的是从哪里重装的答案，不是替你重装的动作。
+
 **导入/导出格式**（`.synrabackup`，zip）：
 ```
 manifest.json           # 备份元数据（版本、时间、包含什么）
