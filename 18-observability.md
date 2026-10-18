@@ -802,8 +802,16 @@ pub fn install_panic_hook(paths: &Paths, version: &str) {
       另外 `plugins_installed` / `plugins_active` 在 `plugins_list` 读库时 set 成 gauge（`active` 是用户的开关，
       不是本进程载入了几个）。测试：守护进程那条计数器测试多断言一次直方图；壳两条（意图的 outcome/无处理/时长、
       两个 gauge 分别为 2 与 1）。
-      **仍然没有生产者**：壳侧的网络、发现、传输那几组（核心/守护进程侧已有部分），以及 §4.1 的
+      **仍然没有生产者**：壳侧的网络、发现两组（核心/守护进程侧已有部分），以及 §4.1 的
       `plugin_calls_total`、`transfer_throughput_bps`、存储与进程那几组。
+      ★ **2026-10-19 晚些时候补上了壳的传输组**：`transfers_total{kind,outcome=delivered|cancelled|failed}`、
+      `transfer_bytes{kind}`（只在 delivered 时记 —— 一次取消或失败没有“文件多大”的答案，记计划大小等于描述没有
+      发出的字节）、`transfer_duration_ms{kind}`（含拨号时间）。记录点是**每个开始的传输都汇合的两处**：
+      `send_over_with` 的拨号失败出口与 `send_ready_since` 的结束处；`send_ready_with` 把尝试开始时间传下去，
+      所以直接调它的测试也会留下一条记录。两条已有测试各多断言一次：成功的那条计数 1 且 size 直方图的 sum 等于文件
+      大小，取消的那条计数 1 且 **没有** size。
+      **仍然缺**：收件方向（listener 的 `FinishedCallback` 只知道“到了”，没有把字节数与耗时交给记录器）、
+      壳侧的网络与发现两组。
 - [x] 设置页的"性能"面板（实时指标）—— **有了（2026-10-19）**。
       ★ `diag_metrics` 从“注册了、没有调用方”变成设置页底部的一节：挂载时读一次、之后每 5 秒重读一次
       （卸载时清掉 interval），Refresh 按钮是立刻读一次。行是**内核渲染的那个键**（`name{label=value}`，与日志、

@@ -1595,6 +1595,29 @@ increment：写失败半途不会留下一个要补正的计数，而被外部�
 **仍然没有生产者**：壳侧的网络、发现、传输三组；以及 §4.1 的 `plugin_calls_total`、`transfer_throughput_bps`、
 存储与进程那几组。
 
+### 8.66 壳的传输指标：一个汇合点，三种结果
+
+★ **发送组接上了**：`transfers_total{kind,outcome=delivered|cancelled|failed}`、`transfer_bytes{kind}`、
+`transfer_duration_ms{kind}`。名字与守护进程已有的两项（`transfer_bytes{kind}`、`transfer_duration_ms{kind}`）一致；
+`transfers_total` 多一个 `outcome` —— 守护进程第 144 轮**故意没做**它，因为它的 `send_file` 有多条早退且是 trait
+方法、无法包一层。壳不是 trait impl，所以这里能做，而且做了才有“失败率”这个数字。
+
+★ **落在哪两处**：一次传输的开始与结束必须汇合在同一处，否则计数器只会数成功的那部分。壳的路径是
+`send_over_with`（拨号）→ `send_ready_since`（逐块）。于是：
+* 拨号失败在 `send_over_with` 里记 `failed` —— 这是用户最常问的那种失败，一个块都没动；
+* 其余出口（成功、取消、块被拒）在 `send_ready_since` 结尾记一次；
+* 时长从 `send_over_with` 进入时开始算，所以含拨号时间；`send_ready_with` 作为直接调用的入口传 `Instant::now()`，
+  测试因此也会留下一条记录。
+
+★ **字节数只在 delivered 时记**：`transfer_bytes` 回答“这台设备发出去的文件有多大”，取消/失败的计划大小不是发出
+去了多少。取消的那条测试因此断言 size **不存在**，success 的那条断言 sum 等于文件字节数 —— 两条一起钉住这个判断。
+
+★ **收件方向仍然没有**：listener 的 `FinishedCallback` 只交回“到了”（路径、长度、id），没有耗时与方向，
+把一个只有一半的 transfer 指标硬塞进去会把“发出”和“收到”混成一个数字。等收件回调带上字节数与时长再接。
+
+★ 测试：壳 247 条通过（成功与取消两条各多一段指标断言），clippy 两种配置 `-D warnings` 通过。
+**仍然缺**：收件方向的传输指标；壳侧的网络与发现两组；`transfer_throughput_bps`（需要块级采样）。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
