@@ -1070,6 +1070,9 @@ Content-Security-Policy:
       `plugin_ui_rpc(token, method, args)` 用 token 反查 `hosted_ui`，校验会话，再分派；
       **`device.list` 是第一个有实现的方法**（四个字段：`deviceId`、`displayName`、`platform`、`online`），
       其余在表面上但返回 `Unsupported` —— 一个空列表或一个假答案会让作者按不存在的功能写代码。
+      ★ **`storage.*` 也接上了**（同日更晚）：`get/set/delete/keys/quota` 走同一通道，grant 用会话的
+      `CapabilitySet` 检查，配额用 `PluginSet::quota`、写入按 `used - replaced + new` 判断，超限是 `PayloadTooLarge`。
+      门面编码为 JSON，读到 headless 半的裸字符串则原样返回。
       ★ **两处顺带修掉的、比枚举更重要的事**：
       1. `open_request` 原来用 `issue_placeholder` 签令牌，而它是**计数器**（注册表自己的文档写着 not for production）——
          一个页面能猜到另一个页面的令牌。现在用 `uuid::Uuid::new_v4().as_u128()`（122 位随机）；
@@ -1086,7 +1089,7 @@ Content-Security-Policy:
       要求 token 在闭包里；作为参数它只活在构造门面的那次调用中。
       **生成物为什么提交**：Rust 构建不依赖 Node；`scripts/check-shapes.ts` 的 `facade-fresh` 用 Vite 的 `build()`
       在临时目录重建并逐字节比较（CRLF 归一化），所以"提交了过期产物"是一个红门而不是一次事故。
-      **仍然缺的**：其余 op（storage / network / transfer / clipboard / self）与插件卡上的"打开"入口。
+      **仍然缺的**：network / transfer / clipboard / self 四个命名空间与插件卡上的"打开"入口。
 - [x] **协议 handler 做了，CSP 受框架限制**（2026-10-18）。
       `builder()` 里 `register_uri_scheme_protocol("synra-plugin", …)`（Tauri 2.12 的方法名是
       `register_uri_scheme_protocol`，handler 收的是 `UriSchemeContext` 而不是 `AppHandle` —— 猜一次就错，读

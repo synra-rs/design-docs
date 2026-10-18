@@ -832,6 +832,12 @@ M0 ──▶ M1 ──▶ M2 ──▶ M3
 `Interface::allows` 说插件接口不能到 Host 那一边。现在它走 `plugin_ui_rpc`，内核把卡片裁成四个字段
 （地址、blocked、传输进度都不给插件看）。
 
+★ **存储也接上了**：`storage.get/set/delete/keys/quota` 走同一个 RPC。grant 由**会话的 `CapabilitySet`** 检查
+（`storage:local:read` / `write`），不是门面那套字符串集合 —— 后者只用于同步的 `env.can`。配额用 `PluginSet::quota`
+（没有引擎的窗口用默认 64 MiB），写入算法与 `HostCalls` 一致：`used - replaced + new`；超限返回 `PayloadTooLarge`
+（协议没有 quota 专用码，而 `RateLimited` 会让插件"等一会儿"—— 错的方向）。门面把值编码成 JSON；读到一个
+headless 半写入的裸字符串时按原样返回，而不是抛 `SyntaxError`。
+
 **仍然缺的**是把 `createInjection(context)` 装进插件页。初始化脚本只放 label 与 token；可行的做法是把注入门面
 单独构建成一份资源（Vite 的第二个 entry），开窗时**拼进 `initialization_script`** —— 这样 `window.synra` 在页面
 任何脚本之前就存在，插件作者也不必改 HTML。要先决定生成物放哪（提交生成物 + 守卫，还是随安装包发资源），
@@ -852,6 +858,9 @@ M0 ──▶ M1 ──▶ M2 ──▶ M3
   提交生成物通常是个坏主意；这里成立的前提是**有一个能证明它是最新的守卫**。
 - 两个小决定：`dist`/`src-tauri/gen` 之外，eslint 也忽略 `src-tauri/inject`（压缩产物的风格不是本仓库的风格）；
   `sdkVersion` 取 manifest 的 `sdk.preferred`（没写才退回 `min`）——`min` 是兼容下限，报它会告诉插件它是对更老的宿主构建的。
+
+**仍然缺的**：network / transfer / clipboard / self 四个命名空间（都在方法表里、都以 `Unsupported` 回答），
+以及插件卡上的"打开"入口。
 
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
