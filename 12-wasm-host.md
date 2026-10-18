@@ -699,6 +699,9 @@ Wasm **验证与编译本身**是攻击面（一个精心构造的模块可以�
 - [x] `InstancePool` + 空闲回收 + 池指标 —— **A/C**：真名 `pool::InstancePool`
       （不是 `PluginPool`），`pool/instance.rs:278` `evict_idle(now_ms)`、`:317` `PoolReport`。
       ★ `evict_idle` 只被测试调用，没有任何扫描器；`synra-observe` 里也**没有池指标**。
+      ★ **2026-10-19：池指标有了，扫描器仍然没有。** `plugin_pool_hit_total` / `plugin_pool_miss_total` 在
+      `PluginSet::call` 里按“调用前 `live` 是否已有这个 handle 的实例”记一次；`evict_idle` 依旧只有测试在调 ——
+      池的**回收**仍然没有生产触发点。
 - [x] 健康状态机 + 降级/停用策略 —— **A/C**：真名 `quota::Health`
       （不是 `PluginHealth`/`HealthState`），`quota/budget.rs:25` 四档 + `:16/:19` 阈值 +
       `:152-159` 降级配额，`quota/tests.rs:290-364` 有完整阶梯测试。
@@ -716,6 +719,10 @@ Wasm **验证与编译本身**是攻击面（一个精心构造的模块可以�
       得出“Runtime 没有这个字段”，于是又加了一个 —— **而它本来就在第 90 行**。
       这次是编译器在提交前拦下的，而上一次是我自己 grep 到的 ——
       **两次都是“看了一部分就下结论”**。
+      ★ **2026-10-19：窗口侧的健康也有生产者了。** 契约里的 `PluginHealthDto`（档位、句子、准入/拒绝、生效配额）此前
+      没有任何代码构造，壳的每张卡都是 `health: None`。现在 `PluginSet::report_of` 返回 `QuotaReport`，壳的 `snapshot()`
+      映射成 DTO，卡片在档位不是 `good` 时显示警告（`faulted` 用 error），正文是配额自己的 `explain()` 句子。
+      与 daemon 的 `liveHealth` 是同一档、同一个 budget。
 - [ ] 测试：死循环（fuel）、阻塞 host（epoch）、内存炸弹、trap 恢复、并发隔离 ——
       ★ **五项里 0 项**由一个真跑 wasm 的测试覆盖：
       fuel 的唯一真用例 `wasmtime_tests.rs:306` 被 `#[ignore]`；
@@ -723,7 +730,10 @@ Wasm **验证与编译本身**是攻击面（一个精心构造的模块可以�
       内存炸弹无 guest 测试（`:354` 只断言 ceiling 已安装）；
       trap 恢复只有 `ScriptedBackend` 桩；并发隔离测的是线程池，不跑 wasm。
       本 crate 里唯一执行真 wasm 的两个测试都被 `#[ignore]`（`wasmtime_tests.rs:270, 306`）。
-      ★ **但是 `#[ignore]` 的理由值得照抄下来，它比"没做"更有用**：
+      ★ **2026-10-19 更正 fuel 那一行**：`last_fuel_consumed()` 现在由 `PluginInstance` 暴露，wasm 后端在调用前后各读
+      一次 `store.get_fuel()`；断言它的测试是 `a_call_reaches_the_guest_and_its_answer_comes_back`（**没有** `#[ignore]`），
+      外加一个被 fuel 停下的 guest 断言恰好花了预算那么多 —— 所以“fuel 只有被 ignore 的用例”这句不再成立。
+      仍然被 ignore 的两条（`wasmtime_tests.rs:270, 306`）的注解值得照抄，它比"没做"更有用：
       两条的注解都是
       "the hand-written fixture does not match the canonical ABI for a `string` parameter and result;
       the lookup itself now works, and a fixture built by `bindgen!` from the WIT file is what would close this"。

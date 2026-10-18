@@ -2084,6 +2084,23 @@ listener 必须**不再**记，否则每条路由消息会变成 2。两个 `Hos
 还在生产路径上），daemon 213 条、壳 259 条全部仍绿 —— 说明“从 Host 移走”没有让任何真实路径少计。clippy、guards 12 项。
 **仍然缺**：`links_closed_total`、`reconnect_attempts_total`。
 
+### 8.91 插件卡的警告：健康档位一直有形状，没有数据
+
+★ 契约里的 `PluginHealthDto`（档位、句子、准入/拒绝、生效配额）从写下的那天起**没有任何代码构造**：壳的 `snapshot()`
+把 `health` 固定为 `None`。后果是具体的 —— 一个被配额降级、甚至已停用的插件，在界面上和一个从未运行过的插件完全一样。
+
+★ 现在：`PluginSet::report_of` 返回 `QuotaReport`（引擎的稳定类型），壳的 `snapshot()` 映射成 DTO，卡片在档位不是
+`good` 时显示一条警告：`overreaching`/`degraded` 用 warning，`faulted` 用 error，正文是配额自己的 `explain()` 句子 ——
+不是界面另写一句。`admitted`/`refused` 是**门**的调用数（脚本化的 guest 不调 host 函数时是 0），这一点写进了测试注释。
+
+★ **顺手更正契约注释**：`explanation` 写的是“message key”，而值与 `Health::explain()` 一样是英文句子 —— 说成 key 会让
+界面以为它可以翻译一个它翻译不了的东西。镜像里的中文注释同步。
+
+★ 测试：壳 260 条（新增：加载一个插件后卡片的 `health` 是 `good`、`calls_admitted=0`、`usage` 非空；无引擎时 `None`），
+前端 259 条（新增：`degraded` 的卡片出现警告标签与配额句子），core 672 条（`report_of` 已加载有报告、未加载为 `None`），
+两种配置 clippy、build、shapes 8 项、guards 12 项。
+**仍然缺**：`usage` 里的配额是整块 JSON，界面只展示档位与句子，没有把几个字段画出来。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
