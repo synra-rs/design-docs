@@ -837,6 +837,21 @@ M0 ──▶ M1 ──▶ M2 ──▶ M3
 任何脚本之前就存在，插件作者也不必改 HTML。要先决定生成物放哪（提交生成物 + 守卫，还是随安装包发资源），
 所以留成独立一轮。
 
+★★ **而这一轮把它做完了（同日更晚）**，选的是"提交生成物 + 守卫"：
+
+- `src/ipc/injection/bootstrap.ts` 是第二个 Vite 构建入口（`pnpm run build:facade`，配置在 `vite.inject.config.ts`），
+  产出一份 IIFE：`src-tauri/inject/facade.js`（约 8.5 KB，含内联的 `@tauri-apps/api`）。
+- 壳用 `include_str!` 把它嵌进来；`open_request` 先写
+  `Object.freeze(window.__SYNRA_PLUGIN__ = Object.freeze(<seed>))`，再把门面拼在同一段 `initialization_script` 里。
+  seed 带 label / token / pluginId / granted / denied / locale / darkMode / sdkVersion / platform / hostKind /
+  appVersion —— 全部由宿主在页面加载前决定。`Object.freeze` 在门面读取之前，而门面把值复制进闭包，
+  所以页面自己的脚本改写全局也影响不了已注入的授权。
+- **为什么生成物要提交**：Rust 构建不能依赖 Node。所以 `facade.js` 进仓库，`scripts/check-shapes.ts` 增加
+  `facade-fresh`：用 Vite 的 `build()` 在临时目录重建一次、逐字节比较（先把 CRLF 归一化）。生成物过期就是红。
+  提交生成物通常是个坏主意；这里成立的前提是**有一个能证明它是最新的守卫**。
+- 两个小决定：`dist`/`src-tauri/gen` 之外，eslint 也忽略 `src-tauri/inject`（压缩产物的风格不是本仓库的风格）；
+  `sdkVersion` 取 manifest 的 `sdk.preferred`（没写才退回 `min`）——`min` 是兼容下限，报它会告诉插件它是对更老的宿主构建的。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
