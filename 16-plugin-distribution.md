@@ -418,6 +418,8 @@ pub struct CatalogItem {
 > ★ **上传是作者自己的命令**：`synra-plugin upload --index … --base … --command 'aws s3 cp {file} {url}'` 按 index 顺序
 > 上传 index 与每个 tarball。模板按空白切分、占位符逐 token 替换、**不经过 shell**；`{file}`/`{url}` 各成为一个参数（路径
 > 含空格也一样）。凭据与工具属于作者，这个命令只提供两个它算得准的值：哪个文件、哪个 URL。
+> ★ **上传后自动回读**：`upload --verify` 在全部命令成功后调用 `publish --verify` 的同一套检查（远端 index 解析 + SHA-256
+> 比对）；失败时把 `re-upload` 清单打出来并以非零退出。`--dry-run` 不上传，也不回读。
 **仍然缺**：客户端还没有把 `plugins.registry` 指向静态 index（目前只解析，不接网络）；`index.json` 的缓存与 ETag 也
 留给接入时处理。
 > ★ **接上了**：`plugins.registry` 里以 `static:` 开头的地址表示静态 index（如 `static:https://bucket.example/plugins`）。
