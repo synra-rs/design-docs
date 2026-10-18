@@ -1423,6 +1423,14 @@ tarball（本地路径按 index 目录/`--base` 解析，URL 按 `--base` 拼）
 ★ `upload --verify`：全部上传命令成功后调用 `publish --verify` 的检查（同一个 `publish_plugin`），输出合并；失败时附
 `re-upload` 清单并以非零退出。
 ★ `--dry-run` 不上传也不回读：dry run 没有新字节可读，去回读只会把旧桶的状态说成这次上传的结果。
+
+### 8.56 契约里那条更简单的搜索注册了
+
+★ `plugins_request_registry_search(query)` 是契约里 `plugins_catalog_search(CatalogQuery)` 的简化入口：同一个端点、
+只给文本。它此前挂在 `NOT_YET_REGISTERED` 上，理由是“没有接 registry 搜索”，而端点在 `plugins_catalog_search` 落地时就
+已经存在 —— 于是它成了一个长期假缺口。
+★ 现在注册为对 `plugins_catalog_search` 的薄包装（`registry/limit/offset/sort` 全为 `None`）；命令清单 45 条中注册 43 条。
+★ 清单、fake kernel 的参数表与返回都同步；README 的计数由 `shapes` 的 `readme-counts` 守住。
 ★ 测试：`--dry-run --verify` 指向不可达地址仍成功（证明没有发起网络请求）。
 
 ## 9. 每阶段的"退出条件"（不允许跳过的）
