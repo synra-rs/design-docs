@@ -752,11 +752,13 @@ Content-Security-Policy:
       >   **没有 trace**（session 没拿到 trace），所以永远是 `None` —— 是**记录**的缺口，不是映射的。
       >   `AuditEntry::new` 的字段里也确实没有可以当 trace 的东西。
       > * ★ **而它现在有调用方了（2026-10-19）**：插件卡的 “Recent calls” 折叠区在展开时读这条记录，拒绝行高亮并带
-      >   `reason`；“没有记录”与“读不到”分别是空态与 `ErrorNotice`。命令答的是环的尾部、旧→新，
-      >   `pages/plugins/actions.ts` 的 `audit()` 因此翻成“最新在前”。
-      > * ★ **清空也接上了**：`plugins_audit_clear`（`Unit`）走 `PluginSet::clear_audit` → `AuditRing::clear_plugin`，
-      >   只清一个插件的记录（计数一起清）；界面上它只在那一节有行时出现，且不弹确认。完整历史仍然没有 ——
-      >   只有内存环，`plugin_audit` 那张表没有读者。
+      >   `reason`；“没有记录”与“读不到”分别是空态与 `ErrorNotice`。顺序由表的查询保证（`at_ms DESC, id DESC`，
+      >   新→旧），`pages/plugins/actions.ts` 不再反转。
+      > * ★ **清空也接上了**：`plugins_audit_clear`（`Unit`）同时删 `plugin_audit` 的行与 `PluginSet` 环里的记录，
+      >   只清一个插件；界面上它只在那一节有行时出现，且不弹确认。
+      > * ★ **读的也是表了**（同日更晚）：`plugins_audit` 走 `audit_trail_for(plugin, limit)` 而不是环，所以重启之后
+      >   的历史仍然在；没有引擎的构建也能答。命名的解析（`AuditOutcome::from_stable_name`）放在 `synra-observe`，
+      >   表的拼写因此只有一份，未知名字被报成拒绝而不是猜成“allowed”。
       > * ★ **而一个“清单”差点被我删错**：`commands/mod.rs` 的 `pub use`
       >   列表看起来无人使用且缺了七个命令，我删了它——而 `diag/tests.rs` 确实在用
       >   其中一个。**我的 grep 模式里漏了 `config_set`，而我没有跑测试就提交。**

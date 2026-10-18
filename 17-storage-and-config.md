@@ -548,7 +548,7 @@ impl GcTask {
 > | 诊断包 | **本轮之前没有调用方**：`BundlePlan` 写好、测试齐全（含两道脱敏和摘要），而生产代码里 **0 个** `BundlePlan::plan`。第 68 轮接上了 `synra doctor --bundle` |
 > | 编译缓存（LRU / 512 MiB） | **没有对象**：全仓 **0 处** `wasmtime::Cache`，也没有任何代码读写 `wasm_cache_dir()` |
 > | catalog 缓存（TTL 7 天） | **没有对象**：`catalog_cache_dir()` 存在，而 `Paths` 之外无人读写它 |
-> | 审计记录（7 天） | **已实现**（第 69 轮）：`record_audit` + `forget_audit_before`，守护进程通过 `with_audit_sink` 写入 |
+> | 审计记录（7 天） | **已实现**（第 69 轮）：`record_audit` + `forget_audit_before`，守护进程通过 `with_audit_sink` 写入。2026-10-19 起壳也写入（同一个 sink 函数）、`plugins_audit` 读表、`plugins_audit_clear` 删表、`AppState::new` 构造时 prune；`audit_retention_days` 这个配置键仍未进 `Catalog`，7 天是默认值 |
 > | 传输会话 | **没有写入方**：`transfer_sessions` 表空着 |
 >
 > ### ★ 而 `plugin_audit` 的写入方，来自一个回调（第 69 轮）

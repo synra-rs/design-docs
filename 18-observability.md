@@ -807,18 +807,21 @@ pub fn install_panic_hook(paths: &Paths, version: &str) {
       测试 2 条：两行（counter + histogram，断言键的拼写与平均值）、overflow 的句子。
 - [x] 审计 UI（时间线 + 拒绝高亮 + 清空）—— **三项都有了（2026-10-19）**。
       ★ 插件卡的 “Recent calls” 折叠区在展开时调 `plugins_audit`（每次展开都读，不在挂载时扇出），拒绝行高亮并带
-      闸门的稳定结果名；“没有记录”与“读不到”分别是空态与 `ErrorNotice`。顺序在动作层翻成“最新在前”。
-      “Clear history” 调 `plugins_audit_clear`（`PluginSet::clear_audit` → `AuditRing::clear_plugin`，只清这一个
-      插件的记录与计数），清完页面写 `[]` 而不是再读一次。
-      **仍然缺的**是 §5.2 的另一半：DB 里那份长期历史（`plugin_audit` 有表、没有读者），所以这里清的是**本进程的环**，
-      命令的文档注释写明了这一点而不是把“历史”说大。
+      闸门的稳定结果名；“没有记录”与“读不到”分别是空态与 `ErrorNotice`。
+      “Clear history” 调 `plugins_audit_clear`，清完页面写 `[]` 而不是再读一次。
+      ★ **命令读的是表，不是环**（同日更晚）：`plugins_audit` 走 `audit_trail_for(plugin, limit)`，SQL 是
+      `at_ms DESC, id DESC`，所以新→旧由查询保证，动作层不再反转。两个宿主都装了 sink，表是环的**超集**，
+      因此重启之后昨天的拒绝仍然看得到。“Clear history” 同时删表里的行与环里的记录 —— 只删一份会让另一份把它救回来；
+      `AppState::new` 在构造时按 7 天 prune 一次（`audit_retention_days` 这个配置键还没进目录）。
+      **仍然缺的**：保留期的配置键；`trace_id` 仍是 `None`（行里没有 trace）。
       ★ **仓库里有两个审计环，只有一个有生产者。**
       * `PluginSet` 的环（`crates/synra-core/src/dispatch/plugins.rs:312`）**有**：每个实例被装上 session，
         调用记录了能力与结果，`drain_audit` 把 session 记下的排进环，`audit_for`/`refusals_for` 读回来。
-        命令 `plugins_audit` 已经在 shell 里注册，读的就是这个环 —— 所以审计 UI 现在**有真数据可显示**。
+        命令已经改读表；环仍供诊断包与 `refusals_for` 使用。
       * `Kernel` 的环（`kernel.rs:676`）**没有**：`record_action` 的唯一调用者是 `kernel_tests.rs:380`，
         而 `synra_core::Kernel` 本身没有任何宿主构造它。这一半仍然是"只有测试往里填数的空壳"。
-      `AuditRing` + `PluginActivity::of`(`audit.rs:384`) 能出摘要，app 里仍然没有任何 audit 组件。
+      `AuditRing` + `PluginActivity::of`(`audit.rs:384`) 能出摘要；界面用的是上面那条记录的插件卡折叠区，
+      不再由这个环供数。
 - [x] `DiagnosticBundle` + 导出流程（内容清单确认）—— **A，而且本次让"debug 日志"这一节真的有内容了**。
       `diagnostics/records.rs:94` + `BundlePlan::build`(`plan.rs:190`) +
       `DiagExportOptions{include_audit, include_debug_logs, log_lines}` 三项默认 `false`
