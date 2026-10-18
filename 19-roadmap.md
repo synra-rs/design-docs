@@ -1733,6 +1733,28 @@ worker 启动时还不存在。
 显示 30、改为 90 并写回）；两种配置 clippy、build、shapes 8 项、guards 12 项。
 **仍然缺**：`log_retention_days` 仍是同样的常量状态；审计的 DB 清空只按插件，没有“清空全部”。
 
+### 8.72 插件调用的计数与延迟
+
+★ 指标清单的插件组一直只有名字。现在 `PluginSet::call` 这个唯一漏斗记三项：
+`plugin_calls_total{interface,plugin}`、`plugin_call_duration_us{interface,plugin}`、`plugin_faulted_total{outcome,plugin}`。
+`interface` 来自 `Work::interface`（`share`/`actions`/`lifecycle`），与协议同一套词；`outcome` 来自
+`CallOutcome::as_str`（`trap`/`timeout`/`fuel-exhausted`/…）。
+
+★ **为什么在 `call` 里而不是 `run_on` 里**：`run_on` 拿到的是一次调用（实例 + 工作 + 预算），不知道是哪个插件、哪个
+接口；`call` 三个都知道，而且匹配、动作、生命周期三个入口都会经过它。放错一层，指标只会覆盖其中一个入口，而那一层
+看起来同样"在记录"。
+
+★ **延迟用微秒，而且不用 `as_micros() as f64`**：设计名是 `plugin_call_duration_us`，目标 <20μs；`as_secs_f64() *
+1_000_000.0` 避免一次整数截断的 cast（本会话早些时候在 transfer 的字节数上已经为同一类 cast 加过 allow）。
+
+★ **fault 的 outcome 是标签而不是第二张计数器**：`trap` 与 `timeout` 对用户是不同的处境，而 `is_misbehaviour` 已经回答
+了"是否 fault"；再写一张按 kind 分表的计数器会是同一个判断的第二种写法。
+
+★ 测试：core 670 条（新增 2：一次调用留下计数与直方图；一次 trap 留下 `outcome=trap` 的 fault），clippy `-D warnings`、
+guards 12 项。
+**仍然缺**：`plugin_fuel_consumed`、`plugin_memory_bytes`（引擎没把读数交给调用方）、`plugin_pool_hit_total` /
+`plugin_pool_miss_total`（`pool.acquire` 不回答命中与否）、`plugin_install_total`（安装路径没有按阶段上报）。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |

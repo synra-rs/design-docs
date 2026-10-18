@@ -832,9 +832,18 @@ pub fn install_panic_hook(paths: &Paths, version: &str) {
       现在 `AppState::new` 先建记录器再把它交给 `state.host`，listener 自己那个 `Host` 也一样（一个进程两个 Host，
       两处都要）。单测直接调 `Host::count_frame_sent`，断言**壳的记录器**里出现那一行 —— 这正是"接上了"与"函数存在"
       的区别。
-      **仍然缺**：壳的**拨号**链路走的是 `dial_peer` + `PeerLink`，绕开了 `Host::send`，所以那些帧仍然不计数
-      （`frames_received_total` 在 listener 的 `handle_within` 一支里，拨号侧的对称位置没有）；`bytes_*`、
+      **仍然缺（网络组）**：壳的**拨号**链路走的是 `dial_peer` + `PeerLink`，绕开了 `Host::send`，所以那些帧仍然不
+      计数（`frames_received_total` 在 listener 的 `handle_within` 一支里，拨号侧的对称位置没有）；`bytes_*`、
       `links_closed_total`、`reconnect_attempts_total` 两个宿主都还没有；`transfer_throughput_bps`。
+      ★ **插件组的前三项也接上了（同日更晚）**：`plugin_calls_total{interface,plugin}`、
+      `plugin_call_duration_us{interface,plugin}`、`plugin_faulted_total{outcome,plugin}`。落点是 `PluginSet::call` ——
+      匹配的 `can-handle`、动作调用与生命周期 tick 都经过它，所以一处覆盖全部调用；`interface` 用
+      `Work::interface`（`share`/`actions`/`lifecycle`），不在这里再列一遍；trap/超时/内存超限已经在
+      `is_misbehaviour` 里判断过，`plugin_faulted_total` 只是把它记下来并带上 `outcome`（`trap`/`timeout`/…）。
+      两个宿主都把记录器交给了 `PluginSet`（`with_metrics`），所以这条对 daemon 与窗口同时生效。
+      **仍然缺**：`plugin_fuel_consumed`、`plugin_memory_bytes`（引擎没有把这两个读数交给调用方）、
+      `plugin_pool_hit_total` / `plugin_pool_miss_total`（`pool.acquire` 不回答命中与否）、
+      `plugin_install_total`（安装路径没有按阶段上报）。
 - [x] 设置页的"性能"面板（实时指标）—— **有了（2026-10-19）**。
       ★ `diag_metrics` 从“注册了、没有调用方”变成设置页底部的一节：挂载时读一次、之后每 5 秒重读一次
       （卸载时清掉 interval），Refresh 按钮是立刻读一次。行是**内核渲染的那个键**（`name{label=value}`，与日志、
