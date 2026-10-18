@@ -687,8 +687,13 @@ pub async fn remove(&self, plugin_id: &PluginId, opts: RemoveOptions) -> Result<
 > 所以 `remove_data` 恒为 `false`），改成 `AModal` + “Also delete its data” 勾选：不勾是保留（默认、可逆），勾了才把
 > `remove_data: true` 传给命令。对话框用 `get-container="false"` 留在组件里，测试才看得见那个勾选框；每次打开都把勾选
 > 重置为“不删”，记住上次的破坏性选择等于第二次访问默认删数据。
-> ★ **仍然缺的**：`RemoveReport`/`bytes_freed` 没有被返回（成功后只给一句 `removedKept`/`removedDeleted` 文案）；
-> 对话框里没有显示数据目录的路径 —— 那需要 `PluginSnapshot` 带一个 `dataPath`，是下一次契约改动的事。
+> ★ **仍然缺的**：对话框里没有显示数据目录的路径 —— 那需要 `PluginSnapshot` 带一个 `dataPath`，是下一次契约改动的事。
+> ★ **2026-10-19：`RemoveReport` 回来了。** 契约里这条命令一直是 `One`，而壳返回 `()`、界面按 `null` 读 —— 声明与实现
+> 差了一个形状，而且没有任何守卫检查返回值。现在 `plugins_uninstall` 返回 `RemoveReport{bytes_freed, data_kept,
+> leftovers}`：字节数在删除**之前**量（artifact 目录 + `remove_data` 为真时的 sandbox），`data_kept` 是
+> `!remove_data`，`leftovers` 恒空 —— `PluginFiles::remove` 要么整棵删掉要么拒绝，没有“删了一半”的状态。
+> 页面把 `bytes_freed` 格式化后放进报告句（`removedKept`/`removedDeleted`），`formatBytes` 同时从 HomePage 抽到
+> `src/format.ts`，两个页面共用一个实现。
 > ★ **仍然缺的**：`RemoveReport`（`bytes_freed` 需要一次测量）没有被返回；命令只回答"删了/没删"。
 
 ## 3. 更新（Update）

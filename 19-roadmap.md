@@ -1965,6 +1965,28 @@ guards 12 项。
 shapes 8 项、guards 12 项。
 **仍然缺**：`RemoveReport`/`bytes_freed`；对话框里显示数据目录路径。
 
+### 8.84 卸载报告：一个声明为 `One` 的命令返回过 `()`
+
+★ `plugins_uninstall` 在契约表里一直是 `One`，但壳的包装器返回 `()`、界面按 `null` 读。守卫检查名字与参数，不检查
+返回值，所以这个差集活了很久：一个能看见的字段（`RemoveReport`）从没被写过，而“删了多少”只有一句没有数字的话。
+
+★ **现在返回 `RemoveReport{bytes_freed, data_kept, leftovers}`**。字节数在删除**之前**量：删完之后再量只会得到 0，那是
+把“没有东西”伪装成“测量”。两个目录都算 —— artifact 总是删，sandbox 只在 `remove_data` 为真时删；报告里的
+`bytes_freed` 是总数，因为用户关心的是“腾出了多少”。`leftovers` 恒空：`PluginFiles::remove` 要么整棵删掉要么拒绝，
+没有“删了一半”的状态。
+
+★ **格式化也合并了**：`formatBytes` 从 `HomePage.vue` 抽到 `src/format.ts`，首页的传输条与插件页的卸载报告共用一个
+实现 —— 两份拷贝第一次改就会对同一个数给出两种写法。
+
+★ **假内核也补了**：`plugins_uninstall` 原来在 `FakeKernel` 里没有处理分支，开发构建点 Remove 会拿到 `undefined`，
+而页面现在要读 `bytesFreed`。补上答案，并把它加进 `REQUIRED_ARGS`（`pluginId`、`removeData`）—— `command-arguments`
+守卫**当场抓到了**这个遗漏，消息是“fake answers plugins_uninstall, which the shell refuses without …”。
+
+★ 测试：壳 259 条（两条卸载测试现在断言 `bytes_freed`：保留数据 = manifest 长度；删除 = manifest + 5 字节）、
+前端 258 条（页面报告句带 `1.5 KiB`；动作层断言 `RemoveReport` 原样传回）、build、lint 0 error、shapes 8 项、
+guards 12 项。
+**仍然缺**：对话框里显示数据目录路径（需要 `PluginSnapshot.dataPath`）。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |

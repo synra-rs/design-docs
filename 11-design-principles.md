@@ -579,11 +579,13 @@ pub enum ProbeOutcome {
       于是把自己测试里的两处调用当成生产代码；修好之后它又报了**自己的源码** ——
 因为它要找的字符串就在它自己身上。两次都是同一件事：**一条看不出“提及”与“使用”区别的规则**。
       取反对照两条：清空允许清单 ⇒ 报出沙箱那两处；在 `paths.rs` 里加一处新的生产调用 ⇒ 报出那一处。
-- [x] 卸载流程有测试断言"删除前有询问、删除后有报告" —— **2026-10-19 补上了前半，后半仍是一句话**：
+- [x] 卸载流程有测试断言"删除前有询问、删除后有报告" —— **2026-10-19 两侧都补上了**：
       `plugin-page.mount.test.ts` 的 “asks about the data in a dialog before removing a plugin” 断言：点 Remove 之后
       `plugins_uninstall` **还没**被调用、对话框里出现两个选择；勾选“同时删除数据”再确认，命令收到 `removeData: true`，
-      页面随后显示 “removed, and its data was deleted”。`plugins/actions.test.ts` 从动作层再断言两个取值都发得出去。
-      **仍然缺**：`RemoveReport` 的 `bytes_freed`（“删了多少”仍只有一句文案），以及对话框里显示数据目录路径。
+      页面随后显示 “removed; 1.5 KiB freed, and its data was deleted”。`plugins/actions.test.ts` 从动作层断言两个取值都
+      发得出去，并断言命令的 `RemoveReport` 原样传回。壳的卸载测试断言 `bytes_freed`：保留数据时只算 artifact，
+      删除时 artifact + sandbox。
+      **仍然缺**：对话框里显示数据目录路径（需要 `PluginSnapshot.dataPath`）。
 - [x] GC 的测试断言“用户数据未被触碰” —— **已有**（第 92 轮）：
       `apps/synra-daemon/src/runtime/tests.rs` 的 `the_sweep_takes_only_what_it_is_for`。
       ★ **而它比试试看更强在两点**：它用 `counts()`（**产品自己的机制**，
