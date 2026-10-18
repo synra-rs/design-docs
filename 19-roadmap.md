@@ -779,6 +779,31 @@ M0 ──▶ M1 ──▶ M2 ──▶ M3
 
 **传输子系统**不该在一轮里开工：它的第一个切片应该是"一个本机回环的传输计划"（`plugins_sync_plan` 已存在但未注册），先把计划与状态机跑通，再谈真正的收发。
 
+### 8.8 同步链路：表终于有了写者，计划问的是现在（2026-10-18 晚）
+
+★★ **`plugins_sync_plan` 的那张空表补上了，而缺口比"计划"低一层。** 再查 `plugin_versions` 时发现**生产代码里没有写入方**：
+`synra_core::install` 只写 `plugins` 行与文件，从不写版本行。于是 `active_plugin_version` 在真实安装之后返回 `None`，
+`plugins_sync_plan` 对任何已安装插件都报 `PluginNotInstalled`。**那句话本身（"写入在安装路径里"）是文档里的一个推断，
+而安装路径里没有那一行** —— 与 `sync_records` / `plugin_versions` 是同一种模式的又一次出现。
+
+现在的链条（四段，各有测试）：
+
+1. **写**：`SynraDb::record_plugin_version` 一个事务里先清旧 `active`、再 upsert 新行；旧行**保留**（回滚要用的 artifact 还在）。
+   `install::from_directory` 在写完 `plugins` 行后调用它，失败时连插件行一起撤销 —— 它因此收 `&mut SynraDb`，
+   因为"两行必须一起退"不是风格问题。
+2. **答**：`plugin_sync::local_list` 把 `plugins` 与 `plugin_versions` 的 active 行 join 成 `PluginList`
+   （没有 active 行的插件不进清单：没有 artifact 可以描述），`answer_plugin_list` 把答复造成信封。
+   listener 在收到 `_synra.plugin.list.request` 时就地作答；`Decision::Delivered` 因此带上信封 —— 回复需要请求的 id、
+   trace 与发送方，而这三样只在信封里。
+3. **问**：`plugin_sync::ask_plugin_list` 发请求并按 deadline 读答复；`MemoryStream` 两端有测试，两条半程第一次真正对上。
+4. **计划**：`plugins_sync_plan` 不再读 `sync_records` 的旧答案。它对每台已配对设备拨号、问一次，把答复交给
+   `replace_sync_for_peer`（同一事务里先删该对端全部行再写：一次活的答复是**完整**的，卸载掉的插件不会出现在里面，
+   而 upsert 看不见"没有"），再用答复里的本插件状态喂 `decide`。`online` 的语义因此变成"**它答复了**"，
+   而不是"它有地址"；没答复的对端仍按"需要发"计入 —— 安全方向。
+
+**剩下的一件**是 `plugins_sync_run`：计划说得出发什么，还没有东西真的发一个 bundle 并读回 `SyncResult`。
+`transfer_send_file` 走的是 `TransferSender::open`（附件），`core::send_bundle` 的调用者在 daemon，壳里没有。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |

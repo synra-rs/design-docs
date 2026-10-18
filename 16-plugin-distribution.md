@@ -1125,3 +1125,29 @@ clippy 的 `type_complexity` 是对的，而它的答案与第 166 轮的 `SyncR
 ★ **而它再次印证了第 141 与第 175 轮的结论**：⑧ 的那七项接不上，不是因为没人写调用者，
 而是因为**序列的第 1 项就要归档与 `SyncSession`，而传输路径没有它们**。
 这是一个设计决定（统一块记账、定义包格式），不是接线工作。
+
+## 第 178 轮：表终于有了写者，而计划问的是现在
+
+★ `plugin_versions` 是这份文档里反复缺席的那张表：`active_plugin_version` 有读者、有测试，而**生产代码里没有写者**。
+`install::from_directory` 写 `plugins` 行与文件，却从不写版本行；`versions.rs` 的模块文档甚至写着
+"the installer wrote it"。于是 `plugins_sync_plan` 在真实安装之后对任何插件都答 `PluginNotInstalled` ——
+一个测试全绿、生产恒为空的功能。
+
+★ 这一轮把四段接上：
+
+1. **写**：`record_plugin_version`（同一事务：先清旧的 active，再 upsert；旧行保留给回滚），
+   以及 `install::from_directory` 里的调用。失败时连 `plugins` 行一起撤销，所以它收 `&mut SynraDb`。
+2. **答**：`local_list` 把 `plugins` 与 `plugin_versions` 的 active 行 join 成 `PluginList`（没有 active 行的插件不进清单），
+   `answer_plugin_list` 造答复；listener 收到请求就地回复，`Decision::Delivered` 因此带上信封。
+3. **问**：`ask_plugin_list` 发请求并按 deadline 读答复，`MemoryStream` 两端有测试。
+4. **计划**：`plugins_sync_plan` 拨号问每台已配对设备，`replace_sync_for_peer` 用答复替换该对端的全部行，再 `decide`。
+
+★ **两个判断值得记下**：
+
+- **一次活的答复是完整的**，所以它用替换而不是 upsert：卸载掉的插件不会出现在答复里，而 upsert 看不见「没有」，
+  旧行会留到永远。
+- **`online` 的意思变了**：从「它有地址」变成「它答复了」。没答复的对端仍计入「需要发」（安全方向），
+  而界面终于能区分「能拨但没答」与「答了但没有」。
+
+★ 仍缺的是 `plugins_sync_run`：`send_bundle` 在 core 里、调用者在 daemon，壳里还没有一个
+「按计划发一个包并读回结果」的运行器。

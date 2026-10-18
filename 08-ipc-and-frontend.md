@@ -599,6 +599,10 @@ Content-Security-Policy:
 > `record_sync` —— 所以 `sync_records` 第一次有了生产写入方。`Router` 不是 daemon 那 660 行编排，而是
 > `synra_core::dispatch::orchestrate::Router`（两个 `Arc`，壳里本来就有）。
 > **壳侧注册总数现在是 30**（多出的是 `plugins_sync_plan`）。仍未做的只有：接收侧的端到端测试（配方在 `19 §8.7`）。
+> ★ **2026-10-18 晚：`plugins_sync_plan` 不再是"读一张没人写的表"。** 它现在对每台已配对设备问一次插件清单
+> （`_synra.plugin.list.request/response`，答半在 core 的 listener），把答复替换进 `sync_records`，再用答复里的本插件状态
+> 喂 `decide`；`online` 因此表示"它答复了"。安装管线也第一次写 `plugin_versions`，否则 `active_plugin_version`
+> 在生产里永远是 `None`。细节与四段改动在 `19 §8.8`、`16 §第 178 轮`；**仍缺的一件**是 `plugins_sync_run`。
 > ★ **worker 的第一步被一个细节挡住（2026-10-18）**：把两条发送命令改成 `async` + `spawn_blocking` 是最省力的修法，
 > 但那要求把 `AppState` move 进去 —— 而 `AppState` **只有 `#[derive(Debug)]`，没有 `Clone`**（`state.rs:39`），
 > `tauri::State` 又借不着 `'static`。两条路：让 `AppState` 变成可 `Clone`（字段大多已是 `Arc`/`Mutex`，
