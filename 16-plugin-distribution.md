@@ -257,6 +257,9 @@ UI 显示：
 > 摘要不会因为构建时钟而变）。只打包 manifest 点名的文件，不把源码/测试带进分发。
 > ★ **pack 先跑 `verify`**：与安装时同一套检查，任何一项失败就不出包 —— 一个已经存在的 tarball 比一份被跳过的报告更容易被
 > 信任。
+> ★ **有签名就核对签名**：存在 `signature.json` 时，pack 用安装侧同一个 `sign::verify` 核对 manifest 与每个 artifact 的摘要；
+> 不匹配就不出包。这里传的是**空 trust store** —— 只问“这把钥匙签的是不是这些字节”，不问“用户信不信这个钥匙”，后者是
+> 安装那台设备的决定。
 > 发布：`npm publish dist/@acme-hello-1.2.3.tgz`（或把同一个 tarball 上传到自建/兼容 registry）。**仍然缺**的是
 > `publish` 子命令：账号、scope、registry 策略都属于发布目标，不属于归档。
 
