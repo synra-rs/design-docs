@@ -841,11 +841,12 @@ M0 ──▶ M1 ──▶ M2 ──▶ M3
 
 - `src/ipc/injection/bootstrap.ts` 是第二个 Vite 构建入口（`pnpm run build:facade`，配置在 `vite.inject.config.ts`），
   产出一份 IIFE：`src-tauri/inject/facade.js`（约 8.5 KB，含内联的 `@tauri-apps/api`）。
-- 壳用 `include_str!` 把它嵌进来；`open_request` 先写
-  `Object.freeze(window.__SYNRA_PLUGIN__ = Object.freeze(<seed>))`，再把门面拼在同一段 `initialization_script` 里。
-  seed 带 label / token / pluginId / granted / denied / locale / darkMode / sdkVersion / platform / hostKind /
-  appVersion —— 全部由宿主在页面加载前决定。`Object.freeze` 在门面读取之前，而门面把值复制进闭包，
-  所以页面自己的脚本改写全局也影响不了已注入的授权。
+- 壳用 `include_str!` 把它嵌进来；`initialization_script` 生成
+  `(function(seed){ <facade>; SynraInjection.boot(seed) })(<seed>)`。seed 带 label / token / pluginId / granted /
+  denied / locale / darkMode / sdkVersion / platform / hostKind / appVersion —— 全部由宿主在页面加载前决定。
+  ★ **seed 是包装函数的参数，不是全局**：设计文档要求 token 在闭包里，而 `window.__SYNRA_PLUGIN__` 会被页面引入的任何
+  脚本读到（一个分析脚本、一个出了问题的依赖）。作为参数它只活在构造门面的那次调用里，门面把值复制进自己的闭包；
+  `window.synra` 仍是插件唯一的入口。
 - **为什么生成物要提交**：Rust 构建不能依赖 Node。所以 `facade.js` 进仓库，`scripts/check-shapes.ts` 增加
   `facade-fresh`：用 Vite 的 `build()` 在临时目录重建一次、逐字节比较（先把 CRLF 归一化）。生成物过期就是红。
   提交生成物通常是个坏主意；这里成立的前提是**有一个能证明它是最新的守卫**。

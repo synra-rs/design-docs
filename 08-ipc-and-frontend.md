@@ -1080,9 +1080,10 @@ Content-Security-Policy:
       第一次被真正遵守，此前注入面自己越过了它。
       ★ **注入也接上了（同日更晚）**：`src/ipc/injection/bootstrap.ts` 是第二个 Vite 构建入口
       （`pnpm run build:facade`，配置 `vite.inject.config.ts`），产出一份 IIFE `src-tauri/inject/facade.js`（约 8.5 KB）。
-      壳 `include_str!` 它，`open_request` 先写 `Object.freeze(window.__SYNRA_PLUGIN__ = Object.freeze(<seed>))`、
-      再把门面拼在同一段 `initialization_script` 里。seed 的字段由宿主在页面加载前决定（含 `granted` / `denied`、
-      locale、dark、`sdk.preferred`、platform、hostKind、appVersion）。
+      壳 `include_str!` 它，`initialization_script` 生成 `(function(seed){ <facade>; SynraInjection.boot(seed) })(<seed>)`。
+      seed 的字段由宿主在页面加载前决定（含 `granted` / `denied`、locale、dark、`sdk.preferred`、platform、hostKind、
+      appVersion）。★ **seed 是参数而不是全局**：`window.__SYNRA_PLUGIN__` 会被页面引入的任意脚本读到，而设计文档
+      要求 token 在闭包里；作为参数它只活在构造门面的那次调用中。
       **生成物为什么提交**：Rust 构建不依赖 Node；`scripts/check-shapes.ts` 的 `facade-fresh` 用 Vite 的 `build()`
       在临时目录重建并逐字节比较（CRLF 归一化），所以"提交了过期产物"是一个红门而不是一次事故。
       **仍然缺的**：其余 op（storage / network / transfer / clipboard / self）与插件卡上的"打开"入口。
