@@ -326,6 +326,10 @@ pub struct CatalogItem {
 > 设备去取别处的 packument 是在索取未被配置的权限）→ `synra-fetch::fetch_bytes` → `synra_registry::extract_tgz`（`package/`
 > 前缀）→ 现有的 `from_directory` 管线。`http` 只允许 loopback（本地镜像/测试），公网必须 `https`。
 > **仍然缺**：catalog 搜索端点、镜像/回退策略（§4.2）、设置页里的 registry 配置与安装 UI。
+> ★ **配置与入口有了**：设置页新增 Registry 一节（写 `plugins.registry`；清空 = `unset`，即关闭 registry 安装）。插件页的
+> 安装框上多了一个 **From a directory / From the registry** 的切换：模式是控件而不是对文本的猜测（`@acme/hello` 与
+> `C:\plugins\hello` 都是“带斜杠的字符串”）。registry 模式把 `{source:'registry', pluginId}` 交给 `plugins_install`。
+> **仍然缺**：catalog 搜索、镜像/回退、以及 registry 安装前的权限预览（内联 manifest 还没显示）。
 
 
 ---

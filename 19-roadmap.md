@@ -1124,6 +1124,16 @@ packument（`/` 编码成 `%2F`），`dist-tags.latest` 或指定版本，`dist.
 packument 与构造的 `.tgz`，断言装上了、库里有行、cache 里的解包目录被清掉；没有配置 registry 时仍是 `Unsupported`。
 **仍然缺**：`plugins_catalog_search`、镜像/回退（§4.2）、设置页里的 registry 配置与安装 UI。
 
+### 8.24 Registry 的用户入口
+
+★ 设置页多了一节 **Registry**：输入 base URL，保存写 `plugins.registry`；清空写 `unset`（不是空字符串 —— 空字符串会被读成
+一个“配置了但不是地址”的值）。输入框是 store 的缓冲：`ConfigUpdated` 到了会覆盖它，页面不自己写第二份真相。
+★ 插件页的安装框改成 **From a directory / From the registry** 两种模式。模式是控件而不是对输入文本的猜测：`@acme/hello`
+与 `C:\plugins\hello` 都是“带斜杠的字符串”，猜错的那一次会去碰网络。registry 模式调 `installFromRegistry`，把
+`{source:'registry', pluginId}` 交给 `plugins_install`。
+★ 测试：设置页写 URL 与清空各一次；插件页切到 registry、输入 id、点 Install，断言命令收到的是 registry source。
+**仍然缺**：catalog 搜索、镜像/回退、安装前的权限预览。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
