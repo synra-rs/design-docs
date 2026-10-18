@@ -1019,6 +1019,11 @@ pub fn install_panic_hook(paths: &Paths, version: &str) {
       负控制：把过滤那行去掉 → 测试红，并且失败信息直接把四条日志打出来。
       ★ 仍未做的：**日志行里现在还没有 trace id** —— 过滤是对的，但要有东西可过滤，
       得先把 `TraceContext` 作为 span 字段挂上去（`TraceContext` 与 `RedactingWriter` 都在，缺的是插桩）。
+      ★ **2026-10-19：trace id 有了第一个来源和一个生产者。** 来源：`IntentSnapshot` 增加了 `trace_id`（板一直带着
+      `IntentView.trace`，快照把它丢了），首页收到的那一行显示它，用户因此有一条可复制的 id。生产者：daemon 的
+      `intent_dispatch` 在路由成功后记一行 `tracing::info!(trace_id, intent, "share routed")`，所以
+      `synra logs --trace <id>` 至少能过滤到这一行。**其余步骤（决定、执行、传输）还没有带上它** —— 这不是“trace 完成
+      了”，而是“过滤从空变成了有一条可查”。
 - [x] `synra logs --follow` —— **★ 2026-10-19 真的跟随了**。
       原状：标志解析、从不读取，命令照常打印尾部就退出，安静日志的快照与一个什么都没发生的实时日志输出完全一样。
       上一轮改成明确拒绝（“需要一个流式协议”），本轮换了实现路线并**删掉了那句拒绝**。

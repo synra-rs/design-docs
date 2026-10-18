@@ -2167,6 +2167,23 @@ workspace clippy、guards 12 项。
 workspace clippy、guards 12 项。
 **仍然缺**：`reconnect_attempts_total`（没有重连机制）；拨号链路结束的语义。
 
+### 8.95 trace id 有了来源：快照带上它，路由记下它
+
+★ `--trace` 一直有过滤、没有生产者：日志行里没有 trace id，用户也没有地方拿到一个 id。这一轮补了两半的**第一块**：
+
+- **来源**：`IntentSnapshot` 增加 `trace_id`。板上的 `IntentView.trace` 从第一版就有，快照把它丢了 —— 用户唯一能粘进
+  `--trace` 的标识，界面反而看不见。首页 “Received” 的每一行显示 `Trace <id>`（等宽、可复制）。
+- **生产者**：daemon 的 `intent_dispatch` 在路由成功后 `tracing::info!(trace_id = ..., intent = ..., "share routed")`。
+  这行会写进 `synra.log`，`--trace <id>` 过滤到它。
+
+★ **写清这不是“trace 完成”**：决定、执行、传输的日志仍然没有 trace 字段（它们大多用 `eprintln!`，根本不进日志文件）。
+所以 `--trace` 目前只会返回路由那一行。把整条动作链的每一步都挂上 trace 是“把 daemon 的自述搬进 tracing”的更大一件事。
+
+★ 测试：core ipc 123 条（快照序列化包含 trace）、壳 260 条（列表与单读同一映射，且 `trace_id` 等于板上
+`raise` 返回的 trace）、前端 259 条（首页行出现 `INTENT.traceId`）、daemon 216 条、js shapes 14 项（34 个 DTO 逐字段）、
+workspace clippy、guards 12 项。
+**仍然缺**：动作链其余步骤的 trace 字段；daemon 的 `eprintln!` 自述仍未进日志文件。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
