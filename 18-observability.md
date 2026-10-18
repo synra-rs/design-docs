@@ -802,8 +802,9 @@ pub fn install_panic_hook(paths: &Paths, version: &str) {
       另外 `plugins_installed` / `plugins_active` 在 `plugins_list` 读库时 set 成 gauge（`active` 是用户的开关，
       不是本进程载入了几个）。测试：守护进程那条计数器测试多断言一次直方图；壳两条（意图的 outcome/无处理/时长、
       两个 gauge 分别为 2 与 1）。
-      **仍然没有生产者**：壳侧的网络、发现两组（核心/守护进程侧已有部分），以及 §4.1 的
-      `plugin_calls_total`、`transfer_throughput_bps`、存储与进程那几组。
+      **仍然没有生产者**（写这一句时）：壳侧的网络、发现两组（核心/守护进程侧已有部分），以及 §4.1 的
+      `plugin_calls_total`、`transfer_throughput_bps`、存储与进程那几组。传输与发现随后在同一会话里接上，见下面两段；
+      网络那一组仍然没有。
       ★ **2026-10-19 晚些时候补上了壳的传输组**：`transfers_total{kind,outcome=delivered|cancelled|failed}`、
       `transfer_bytes{kind}`（只在 delivered 时记 —— 一次取消或失败没有“文件多大”的答案，记计划大小等于描述没有
       发出的字节）、`transfer_duration_ms{kind}`（含拨号时间）。记录点是**每个开始的传输都汇合的两处**：
@@ -818,7 +819,15 @@ pub fn install_panic_hook(paths: &Paths, version: &str) {
       （若 abort 在第一次 progress 之前到达，就没有时长可记，而不是记 0 把它塞进延迟分布）。
       ★ **可验证性的边界**：`listener::spawn` 要一个 `AppHandle`，所以记录逻辑抽成 `record_received` 并由单测断言，
       而“它真的被那两个回调调用”目前只有编译期证据（与 `frames_received_total` 在 listener 里的处境相同）。
-      **仍然缺**：壳侧的网络与发现两组；`transfer_throughput_bps`。
+      ★ **发现组也接上了（同日更晚）**：`scans_total{result=ran|unavailable}`、`scan_duration_ms`、
+      `candidates_found`。`unavailable` 在 `devices_scan_start` 拒绝（绑不上 socket）时记；`ran` 在一次真正的网络扫描
+      结束时记。`candidates_found` 读的是 worker 维护的一个**设备 id 集合**而不是计数器 —— 一台设备在一个扫描窗口里
+      会广播多次，而问题问的是“几台回答了”，守护进程读的 `host.discovery().len()` 也是集合。集合在扫描前清空，
+      所以第二次扫描不会继承第一次的数字。cached / 零预算的“读已知”**不计**：它们没有扫描，记进去会把“扫了”和
+      “看了一眼”混成一个数字。
+      ★ 测试：一个用 60ms 预算的真实扫描断言三个指标（`ran`、`candidates_found` 的 `count == 1`、duration 存在），
+      拒绝的那条断言 `unavailable`；集合去重单独一条（同一 id 两次只算一台）。
+      **仍然缺**：壳侧的网络一组（`links_*`/`frames_*`/`bytes_*`）；`transfer_throughput_bps`。
 - [x] 设置页的"性能"面板（实时指标）—— **有了（2026-10-19）**。
       ★ `diag_metrics` 从“注册了、没有调用方”变成设置页底部的一节：挂载时读一次、之后每 5 秒重读一次
       （卸载时清掉 interval），Refresh 按钮是立刻读一次。行是**内核渲染的那个键**（`name{label=value}`，与日志、

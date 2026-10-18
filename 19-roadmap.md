@@ -1666,6 +1666,26 @@ record_bytes)`，于是“哪些结果记大小”只有一个判断。名字仍
 ★ 测试：壳 249 条通过（新增 1 条）；两种配置的 clippy `-D warnings` 通过。
 **仍然缺**：壳侧的网络与发现两组；`transfer_throughput_bps`。
 
+### 8.69 壳的发现指标：设备数而不是包数
+
+★ **三个名字，与守护进程一致**：`scans_total{result=ran|unavailable}`、`scan_duration_ms`、`candidates_found`。
+`unavailable` 在 `devices_scan_start` 拒绝（这是“有网络却绑不上 socket”）时记；`ran` 在一次真正的网络扫描结束时记；
+cached 与零预算的“读已知”不计 —— 它们没有扫描，记进去会把“扫了”和“看了一眼”混成一个数字。
+
+★ **`candidates_found` 读的是集合**：worker 在 `record` 之后把接受的设备 id 放进一个
+`Arc<Mutex<HashSet<String>>>`（`Sightings`），命令在扫描前 `reset_sightings`、扫描后取 `len`。一台设备在一个扫描窗口
+里会广播多次，计数器会把它报成两台；守护进程读的 `host.discovery().len()` 也是一个集合，两个宿主的数字必须回答
+同一个问题。集合由 `note_sighting` 这个自由函数写入，worker 闭包持有的是 Arc 而不是整个 `Discovery` —— 后者在
+worker 启动时还不存在。
+
+★ **一个不在设计清单里的选择**：拒绝也是一次扫描尝试，所以 `unavailable` 与 `ran` 同一个 counter、同一个标签名。
+设计写的是“按结果”，守护进程用的就是这两个结果词；壳只是补齐了另一半。
+
+★ 测试：真实扫描（60ms 预算）断言 `scans_total{result=ran}`、`candidates_found` 的 `count == 1`、`scan_duration_ms`
+存在；无 worker 的拒绝断言 `unavailable`；集合去重一条（同一 id 两次 == 一台）。壳 250 条测试、
+两种配置 clippy `-D warnings`、`cargo check`（含 Tauri）。
+**仍然缺**：壳侧网络组（`links_*`/`frames_*`/`bytes_*`）；`transfer_throughput_bps`。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
