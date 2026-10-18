@@ -1367,6 +1367,15 @@ artifact 的摘要；签名后改过 wasm 或 manifest 都会被拒绝。测试�
 ★ 测试 2 条：本地服务回读通过并打印 `digest matches`；桶里 tarball 改一个字节 → 报 `different bytes`。
 **仍然缺**：上传本身；回读失败后自动重传（现在只报告）。
 
+### 8.49 插件页自带 CSP
+
+★ `plugin_ui::document_response`：`synra-plugin://` 的 200 响应加 `Content-Security-Policy`，策略与 09 §416 一致
+（`default-src 'none'`、`connect-src 'none'`、`script-src 'self' 'unsafe-inline'`、`form-action 'none'`）。
+★ 理由：Tauri 2.12 没有公开 per-window CSP，页面只继承 `tauri.conf.json` 的全局策略；把策略放进文档响应头后，
+`connect-src 'none'` 不再依赖一个页面看不见的设置。两者同时生效时浏览器取交集。
+★ 测试：`document_response` 的状态与四个关键指令（默认 / 连接 / 脚本 / 表单）。
+**仍然缺**：`'self'` 在自定义协议 origin 下的真实语义仍需一次运行确认；上传本身。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |

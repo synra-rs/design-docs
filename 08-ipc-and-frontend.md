@@ -1128,11 +1128,15 @@ Content-Security-Policy:
       `tauri-2.12.1/src/app.rs:2267` 一次就对），handler 是 `commands::plugin_ui::serve`：
       已知 id 取自 `hosted_ui`（页面只能点名宿主开过窗口的插件）→ `split_ui_url` → `ui_file` →
       `200`（带 content-type）/ **`403`**（路径规则拒绝）/ **`404`**（包缺文件）。
-      ★ **CSP 的结论是"继承"，不是"独立"**：Tauri 2.12 **没有公开的 per-window CSP**（`set_csp` 是 `pub(crate)`，
+      ★ **CSP 的结论是"继承 + 文档自带"**：Tauri 2.12 **没有公开的 per-window CSP**（`set_csp` 是 `pub(crate)`，
       见 `tauri-2.12.1/src/…/mod.rs:53`），所以插件页拿到的就是 `tauri.conf.json` 的全局策略
       `default-src 'self'; connect-src 'none'; img-src 'self' data:; style-src 'self' 'unsafe-inline'`。
-      这比设计要求的（插件页 `connect-src 'none'`）**更严**，方向是对的；但 `'self'` 在 `synra-plugin://` 这个 origin 下
-      具体意味着什么，只能由一次真实运行确认 —— 这是本仓库唯一无法用 `cargo check` 回答的问题，记在这里而不是假装它已解决。
+      ★ **handler 现在给 200 响应加上 `Content-Security-Policy` 头**（`plugin_ui::PLUGIN_CSP`，策略与 09 §416 一致：
+      `default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;
+      font-src 'self'; connect-src 'none'; base-uri 'none'; form-action 'none'`），所以 `connect-src 'none'` 是**文档
+      自带的属性**，不再只依赖全局设置；两者同时生效时浏览器取交集。
+      但 `'self'` 在 `synra-plugin://` 这个 origin 下具体意味着什么，只能由一次真实运行确认 —— 这是本仓库唯一无法用
+      `cargo check` 回答的问题，记在这里而不是假装它已解决。
 - [x] 插件 WebView 初始化脚本（token 闭包注入）—— **部分做了**（2026-10-18）：
       `commands::plugin_ui::initialization_script(label, token)` 生成脚本、`open_request` 组装、`plugin_ui_open` 建窗口；
       **仍缺**协议 handler（`register_uri_scheme`）与 CSP，所以页面还打不开。
