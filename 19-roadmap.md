@@ -1890,6 +1890,25 @@ js 34 条 + `pnpm run check`，两种配置 clippy、build、shapes、guards 12 
 **仍然缺**：`db_write_duration_us`（写路径没有计时钩子）；进程组四项（`memory_rss_bytes`/`cpu_percent`/`threads`/
 `uptime_seconds`）需要平台读数。
 
+### 8.80 进程组的第一项：uptime 不需要平台调用
+
+★ 进程组四项里三项要平台读数（RSS、CPU、线程数），`uptime_seconds` 不用。`AppState` 多了一个单调
+`std::time::Instant`，`diag_metrics` 每次读快照前把“距上次采样的秒数”加进计数器；第一次采样加全部已运行时间。
+
+★ **delta 而不是 set**：设计里它是 `Counter`。每次轮询把整个 uptime 写进去会让它随**刷新次数**增长，而不是随时间；
+`record_uptime(10)` 之后 `record_uptime(14)` 的结果是 14，不是 24 —— 测试就是照这个差值写的。
+
+★ **为什么不用 `started_at_ms`**：那是调用方的墙钟，测试里固定（`FIXED_NOW_MS`），用户也可能在两次读之间改系统时间。
+uptime 问的是“这个壳开了多久”，时钟回拨不该让它倒退。
+
+★ **锁的顺序**：先取 `uptime_reported` 的锁算出差值，**放锁之后**再碰记录器 —— 记录器内部有自己的锁，两把锁在同一
+函数里按一个顺序拿、在别处按另一个顺序拿，是死锁的标准配方。clippy 的 `significant_drop_tightening` 也正好指出了
+这一点。
+
+★ 测试：壳 257 条（新增 1：两次采样 10/14 → 计数器 14；`diag_metrics` 的空壳用例改成断言两个样本
+`db_size_bytes` 与 `uptime_seconds`），两种配置 clippy、check、guards 12 项。
+**仍然缺**：`memory_rss_bytes`、`cpu_percent`、`threads`（需要平台读数）、`db_write_duration_us`。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |

@@ -857,7 +857,11 @@ pub fn install_panic_hook(paths: &Paths, version: &str) {
       读列表时逐个插件遍历沙箱目录（不存在或不可读记 0：大小是诊断，不是让列表失败的理由）。两者都是**采样**而不是
       写入点计数，所以面板每 5 秒的轮询就是它们的刷新。
       **仍然缺（存储/进程）**：`db_write_duration_us`（写路径没有计时钩子）、`memory_rss_bytes`、`cpu_percent`、
-      `threads`、`uptime_seconds`（进程组需要一个平台读数，窗口目前没有）。
+      `threads`（这三项需要一个平台读数，窗口目前没有）。
+      ★ **`uptime_seconds` 也接上了**：`AppState` 存一个单调 `Instant`，`diag_metrics` 读时把“距上次采样的秒数”加进
+      计数器（第一次加全部已运行时间）。**用 delta 而不是用 set**：这是设计里的 Counter，每次轮询把整个 uptime 写一遍会
+      让它随刷新次数增长而不是随时间增长。它与 `started_at_ms` 分开：后者是调用方的墙钟（测试里固定），uptime 不能被
+      时钟调整带回过去。
 - [x] 设置页的"性能"面板（实时指标）—— **有了（2026-10-19）**。
       ★ `diag_metrics` 从“注册了、没有调用方”变成设置页底部的一节：挂载时读一次、之后每 5 秒重读一次
       （卸载时清掉 interval），Refresh 按钮是立刻读一次。行是**内核渲染的那个键**（`name{label=value}`，与日志、
