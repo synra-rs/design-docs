@@ -2717,8 +2717,26 @@ publisher 提示，见 §8.123）—— 都工作，但重复，统一到核心�
 
 ★ 测试：daemon **229**（+2）、core 675、store 236、CLI 103、control 67、app shell 262/261、workspace clippy、`api-guard`、
 guards 12。
-**仍然缺**：shutdown 仍不 join 连接线程（进程退出时它们随进程结束）；没有“当前控制连接数”的指标；超限只写 `eprintln`
-不进日志文件。
+**仍然缺**：shutdown 仍不 join 连接线程（进程退出时它们随进程结束）；仪表与日志由 §8.125 补上。
+
+### 8.125 控制连接数进了指标，拒绝进了日志
+
+★ §8.124 的门只做准入，读者看不到“现在有几条连接”，而超限与 accept 失败仍然走 `eprintln` —— 两件事都只到终端，不进
+`synra logs`。一个有 bug 的客户端把连接占满时，日志里什么都没有。
+
+- **`control_connections` 仪表**：`ControlGate` 持 `Option<Arc<RingRecorder>>`，准入与 `Permit` 归还两个边沿都 `gauge_set`。
+  仪表而不是计数：`status` 问的是“现在几条”，计数只能回答“一共开过几条”。`serve` 用
+  `ControlGate::new(MAX).with_metrics(metrics)` 接线。
+- **拒绝进日志**：满门与 accept 失败改用 `tracing::warn!`/`tracing::error!`（accept 失败还保留 `eprintln`，因为启动终端
+  上的错误不该只存在于一个可能没打开的文件里）。
+- **抽出 `accept_control`**：把“准入 / 生成线程 / 处理 accept 失败”从 `serve` 拿出去。加仪表把 `serve` 推到复杂度 27/25，
+  这条函数是预算的答案，不是风格。
+- **测试**：门新增一个用例，断言仪表随准入升、随归还降、最后归零。
+
+★ 测试：daemon **230**（+1）、core 675、store 236、CLI 103、control 67、app shell 262/261、workspace clippy、`api-guard`、
+guards 12。
+**仍然缺**：shutdown 仍不 join 连接线程；连接线程本身的 panic 没有逐连接记录（只有线程名与 stderr）；`status` 里的仪表
+没有专门的 UI 行（它在 metrics 列表里）。
 
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
