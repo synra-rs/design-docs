@@ -404,6 +404,9 @@ pub struct CatalogItem {
 > ★ **发第二个版本是追加，不是覆盖**：目标 index 已存在时读取它，保留其他版本的条目，替换同版本条目、更新 `latest`、合并
 > `publishers`。同一版本重打包替换原条目（解析器拒绝重复版本）；读不懂的现有文件拒绝覆盖 —— 一个工具不该用自己看不懂的
 > 内容去换掉它没写的版本历史。
+> ★ **tarball 可以相对**：`pack --index`（不带值）写相对文件名，客户端按 index 自身的 URL 解析；带值时写
+> `{base}/{文件名}`。作者在打包时通常不知道桶的公开地址，而“上传这两个文件”应该是发布的最小动作。
+> 客户端拒绝 `..`（不规范化）：一个爬出自己目录的 index 是在请求作者没打算发布的东西。
 **仍然缺**：客户端还没有把 `plugins.registry` 指向静态 index（目前只解析，不接网络）；`index.json` 的缓存与 ETag 也
 留给接入时处理。
 > ★ **接上了**：`plugins.registry` 里以 `static:` 开头的地址表示静态 index（如 `static:https://bucket.example/plugins`）。
