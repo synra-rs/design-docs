@@ -2339,6 +2339,24 @@ workspace clippy、guards 12。
 `db_write_duration_us{kind=config}`）、前端 259、core 674、workspace clippy、guards 12。
 **仍然缺**：迁移与备份的耗时；直方图的标签使设计里的“单一直方图”变成按 kind 分组（更有用，但确实是偏离，记在这里）。
 
+### 8.104 插件的日志行带上动作的 trace
+
+★ `--trace` 之前只覆盖内核自己的三行（路由、决定、远端结果应用）。插件执行时说的话——`log` host function——没有 trace：
+插件契约里没有一个字段可以放它，而给每个 host 函数加一个 trace 参数会把“这是哪个动作”变成插件的责任。
+
+- **线程局部的作用域**：`synra_observe::trace_scope` 存“这个线程当前在跑哪个动作”。`PluginSet::call_traced` 在调用
+  开始时 `enter(trace)`，guard 的 `Drop` 恢复**上一层**的值 —— 一个嵌套的 host 回调不会抹掉外层动作，一个 guest trap
+  也不会留下脏值（`run_on` 捕获 panic，但提前返回会跳过手工清理）。
+- **两个宿主读取**：daemon 把 `trace_id` 作为 `tracing` 字段写进同一行；窗口把 `trace=<id>` 前缀写到 stderr（它没有
+  `tracing`）。`can-handle` 与生命周期调用没有动作，`current()` 是 `None`，行上就没有 trace —— 不编造。
+- **与上一轮的关系**：审计条目的 trace 是 `drain_audit` 用参数盖上的；插件的日志行用线程作用域。两者都来自同一个
+  `call_traced` 入参，不会出现“审计说属于 A、日志说属于 B”。
+
+★ 测试：observe **286**（+4：默认无动作、作用域内可见、嵌套恢复外层、`enter(None)` 暂时清空并恢复）、core 674、
+daemon 220、store 227、app shell 262/261、前端 259、workspace clippy、guards 12。
+**仍然缺**：其余 host 调用（存储、网络、设备列表）本身没有日志行，所以它们不在这条 trace 里；插件的 **trap 原因**
+仍只在内核的 outcome 里，不是插件自己的一行。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |

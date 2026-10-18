@@ -1046,6 +1046,11 @@ pub fn install_panic_hook(paths: &Paths, version: &str) {
       ★ **远端结果也进入 trace（同日更晚，见 19 §8.99）**：发送侧应用回信成功后记
       `tracing::info!(trace_id = %reply.trace_id, intent, ok, "remote outcome applied")` —— trace 来自回信本身，
       不是重新生成的。`--trace <id>` 因此能覆盖发生在另一台设备上的那一步；仍未覆盖的是远端插件内部的执行细节。
+      ★ **插件自己的 log 行也带 trace 了（19 §8.104）。** `synra_observe::trace_scope` 是线程局部的“当前动作”：
+      `PluginSet::call_traced` 在整个调用（含 guest 的 host 函数）期间进入它，guard 的 `Drop` 恢复上一层（嵌套调用
+      不会抹掉外层）。两个宿主的 `log` 读取它：daemon 作为 `trace_id` 字段写进 `tracing`，窗口作为 `trace=` 前缀写到
+      stderr。插件契约里没有 trace 参数，所以这是唯一不改变契约的传法；于是 `synra logs --trace <id>` 能看到插件执行时
+      自己说的话，而不再只有内核的三行。
 - [x] `synra logs --follow` —— **★ 2026-10-19 真的跟随了**。
       原状：标志解析、从不读取，命令照常打印尾部就退出，安静日志的快照与一个什么都没发生的实时日志输出完全一样。
       上一轮改成明确拒绝（“需要一个流式协议”），本轮换了实现路线并**删掉了那句拒绝**。
