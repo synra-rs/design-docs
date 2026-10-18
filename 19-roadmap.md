@@ -1019,6 +1019,12 @@ worker 出现时忘记它。discovery 的 `stop` 只持有 supervisor 的 **shut
 ★ **仍然缺的**：`finish` 仍是同步发送，页面 `send` 还是要等传输结束才拿到 id；真正的“页面提前返回”要等 finish 走
 worker（桌面命令已经是这样，见 §8.15）。
 
+★ **接上了**：`plugin_ui_rpc` 之外多了一个 `plugin_ui_rpc_arc`（Tauri 命令用它），把 `Arc<AppState>` 带到 dispatch 的
+`transfer.finish`。有 managed state 时，finish 用 `prepare_file_send` + `start_send` 交给 worker，**立刻返回 transferId**；
+文件的删除与上传目录的清理由 worker 负责（`start_send` 多一个 `cleanup_dir`）。没有 Arc 的入口（测试、旧调用）仍走同步
+发送，所以两条路径都能测。页面侧 `synra.transfer.send` 的语义随之改变：**返回 = 字节已交给发送端**，结束状态用
+`status` / `onProgress`；门面不再把它缓存成 `completed`。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
