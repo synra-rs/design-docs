@@ -875,7 +875,13 @@ core 的响应把重定向后的地址丢掉了。门面把 host 的纯文本 bo
   `sdkVersion` 取 manifest 的 `sdk.preferred`（没写才退回 `min`）——`min` 是兼容下限，报它会告诉插件它是对更老的宿主构建的。
 
 **仍然缺的**：transfer.*、self.invoke/actions 两个命名空间（都在方法表里、都以 `Unsupported` 回答），
-以及插件卡上的"打开"入口。
+以及插件页的导航范围限制。
+
+★ **插件卡上的"打开"入口接上了**：`PluginSnapshot` 增加 `hasUi`（读 manifest 的 `runtime.ui`），它与 `hybrid`
+**不是**一件事 —— 只有 UI 的插件有页面、没有 headless 半，用 `hybrid` 做门会漏掉这个形态。按钮只在 `hasUi` 为真时
+出现，点击走 `plugin_ui_open`（窗口的 label / origin / token 仍由宿主在开窗前决定）。
+★ 顺带修了守卫：`check-shapes` 的 `command-arguments` 原来只把 `state` 当作"宏注入、调用方不传"，`app: tauri::AppHandle`
+被当成必填键 —— 而它和 `state` 一样由 `#[tauri::command]` 从调用上下文解析，页面只该传 `pluginId`。
 
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
