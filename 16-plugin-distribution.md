@@ -48,6 +48,13 @@
 | Manifest    | `manifest.json`   | 256 KiB    | SHA-256（含在签名内） |
 | 整个包       | `<name>.synra`    | 64 MiB     | SHA-256   |
 
+> ★ **容器定了**：`.synra` 是一个 **zip**，内容就是安装器接受的目录（`manifest.json`、manifest 命名的 artifact、
+> 有签名时的 `signature.json`）。解包**复用** `synra_plugin_ui::artifact::unpack` 的同一套规则（`..`/绝对路径/
+> 符号链接拒绝、条目数与大小上限、压缩比），因为那些规则是关于**归档**的、不是关于 UI 的；
+> `ArchiveLimits::package()` 就是本节 64 MiB / 32 MiB 那一组数字。发送侧 `package_directory` 把已安装目录压成包，
+> 并**跳过已解包的 `ui/`**（包里带的是 `ui.zip`，`ui/` 是本机的产物）。
+> 本轮只到"装得进去"：`install::from_package` 有测试，接收端的同步回调仍发/收单个 wasm，尚未接上。
+
 ### 2.2 摘要的表达
 
 使用 **SRI（Subresource Integrity）** 风格，与 npm 生态兼容：

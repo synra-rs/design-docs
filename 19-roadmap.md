@@ -920,8 +920,8 @@ Blob 编码成 base64，内核解码到 `cache/plugin-transfers/<uuid>/<fileName
 
 ★ 窗口的关闭键是"收起来"，不是"退出"：这个进程是内核（监听端口、传输在飞、插件已载入），对别的设备可达；把
 "整理窗口"和"结束服务"绑在同一个手势上，会让一个只想让窗口让开的用户停掉所有传输。托盘菜单只有 **Show** 与
-**Quit**；Quit 先 `cancel()` 那个被 `manage` 的 listener token，再 `app.exit(0)` —— 退出本来会释放端口，但重启时与
-旧进程抢同一个端口，正是这个 token 存在的原因。
+**Quit**；Quit 只调 `app.exit(0)`，停止逻辑统一在 8.12 的 `ExitRequested` 一处 —— 退出本来会释放端口，但重启时与
+旧进程抢同一个端口，正是那个 token 存在的原因。
 `tray_menu` 与 `tray` 分开：前者的 id → 动作映射不需要 Tauri，所以它在跑测试的构建里也有断言；后者是事件循环与
 图标的接线，失败只报告不致命（有的 Linux 桌面没有 indicator host，窗口仍必须能开）。
 
@@ -960,6 +960,17 @@ worker 出现时忘记它。discovery 的 `stop` 只持有 supervisor 的 **shut
 为什么不是"同插件 origin"：初始化脚本挂在 WebView 上而不是地址上，跳到同 bundle 的另一页会**保留本页的 token 与
 授权**却显示打开者没选过的内容。`window.open` 一并 `Deny` —— 新窗口没有初始化脚本，等于一个没有 token 的页面。
 谓词在无 WebView 的构建里照样编译并有测试，只有把它交给 builder 的那一行在 `tauri-shell` 里。
+
+### 8.13 包归档：先让 `.synra` 装得进去
+
+★ 容器定为 **zip**：内容就是安装器接受的目录（`manifest.json`、manifest 命名的 artifact、有签名时的
+`signature.json`）。解包复用 `synra_plugin_ui::artifact::unpack`，因为 zip-slip、绝对路径、符号链接、条目数与大小、
+压缩比这些规则是关于**归档**的，不是关于 UI 的；`ArchiveLimits::package()` 只是把 64 MiB / 32 MiB 那两个数字填进去。
+`install::from_package` 解到 `plugins/` **外面**的 `.install-staging/`（plugins 下带 manifest 的目录会被当成已安装插件），
+再调用 `from_directory`；失败时按 unpack 返回的清单逐文件清理（不做递归删除），成功也清理。
+`install::package_directory` 是发送侧：把已安装目录压成包，**跳过解包出的 `ui/`**（包里要的是 `ui.zip`，`ui/` 是本机产物），
+并检查 64 MiB 总量。
+★ 本轮只到"装得进去"：接收端的同步回调仍发/收单个 wasm，`plugins_sync_run` 与 `record_received` 都还没换成包。
 
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
