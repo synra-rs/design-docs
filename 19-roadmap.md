@@ -2219,8 +2219,26 @@ workspace clippy、guards 12 项。
 ★ 测试：core 673（+1 `dispatched_to` 的两个半键与结束后不再命中）、daemon 218（+2：`apply_result` 把 dispatching
 变成 succeeded 且重复回答被忽略；一条真实 TCP 连接上 `INTENT_INVOKE` 得到同一链接上的 `INTENT_RESULT`，`reply_to`
 等于请求 id）、ipc 123、workspace clippy、guards 12。
-**仍然缺**：3 s 之外的迟到结果（无重试、无离线队列）；远端取消没有回执（取消本身不需要答案）；控制 socket 仍是一次一个客户端，
-所以这段等待是别的命令排队的时间。
+**仍然缺**：3 s 之外的迟到结果（无重试、无离线队列）；远端取消没有回执（取消本身不需要答案）。
+（控制 socket 的排队已在 §8.98 消掉：现在每连接一线程。）
+
+### 8.98 控制连接：接受与伺候分开，每个客户端一条线程
+
+★ 上一轮让远程 decide 等 3 s 回信，于是“控制 socket 一次只服务一个客户端”从一句注释变成了用户能感到的排队：一台
+`status` 会排在一条 `intent decide` 后面。根因不是等待本身，而是 accept 和 serve 是同一个调用
+（`Listener::serve_one`）—— 循环里没有任何地方可以“先收下、再交给别人”。
+
+- `Listener::accept` 公开，`serve_one` 改为 `accept` + `serve_stream` 的组合；
+- daemon 的控制循环只做 accept，每条连接 `std::thread::spawn` 一个 `serve_stream`，`Runtime` 放进 `Arc`；
+- accept 失败时**睡 10 ms**：以前失败的调用本身就是那个会阻塞的调用，现在拆开后一个永久失败的 listener 会烧满一核。
+
+★ **为什么线程模型没有扩权**：socket 是本地的，每个客户端都是用户自己启动的进程 —— 与“一次一个”相同的信任边界，
+只是没有队列。每个连接线程持有 `Arc<Runtime>`，命令内部本来就用锁（host/plugins/board/db），与 transport 线程并发
+调用的是同一套。
+
+★ 测试：control 67（+1：`accept` 只交出连接、`serve_stream` 在另一个线程上把 `Status` 答完 —— 断言的是跨交接触发的
+回答，不是 `accept` 返回了一个 socket）、daemon 218、core 673、workspace clippy、guards 12。
+**仍然缺**：每条连接一个线程没有上限（本地 socket 的信任边界内）；shutdown 不 join 连接线程，进程退出时它们随进程结束。
 
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 

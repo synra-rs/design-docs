@@ -421,7 +421,8 @@ impl Supervisor {
 >   `ok/result/state` 回答，而不是一律 `dispatching`。
 >   ③ **一个真的 bug**：`remote::invoke` 造信封时新铸 request id，而板上记的是 `confirm` 的 id —— 于是 `reply_to`
 >   永远匹配不上，收信侧的幂等键也和本侧记录的不是同一个。现在信封携带 `confirm` 的 id，测试断言两者相等。
->   **写明的限制**：等待 3 s（控制 socket 一次只服务一个客户端）；更慢的回信会丢、不会重试，意图停在 `dispatching`。
+>   **写明的限制**：等待 3 s（发送方自己的时间；控制连接已改为每连接一线程，见 19 §8.98）；更慢的回信会丢、不会重试，
+>   意图停在 `dispatching`。
 >   测试：core **673**、daemon **218**、ipc **123**、workspace clippy、guards 12。
 > * ★ **幂等没有在这里实现，而是用了已有的**：`Board::raise` 在**创建任何东西之前**
 >   就按 `(origin, request)` 查重，重发会拿到第一次的 intent、`created == false`，于是动作不会跑第二次。
