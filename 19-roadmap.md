@@ -2658,6 +2658,31 @@ app shell 262/261、workspace clippy、`api-guard`、guards 12。
 **仍然缺**：`--follow` 本来就按轮询读，不需要 flush；`diag_export`（shell）已有自己的 flush；日志写失败后仍然只计数，
 不降级。
 
+### 8.122 按名字从 registry 安装
+
+★ `synra plugin install @acme/chat` 一直解析、出现在文档里，然后被内核当成一个**路径**拒绝 —— 而“路径不存在”和“registry 没有
+这个版本”是两种完全不同的答案。设计的 registry 安装（16 §2）有 packument 解析、有取件客户端、有完整性校验，缺的是一条把
+它们按顺序接起来的管线。
+
+- **`Request::PluginInstallPackage { package, version }`**：路径安装与 registry 安装是两个请求，因为后者要做的事多三件 ——
+  取 packument、选版本、取 tarball 并比对完整性。把一个字符串交给内核去分类，等于把“这是路径还是包名”这个判断放错了
+  一边。
+- **管线就是五步**（`runtime/registry_install.rs`）：取 packument（镜像按 `RegistryConfig` 顺序，失败换下一个）→ 选版本
+  （`--version` 或 `latest`）→ 取 tarball → `check_integrity`（**没有 integrity 字符串就拒绝**：没有东西可校验的字节不装）
+  → `extract_tgz` 解到 `.install-staging` → 交给已有的 `install_from_directory`。最后一步不是第二个安装器：验签、版本行、
+  原子改名只有一份实现。
+- **解开的东西一定删**：成功或失败都用 `remove_tree` 清掉 staging 目录（`root` 是 staging 根，越界检查仍在）。
+- **CLI 的选择规则**：存在的路径就是路径；以 `.`/`/`/盘符开头的是路径（即使不存在）；其余没有分隔符的是包名，`@scope/name`
+  是唯一带斜杠的包名。`--version` 只对包名有意义，并且原样交给内核。
+- **测试用假 registry**：`Fetch` 是一个 trait，测试给一个内存里的 packument + 用 `flate2`/`tar` 现场打的 `.tgz`，覆盖
+  安装成功（staging 为空）、完整性不匹配、没有 integrity、未知版本、镜像全部不答；都不需要网络。
+
+★ 测试：daemon **227**（+5）、control 67、CLI 103、core 675、store 236、app shell 262/261、workspace clippy、`api-guard`、
+guards 12。
+**仍然缺**：**shell 的 `plugins_install` 仍按名字拒绝 `Registry`**（08 §675）—— 管线在 daemon 侧，壳没有接（下一轮把它
+移到共享层，让两个宿主共用）；没有版本范围解析（只认精确版本或 `latest`）；不上传/发布；`dist.integrity` 的算法只由
+`Integrity` 支持的那几种。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |

@@ -57,6 +57,11 @@
 >
 > ★ **接上了（设备间同步）**：`plugins_sync_run` 现在把 `plugins/<id>/` 打成 `.synra` 再发；接收侧（窗口与 daemon）
 > 在 `on_finished` 里先 `install::from_package`，成功后才 `record_received`，失败回 `SyncOutcome::refused`。
+>
+> ★ **2026-10-19：registry 那一半接上了（19 §8.122）。** `synra plugin install @acme/chat` 不再被当成路径：
+> `Request::PluginInstallPackage` → 取 packument（按 `RegistryConfig` 的镜像顺序）→ 选版本 → 取 tarball →
+> `check_integrity`（没有 integrity 就拒绝）→ `extract_tgz` 到 `.install-staging` → `install_from_directory`。
+> 管线目前在 daemon 侧；壳的 `plugins_install` 仍拒绝 `Registry`，直到它移到共享层。
 > 收件箱里的名字也从 `plugin-<id>.wasm` 改成 `plugin-<id>.synra`。
 
 ### 2.2 摘要的表达
