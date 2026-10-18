@@ -893,6 +893,18 @@ core 的响应把重定向后的地址丢掉了。门面把 host 的纯文本 bo
 
 **仍然缺的**：transfer.*（需要 WebView 到内核的大文件通道）。
 
+★ **`env.platformSupports` 接上了真实答案**：宿主在开窗前用 `CommandPlatform::supported_actions()` 生成
+`platformCapabilities` 放进 seed，门面同步查表。两层映射是刻意的：`PlatformAction → 客户端拼写`
+（`open_url`/`clipboard_read`/…）与能力拼写（`platform:open-url`）**不是**一套；`simulate_keys` 只在策略允许时出现，
+所以按钮不会提供一个宿主会拒绝的动作。`PlatformAction` 是 `non_exhaustive`，未命名的动作被丢弃（答案 false），
+而不是猜一个名字。
+
+★ **已知不一致（未修，留作独立一轮）**：剪贴板能力有两种拼写 —— 生成的契约表与 host 闸门用
+`platform:read-clipboard` / `platform:write-clipboard`，而 `synra-capability` 的文档、`PlatformAction::capability()`
+与 `admission` 的映射用 `platform:clipboard:read` / `platform:clipboard:write`。**实际被检查的是前者**；后者仍在
+`supported_actions` 等地方被广播。统一它要同时改 WIT 生成的表、能力语法与已存 grant 的迁移，所以单独一轮；本轮的
+`platformSupports` 用客户端自己的拼写，不受这个分歧影响。
+
 ★ **导航范围限制也做了**：`plugin_ui_open` 现在装 `on_navigation`，谓词是 `stays_on_page(candidate, opened)` ——
 **只能留在打开的这一个页面**（含 `#` 片段路由），另一个路径、另一个插件的 origin、`https:`/`file:`/`data:` 全部拒绝。
 为什么不是"同插件 origin"：初始化脚本挂在 WebView 上而不是地址上，跳到同 bundle 的另一页会**保留本页的 token 与

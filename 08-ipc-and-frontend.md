@@ -1105,6 +1105,12 @@ Content-Security-Policy:
       **生成物为什么提交**：Rust 构建不依赖 Node；`scripts/check-shapes.ts` 的 `facade-fresh` 用 Vite 的 `build()`
       在临时目录重建并逐字节比较（CRLF 归一化），所以"提交了过期产物"是一个红门而不是一次事故。
       **仍然缺的**：transfer.*（需要 WebView 到内核的大文件通道）。
+
+      ★ **`env.platformSupports` 接上了真实答案**：seed 增加 `platformCapabilities`，由
+      `CommandPlatform::supported_actions()` 生成（`simulate_keys` 只在策略允许时出现），门面同步查表。
+      ★ **已知不一致（未修）**：剪贴板能力在生成契约表里是 `platform:read-clipboard`/`write-clipboard`，在
+      `synra-capability`/`PlatformAction::capability`/`admission` 里是 `platform:clipboard:read`/`write`。实际生效的是
+      前者；统一需要改 WIT 生成表与已存 grant，留作独立一轮。
 - [x] **协议 handler 做了，CSP 受框架限制**（2026-10-18）。
       `builder()` 里 `register_uri_scheme_protocol("synra-plugin", …)`（Tauri 2.12 的方法名是
       `register_uri_scheme_protocol`，handler 收的是 `UriSchemeContext` 而不是 `AppHandle` —— 猜一次就错，读
