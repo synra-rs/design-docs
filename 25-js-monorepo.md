@@ -160,6 +160,14 @@ synra-js/packages/protocol/src/generated/*.ts   （★ 手写，commit 进仓库
 **必须有的守卫**（[§6](#6-ci-守卫)）：JS 仓库里的生成物与 core 当前导出**必须一致**，
 否则 JS 仓库的 CI 失败（core 改了协议但没同步过来）。
 
+> ★ **2026-10-19：核对多认了一个来源，并抓到两处真缺口。** 指标快照（`diag_metrics` 的答案）住在
+> `synra-observe/src/metrics`，不在 `synra-ipc` 的 DTO 目录；只扫 DTO 与 protocol 两个目录会让 `ui.ts` 里那几个
+> interface 被报成“没有同名 Rust struct”（那项是证据而不是失败，但一个每次都出现的假缺口会把真缺口埋掉）。
+> `check-shapes.ts` 的扫描根因此加了第三个目录。
+> 同一轮里，`dto-coverage` 的正向检查抓到 `PublisherDto` 与 `InstallPreviewDto` 一直没被镜像 ——
+> 而界面当时正在手抄这两份形状（`PublisherRow` / `InstallPreview`），手抄的那份不会在 Rust 改字段时编译失败。
+> 现在两份都进了 `ui.ts`，插件页改用 `@synra/protocol` 的类型。
+
 ### 2.3 文件头（生成物必须标注，防止被手改）
 
 ```ts

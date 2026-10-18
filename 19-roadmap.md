@@ -1510,8 +1510,32 @@ now, max_bytes)` 把上限作为参数，测试可以用小值。
 
 ★ 测试：core 1 条（清 A 不动 B）、壳 1 条（没有引擎时拒绝而不是成功）、动作层 2 条（参数、拒绝映射）、
 挂载 1 条（点一下、命令收到 id、行消失而空态出现、`plugins_audit` 只读了那一次）；
-两处“契约条数”的硬编码从 45 改为 46，README 的 46/44/28 由 `readme-counts` 盯着。
+两处“契约条数”的硬编码从 45 改为 46，README 的 46/44/28（§8.63 之后被调用数变成 29）由 `readme-counts` 盯着。
 **仍然缺**：DB 那份历史与它的清空；`trace_id` 仍是 `None`。
+
+### 8.63 性能面板与它需要的类型
+
+★ `diag_metrics` 之前“注册了、没有调用方”，而 [18 §4.2](./18-observability.md) 把设置页的性能面板列为记录器存在的
+理由之一。现在设置页底部有一节：挂载读一次、每 5 秒重读（`onUnmounted` 清 interval），Refresh 立刻读；
+失败走页面既有的 `ErrorNotice`，notice 的 Retry 改成同时重读配置、身份与指标 —— 否则“重试”不会重试出错的那一个。
+
+★ **“实时”是轮询而不是事件**：指标没有事件流（`KernelEvent` 里没有 metric 变体，也不该有 —— 一条每次调用都发的
+事件会把观测成本变成 IPC 成本）。5 秒是页面能接受的频率，而 `diag_metrics` 只是读一个内存记录器。
+
+★ **键用内核的拼写**：`SeriesKey::render` 的 `name{label=value}` 与日志行、诊断包一致；页面另起一种写法会让
+“报告里的那个指标”和“面板里的那个指标”变成两个要对照的东西。直方图只说两个数：观测次数与平均值
+（`sum/count`，两位小数）；没有观测时平均是 `—`，不是 0 —— 0/0 写成 0 会让从未发生过的直方图看起来像 0 毫秒。
+
+★ **类型先补进 `@synra/protocol`**：`MetricsSnapshot` / `SeriesValue` / `SeriesKey` / `MetricValue` /
+`HistogramSnapshot` 住在 `synra-observe` 而不是 `synra-ipc` 的 DTO 目录，所以 `dto-coverage` 的扫描根加了第三个
+（`synra-observe/src/metrics`），否则这几个 interface 会被报成“没有同名 Rust struct”。
+**而这一步顺手抓到了两处真缺口**：`PublisherDto` 与 `InstallPreviewDto` 在 Rust 里早已存在，镜像里没有 ——
+界面当时正手抄它们（`PublisherRow` / `InstallPreview`），而手抄的 shape 不会在 Rust 改字段时编译失败。
+现在两份都在 `ui.ts` 里，插件页改用 `@synra/protocol` 的类型。
+
+★ 测试：js 侧 `shapes` 14 项（31 个 DTO 逐字段对照）、`pnpm test` 34 条、`pnpm run check` 全绿；
+app 侧设置页 2 条新测试（键/值/平均值、overflow 句子），全量 246 条。
+**仍然缺**：指标名还是“谁写谁起名”（§4.1 的清单没有全部落地），面板只画当前值、没有趋势。
 
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 

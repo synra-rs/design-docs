@@ -796,8 +796,15 @@ pub fn install_panic_hook(paths: &Paths, version: &str) {
       ★ 本行的状态：门三项 + 直方图两项（host 调用、意图）+ 传输两项；缺的是网络、发现那几组。
       `RingRecorder` 只出现在 `synra-observe` 自己的测试里。§4.1 的指标名中只有
       `frames_sent_total`/`links_open` 出现过，且只是 `metrics/tests.rs` 的测试夹具。
-- [ ] 设置页的"性能"面板（实时指标）—— **缺失**：`synra-rust-app/src/pages` 只有
-      Devices/Home/Plugins/Settings。
+- [x] 设置页的"性能"面板（实时指标）—— **有了（2026-10-19）**。
+      ★ `diag_metrics` 从“注册了、没有调用方”变成设置页底部的一节：挂载时读一次、之后每 5 秒重读一次
+      （卸载时清掉 interval），Refresh 按钮是立刻读一次。行是**内核渲染的那个键**（`name{label=value}`，与日志、
+      诊断包同一拼写），值按 `kind` 分开：counter/gauge 直接印数字，histogram 印 “N samples, mean X”
+      （没有观测时 mean 是 `—` 而不是 0）。`overflowedTotal > 0` 时说明有观测被折进 overflow 以及每指标上限 ——
+      一份被截断的快照不能画成全集。
+      ★ 类型来自 `@synra/protocol` 新增的 `MetricsSnapshot`（见 [25 §2.2](./25-js-monorepo.md)），界面没有手抄一份。
+      失败走页面既有的 `ErrorNotice`，它的 Retry 同时重读配置、身份与指标。
+      测试 2 条：两行（counter + histogram，断言键的拼写与平均值）、overflow 的句子。
 - [x] 审计 UI（时间线 + 拒绝高亮 + 清空）—— **三项都有了（2026-10-19）**。
       ★ 插件卡的 “Recent calls” 折叠区在展开时调 `plugins_audit`（每次展开都读，不在挂载时扇出），拒绝行高亮并带
       闸门的稳定结果名；“没有记录”与“读不到”分别是空态与 `ErrorNotice`。顺序在动作层翻成“最新在前”。
