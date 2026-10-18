@@ -1385,6 +1385,15 @@ artifact 的摘要；签名后改过 wasm 或 manifest 都会被拒绝。测试�
 ★ 测试：会话存在 → `forget_window` → `hosted_ui` 无条目且 `validate` 拒绝。
 **仍然缺**：多窗口（同一插件两个页面）的会话计数 —— 现在一个 label 一个会话，关掉一个就结束。
 
+### 8.51 一个插件一个页面
+
+★ `plugin_ui::window_label(id)` 从 id 派生窗口 label（`plugin-@acme__hello`）；`open_request` 用它，`plugin_ui_open` 也用它。
+★ `plugin_ui_open` 先 `app.get_window(label)`：已有 → `show` + `set_focus` 后返回，不再建第二个窗口、不再发第二个令牌。
+此前第二次打开会发新 nonce、覆盖 `hosted_ui` 里的旧条目，第一个页面的令牌就没有表项了。
+★ 为拿 `Manager::get_window`，`tauri` 依赖启用 `unstable` feature（2.12 的该方法在该 feature 下）。
+★ 测试：`window_label` 对 scoped id 的映射（`plugin-@acme__hello`）。
+**仍然缺**：窗口已存在时的“聚焦”在无 GUI 的单测里验证不了，只能依赖 Tauri 的 `show`/`set_focus`。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |

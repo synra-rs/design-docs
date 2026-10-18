@@ -1146,6 +1146,9 @@ Content-Security-Policy:
       ★ **窗口关闭即会话结束**：`on_window_event` 的 `Destroyed` 调 `plugin_ui::forget_window`，删除 `hosted_ui` 条目并
       `revoke` 对应 nonce；`CloseRequested` 可能被取消，所以选 `Destroyed`。此前 `hosted_ui` 只增不减，一个关掉的页面仍能
       通过 `plugin_ui_ready` 与协议 handler 得到回答。
+- [x] **一个插件一个页面**：`plugin_ui::window_label(id)` 从 id 派生窗口 label（`plugin-@acme__hello`）；`plugin_ui_open`
+      先找已有窗口，`show` + `set_focus` 后返回，不再建第二个窗口、也不再发第二个令牌。为此 `tauri` 启用 `unstable`
+      feature —— `Manager::get_window` 在 2.12 里就在这个 feature 后面。
 - [ ] 前端 stores：`ui`/`devices`/`pairing`/`plugins`/`intent`/`transfers`/`config`/`diagnostics` —— **1/8**。
       只有 `src/stores/devices.ts`，其余七个没有文件。
       ★ 现存这一个确实是忠实的只读镜像：`:70` 整体替换快照、`:82/:94/:99` 只记录、
