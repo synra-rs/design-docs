@@ -925,6 +925,17 @@ Blob 编码成 base64，内核解码到 `cache/plugin-transfers/<uuid>/<fileName
 `tray_menu` 与 `tray` 分开：前者的 id → 动作映射不需要 Tauri，所以它在跑测试的构建里也有断言；后者是事件循环与
 图标的接线，失败只报告不致命（有的 Linux 桌面没有 indicator host，窗口仍必须能开）。
 
+### 8.12 单实例：一个数据目录一个进程
+
+★ 用**操作系统文件锁**（`File::try_lock`：Windows 独占锁、Unix `flock`），不是 pid 文件：进程被杀时锁由内核释放，
+而手写的 pid 文件会留下一个"看起来还在跑"的记录。锁文件在数据目录下，所以**不同安装（不同数据目录）可以并存**。
+第二次启动拿到 `WouldBlock` 时写 `<data>/instance.show` 并退出；第一次启动在窗口存在后起一个 500 ms 的轮询线程，
+看到文件就删掉并 `show_main`。
+★ **窗口改为 `visible: false`，在单实例检查通过之后才 show**：Tauri 的 setup 之前就会按配置创建窗口，第二次启动
+否则会先闪一下再退出。第一次启动在 setup 末尾显式 `show()`。
+第二次启动在 `app_state` **之前**退出，因此不会开第二个数据库、不会绑第二个端口；锁拿不到（只读目录等）时**继续运行**
+并打印原因 —— 两个实例比一个打不开的窗口轻。
+
 ★ **`env.platformSupports` 接上了真实答案**：宿主在开窗前用 `CommandPlatform::supported_actions()` 生成
 `platformCapabilities` 放进 seed，门面同步查表。两层映射是刻意的：`PlatformAction → 客户端拼写`
 （`open_url`/`clipboard_read`/…）与能力拼写（`platform:open-url`）**不是**一套；`simulate_keys` 只在策略允许时出现，
