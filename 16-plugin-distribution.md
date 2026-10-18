@@ -427,7 +427,8 @@ pub struct CatalogItem {
 > https/loopback 策略约束）。**搜索**只在 npm 兼容的地址上做：静态 index 没有索引可搜，全部是静态时 `plugins_catalog_search`
 > 返回 `Unsupported`，而不是把 404 说成“没有匹配”。
 > ★ **条件请求**：文档的 `ETag`/`Last-Modified` 按 URL 缓存；下一次带 `If-None-Match`/`If-Modified-Since`，304 直接复用上次
-> 解析结果（`synra-fetch` 也因此不再把 304 当重定向）。进程内缓存，靠验证器续期，不设 TTL。
+> 解析结果（`synra-fetch` 也因此不再把 304 当重定向）。进程内缓存，靠验证器续期，不设 TTL。**npm packument 与静态 index
+> 用同一机制** —— 验证器是注册表的，与它说什么协议无关。
 > ★ **`Cache-Control: max-age`**：有寿命的条目过期后不再发送验证器，直接重新读取；304 携带新的 `max-age` 时续期。
 > `no-store`/`no-cache` 被当作“没有寿命”，即每次都重新验证 —— 对这个客户端而言是保守的读法。
 

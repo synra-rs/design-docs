@@ -1423,6 +1423,7 @@ tarball（本地路径按 index 目录/`--base` 解析，URL 按 `--base` 拼）
 ★ `upload --verify`：全部上传命令成功后调用 `publish --verify` 的检查（同一个 `publish_plugin`），输出合并；失败时附
 `re-upload` 清单并以非零退出。
 ★ `--dry-run` 不上传也不回读：dry run 没有新字节可读，去回读只会把旧桶的状态说成这次上传的结果。
+★ 测试：`--dry-run --verify` 指向不可达地址仍成功（证明没有发起网络请求）。
 
 ### 8.56 契约里那条更简单的搜索注册了
 
@@ -1431,7 +1432,14 @@ tarball（本地路径按 index 目录/`--base` 解析，URL 按 `--base` 拼）
 已经存在 —— 于是它成了一个长期假缺口。
 ★ 现在注册为对 `plugins_catalog_search` 的薄包装（`registry/limit/offset/sort` 全为 `None`）；命令清单 45 条中注册 43 条。
 ★ 清单、fake kernel 的参数表与返回都同步；README 的计数由 `shapes` 的 `readme-counts` 守住。
-★ 测试：`--dry-run --verify` 指向不可达地址仍成功（证明没有发起网络请求）。
+
+### 8.57 npm packument 也走条件缓存
+
+★ `packument_with_base` 的缓存不再只对静态 index 生效：npm packument 以同样的 `ETag`/`Last-Modified` 缓存，304 直接复用
+解析结果。验证器属于注册表，与它说什么协议无关。
+★ 测试：本地 npm 注册表第一次回 200 + `etag: "p1"`，第二次只在带 `If-None-Match: "p1"` 时回 304；两次
+`plugins_check_update` 都得到 2.0.0，且共两次请求。
+**仍然缺**：跨进程缓存（进程退出即清空）。
 
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
