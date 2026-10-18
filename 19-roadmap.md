@@ -1394,6 +1394,14 @@ artifact 的摘要；签名后改过 wasm 或 manifest 都会被拒绝。测试�
 ★ 测试：`window_label` 对 scoped id 的映射（`plugin-@acme__hello`）。
 **仍然缺**：窗口已存在时的“聚焦”在无 GUI 的单测里验证不了，只能依赖 Tauri 的 `show`/`set_focus`。
 
+### 8.52 打开是原子的
+
+★ `open_request` 返回 `OpenDecision::{Open, AlreadyOpen}`，在 `hosted_ui` 的锁内检查并插入；插入若发现旧条目，放回旧条目、
+`revoke` 本次多发的 nonce 并返回 `AlreadyOpen`（快速点击不再各发一个令牌）。
+★ 建窗失败时 `plugin_ui_open` 调 `forget_window`：一次失败不能让插件永久处于“已打开”而窗口不存在。
+★ 测试：第二次 `open_request` 返回 `AlreadyOpen`、`ui_sessions.issued()` 不变、`hosted_ui` 仍只有一条。
+**仍然缺**：聚焦本身无 GUI 不可测；上传本身。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |

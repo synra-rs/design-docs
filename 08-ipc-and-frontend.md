@@ -1149,6 +1149,9 @@ Content-Security-Policy:
 - [x] **一个插件一个页面**：`plugin_ui::window_label(id)` 从 id 派生窗口 label（`plugin-@acme__hello`）；`plugin_ui_open`
       先找已有窗口，`show` + `set_focus` 后返回，不再建第二个窗口、也不再发第二个令牌。为此 `tauri` 启用 `unstable`
       feature —— `Manager::get_window` 在 2.12 里就在这个 feature 后面。
+      ★ **检查与占位在同一把锁下**：`open_request` 返回 `OpenDecision::{Open, AlreadyOpen}`，在 `hosted_ui` 的锁里插入；
+      若插入发现已有条目，把旧条目放回并 `revoke` 这次多发的 nonce，返回 `AlreadyOpen`。建窗失败时 `plugin_ui_open` 调
+      `forget_window`，否则一次失败会让插件永远“已打开”却没有窗口可聚焦。
 - [ ] 前端 stores：`ui`/`devices`/`pairing`/`plugins`/`intent`/`transfers`/`config`/`diagnostics` —— **1/8**。
       只有 `src/stores/devices.ts`，其余七个没有文件。
       ★ 现存这一个确实是忠实的只读镜像：`:70` 整体替换快照、`:82/:94/:99` 只记录、
