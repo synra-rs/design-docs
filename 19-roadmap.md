@@ -816,6 +816,27 @@ M0 ──▶ M1 ──▶ M2 ──▶ M3
 没有签名覆盖目录，也没有 `plugins/<id>/` 下的文件。所以这条同步链的下一步不是"再发一次"，而是**包格式**：
 在它存在之前，一次同步的终点是"对端说它装了"，而不是"对端能跑"。
 
+### 8.9 插件页的调用通道（2026-10-18 晚）
+
+★ `plugin_ui_rpc` 注册了，`PluginUiOp` 在 `synra-ipc` 里是一张**封闭的**方法表：不允许的方法（`fs.*`、
+`platform.simulateKeys`、`plugins_*`、`devices_*`、`config.set`）不是变体，所以"不存在"与"不允许"给同一个答案。
+`device.list` 是第一个有实现的方法（四个字段）；其余在表面上、以 `Unsupported` 回答 —— 不是空列表，也不是假承诺。
+
+★ 两处修正比枚举本身更重要：
+1. **令牌不再是计数器**：`open_request` 原来用 `issue_placeholder`，而注册表自己的文档写着 not for production ——
+   一个页面能猜到另一个页面的令牌。现在用 `uuid::Uuid::new_v4().as_u128()`。
+2. **会话带上用户的授权**：原来签发时用 `CapabilitySet::new()`，于是 `env.can` 对用户批准过的能力也答 false。
+   现在读 `plugin_grants` 里 `granted = 1` 的行；一个解析不了的 grant 拒绝开页，而不是拿猜出来的集合开。
+
+★ 前端第一次守住接口分离：`device.list` 以前直接调 **Host** 命令 `devices_snapshot`，而 `command.rs` 的
+`Interface::allows` 说插件接口不能到 Host 那一边。现在它走 `plugin_ui_rpc`，内核把卡片裁成四个字段
+（地址、blocked、传输进度都不给插件看）。
+
+**仍然缺的**是把 `createInjection(context)` 装进插件页。初始化脚本只放 label 与 token；可行的做法是把注入门面
+单独构建成一份资源（Vite 的第二个 entry），开窗时**拼进 `initialization_script`** —— 这样 `window.synra` 在页面
+任何脚本之前就存在，插件作者也不必改 HTML。要先决定生成物放哪（提交生成物 + 守卫，还是随安装包发资源），
+所以留成独立一轮。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |

@@ -114,8 +114,12 @@
 #[tauri::command] async fn plugins_request_registry_search(state: State<'_, AppState>, query: String) -> Result<Vec<CatalogItem>, IpcError>;
 
 // ─────────── UI 插件专用（不同于上表，见 §7）───────────
-#[tauri::command] async fn plugin_ui_rpc(state: State<'_, AppState>, token: u128, method: String, args: serde_json::Value) -> Result<serde_json::Value, IpcError>;
-#[tauri::command] async fn plugin_ui_ready(state: State<'_, AppState>, token: u128) -> Result<(), IpcError>;
+// ★ 实际签名与设计初稿有三处不同，都是被运行时事实逼出来的（2026-10-18）：
+//   1. `token` 是 **十进制字符串**：`u128` 超出 JS 数字精度，数字形式会静默丢低位；
+//   2. `plugin_ui_ready` 收 **label**：`validate` 要声明者与版本，而这两样只有宿主自己的 `hosted_ui` 知道；
+//   3. `plugin_ui_rpc` 用 token 反应 `hosted_ui` 找到那一行，所以页面的声明与宿主的记录必须对上。
+#[tauri::command] async fn plugin_ui_rpc(state: State<'_, AppState>, token: String, method: String, args: serde_json::Value) -> Result<serde_json::Value, IpcError>;
+#[tauri::command] async fn plugin_ui_ready(state: State<'_, AppState>, label: String) -> Result<(), IpcError>;
 
 // ─────────── config ───────────
 #[tauri::command] async fn config_get(state: State<'_, AppState>) -> Result<ConfigSnapshot, IpcError>;
@@ -483,6 +487,11 @@ pub enum PluginUiOp {
     PageReady, PageNavigate,
 }
 ```
+
+> ★ **2026-10-18：枚举已经落地，位置与名字都与上面这段初稿略有不同。** 它在
+> `synra-ipc/src/plugin_ui.rs`，线名是点分的（`env.get`、`device.list`、`storage.set`…），`parse` 只认 `ALL` 里的
+> 名字；上面的变体之外还补了 `DeviceBroadcast`、`DevicePick`、`StorageQuota`、`TransferOnProgress`、`SelfInvoke`、
+> `SelfActions`（客户端的 namespace 里有，这份初稿没列全）。是**变体**只表示"可寻址"，不表示"这个构建实现了它"。
 
 **明确不允许**（即使插件声明了对应 capability）：
 
@@ -1054,12 +1063,23 @@ Content-Security-Policy:
       页面在命令返回后自己重读列表。
       `RemoveOptionsDto` / `RemoveReport` 两个 DTO 仍然没有被用到：报告里要的 `bytes_freed` 需要一个测量，
       而这一版只回答"删了/没删"。
-- [ ] `PluginUiOp` 枚举 + 方法白名单 + `plugin_ui_rpc` —— **未做**。
-      `PluginUiOp` 全仓 0 处；`plugin_ui_rpc` 只作为注释出现在 `command.rs:39`。
-      `command.rs` 里 `Interface::{Host,Plugin}`、`:59` `allows()`、`:375` `plugin_allow_list()` 是真的且有测试，
-      **但 app 侧 0 处调用**。
-      ★ `injection.ts` 的 `BACKED` 布尔表不是这个方法白名单：它答的是"这个功能实现了没有"，
-      不是"这个调用允许不允许"。
+- [x] `PluginUiOp` 枚举 + 方法白名单 + `plugin_ui_rpc` —— **第一片做完了**（2026-10-18）。
+      枚举在 `synra-ipc/src/plugin_ui.rs`：`ALL` + `as_str` + `parse`，线名是点分的（`device.list`），
+      而设计里明确**不允许**的方法（`platform.simulateKeys`、`fs.read/write`、`plugins_install`、`plugin_consent`、
+      任何 `devices_*`、`config.set`）**不是变体** —— 所以"不存在"与"不允许"给同一个答案，页面没法用它枚举宿主能力。
+      `plugin_ui_rpc(token, method, args)` 用 token 反查 `hosted_ui`，校验会话，再分派；
+      **`device.list` 是第一个有实现的方法**（四个字段：`deviceId`、`displayName`、`platform`、`online`），
+      其余在表面上但返回 `Unsupported` —— 一个空列表或一个假答案会让作者按不存在的功能写代码。
+      ★ **两处顺带修掉的、比枚举更重要的事**：
+      1. `open_request` 原来用 `issue_placeholder` 签令牌，而它是**计数器**（注册表自己的文档写着 not for production）——
+         一个页面能猜到另一个页面的令牌。现在用 `uuid::Uuid::new_v4().as_u128()`（122 位随机）；
+      2. 会话的 grants 原来是 `CapabilitySet::new()`（空集），于是 `env.can` 对用户批准过的能力也答 false。
+         现在从 `plugin_grants` 里读 `granted = 1` 的行；一个解析不了的 grant 直接拒绝开页，而不是拿一个猜出来的集合。
+      ★ 前端同时改了两处：`InjectionContext` 多一个 `token`（十进制字符串），`device.list` 不再调 **Host** 命令
+      `devices_snapshot`，而是走 `plugin_ui_rpc`（`method: 'device.list'`）—— 这是 `Interface::allows` 那条分离规则
+      第一次被真正遵守，此前注入面自己越过了它。
+      **仍然缺的**是**把注入对象装进插件页**：初始化脚本只写 `window.__SYNRA_PLUGIN__ = { label, token }`，
+      没有代码用它们构造 `createInjection(context)`，所以 `injection/` 目前只在测试里被调用。
 - [x] **协议 handler 做了，CSP 受框架限制**（2026-10-18）。
       `builder()` 里 `register_uri_scheme_protocol("synra-plugin", …)`（Tauri 2.12 的方法名是
       `register_uri_scheme_protocol`，handler 收的是 `UriSchemeContext` 而不是 `AppHandle` —— 猜一次就错，读
