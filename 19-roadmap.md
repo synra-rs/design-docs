@@ -1359,6 +1359,14 @@ artifact 的摘要；签名后改过 wasm 或 manifest 都会被拒绝。测试�
 ★ 测试 4 条：打包产物通过检查；缺 tarball 点名；签名后改 manifest 被拒；绝对 URL 需要 `--base`。
 **仍然缺**：上传本身（`aws s3 cp` 或等价物）；主题切换；每窗口 CSP。
 
+### 8.48 `publish --verify`：回读桶
+
+★ `publish --verify --base <url>`：GET `{base}/{pluginId}.json`，用 `parse_static_index` 解析，按版本比对；每个 tarball
+按相对/绝对规则解析后 GET，与本地文件比 SHA-256（不比大小：同尺寸的不同文件正是大小检查漏掉的）。
+★ 网络走 `synra-fetch` + 宿主 `NetworkGuard`：https 默认，http 仅 loopback；响应上限 64 MiB + 1。
+★ 测试 2 条：本地服务回读通过并打印 `digest matches`；桶里 tarball 改一个字节 → 报 `different bytes`。
+**仍然缺**：上传本身；回读失败后自动重传（现在只报告）。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |

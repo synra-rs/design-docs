@@ -410,6 +410,9 @@ pub struct CatalogItem {
 > ★ **发之前可以自查**：`synra-plugin publish --index <file>` 读 index → 定位每个 tarball → 用安装侧的 `extract_tgz` 解包 →
 > 有 `signature.json` 就用安装侧同一个 `sign::verify` 核对 → 检查 manifest 点名的 artifacts 都在。它**不上传**：桶是否公开、
 > CDN 是否配置属于托管方；它只回答“装得上的形状对不对”。绝对 URL 的 tarball 需要 `--base` 才能映射回本地文件。
+> ★ **发之后可以回读**：`publish --verify --base <url>` 再 GET `{base}/{pluginId}.json` 与每个 tarball，用同一个
+> `parse_static_index` 解析、按 SHA-256 比对字节；任何版本不同都点名。网络走宿主的 `NetworkGuard`（https；http 仅 loopback），
+> 所以“宿主拒的地址”在这里也会被拒。
 **仍然缺**：客户端还没有把 `plugins.registry` 指向静态 index（目前只解析，不接网络）；`index.json` 的缓存与 ETag 也
 留给接入时处理。
 > ★ **接上了**：`plugins.registry` 里以 `static:` 开头的地址表示静态 index（如 `static:https://bucket.example/plugins`）。
