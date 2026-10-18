@@ -655,6 +655,9 @@ impl GcTask {
 ★ **同日更晚：重装前先清掉导入留下的行（19 §8.117）。** 导入恢复的是数据库，插件行说已安装但 artifact 不在；安装器
 拒绝“已安装”的标识符，所以 `reinstall` 先 `PluginRemove`（保留 sandbox）再 `PluginInstall`。清行会级联删掉 grants，
 重装后需要重新同意；容器里的 `enabled` 没有恢复。
+★ **同日更晚：容器带上 grants，重装恢复同意与开关（19 §8.118）。** `plugins-manifest.json` 的每项新增 `grants`
+（只含被允许的能力，空则省略）；重装的顺序是安装 → `PluginConsent` → （容器说启用且 grants 非空）`PluginSetEnabled`。
+旧容器没有 grants 时不做同意、也不启用 —— 打开一个没人批准过的插件不是“恢复”。
 
 **导入/导出格式**（`.synrabackup`，zip）：
 ```

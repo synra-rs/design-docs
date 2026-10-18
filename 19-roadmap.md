@@ -2591,8 +2591,27 @@ guards 12。
 
 ★ 测试：CLI **100**（+1：清行→安装的顺序；另一条断言未安装的插件不会被删）、core 675、store 236、daemon 221、
 app shell 262/261、workspace clippy、`api-guard`、guards 12。
-**仍然缺**：删除行会级联删掉 grants（导入带来的同意记录），所以重装后要重新同意 —— 容器目前不携带 grants；容器里的
-`enabled` 状态没有恢复（安装按设计是 `enabled=false`）；重装仍不是事务。
+**仍然缺**：重装不是事务（装到一半失败会留下前面成功的插件）；来源是本机路径，换设备后可能不存在；registry 安装仍
+没有来源字符串；同意与启用由 §8.118 恢复（旧容器没有 grants 时保持关闭）。
+
+### 8.118 备份带着“用户批准过什么”
+
+★ §8.117 修好了重装**能**安装，但安装器按设计写的是 `enabled=false` 且没有 decisions —— 而 `load_one` 拒绝没有
+decisions 的插件。于是重装后的插件“在磁盘上、不能运行”，导入带来的 grants 又随着行的级联删除一起没了。用户得把每个
+能力重新点一遍。
+
+- **容器带 grants**：`PluginEntry.grants` 只收 `granted = true` 的能力（拒绝的能力是**缺席**，不是带 `false` 的项），
+  `plugins-manifest.json` 里 `skip_serializing_if` 为空时省略。旧容器没有这个字段：`#[serde(default)]` 读成空列表。
+- **重装按顺序恢复**：安装 → `PluginConsent { granted }` → （容器说启用且 grants 非空时）`PluginSetEnabled`。
+  **为空不启用**：一个没有同意记录的插件被打开，就是打开了没人批准的东西；旧容器的开关保持关着，用户重新同意。
+- **失败点名**：`… was installed but its consent could not be restored: …` 与 `… could not be enabled: …`，两种都是
+  “装好了但没恢复完”，不是“没装”。
+
+★ 测试：store 236（容器里的 grants 只含 `log:*`，被拒绝的 `net:read-title` 不在列表里；`plugins_in_backup` 读到同一份）、
+CLI **102**（+2：安装→同意→启用的顺序；旧容器/无 grants 时既不同意也不启用）、core 675、daemon 221、app shell 262/261、
+workspace clippy、`api-guard`、guards 12。
+**仍然缺**：重装仍不是事务（同意失败会留下已安装但未同意的插件）；容器格式仍是 version 1，新增字段靠 serde 默认值兼容；
+重装不恢复 `health` 等运行期字段（它们由加载时重新观察）。
 
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
