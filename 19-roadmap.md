@@ -846,6 +846,13 @@ quota → `RateLimited`（这一次"等一会儿"就是正确的动作）、过�
 前端同时修了一个拼写：旧代码检查 `clipboard_read`，而能力表里是 `platform:read-clipboard` —— 一个声明了真实能力的
 插件仍然会被拒。测试用一个记录型 `CommandRunner` 替换真实程序，所以不会真的打开浏览器、改剪贴板或弹通知。
 
+★ **出网也接上了**：`network.fetch` 走 `PluginSet` 的 **host**，而不是在壳里新建一个 fetcher —— 同一个客户端才有
+同一条 in-flight 限制、同一份 grant 视图；`fetcher_for` 读 `network:fetch:<host>`，空列表是拒绝而不是"任意 host"。
+`synra-fetch` 的 `Response` 补了 `statusText`、`url`、`redirected`：契约里的 `SynraResponse` 声明了它们，而之前
+core 的响应把重定向后的地址丢掉了。门面把 host 的纯文本 body 变成 `text/json/bytes` 三个**互斥**的读法，
+第二次读是 `invalid_argument`；`timeoutMs` 与字节 body 在门面与 RPC 两处都拒绝（这一层的超时是客户端的，
+传一个会被静默忽略的值等于让作者以为它生效了）。
+
 **仍然缺的**是把 `createInjection(context)` 装进插件页。初始化脚本只放 label 与 token；可行的做法是把注入门面
 单独构建成一份资源（Vite 的第二个 entry），开窗时**拼进 `initialization_script`** —— 这样 `window.synra` 在页面
 任何脚本之前就存在，插件作者也不必改 HTML。要先决定生成物放哪（提交生成物 + 守卫，还是随安装包发资源），
@@ -867,7 +874,7 @@ quota → `RateLimited`（这一次"等一会儿"就是正确的动作）、过�
 - 两个小决定：`dist`/`src-tauri/gen` 之外，eslint 也忽略 `src-tauri/inject`（压缩产物的风格不是本仓库的风格）；
   `sdkVersion` 取 manifest 的 `sdk.preferred`（没写才退回 `min`）——`min` 是兼容下限，报它会告诉插件它是对更老的宿主构建的。
 
-**仍然缺的**：network.fetch、transfer.*、self.invoke/actions 三个命名空间（都在方法表里、都以 `Unsupported` 回答），
+**仍然缺的**：transfer.*、self.invoke/actions 两个命名空间（都在方法表里、都以 `Unsupported` 回答），
 以及插件卡上的"打开"入口。
 
 ## 9. 每阶段的"退出条件"（不允许跳过的）
