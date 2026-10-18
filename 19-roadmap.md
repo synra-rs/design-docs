@@ -2039,6 +2039,21 @@ guards 12 项。
 分支的测试），两种 clippy、guards 12 项。
 **仍然缺**：plugin pool 命中/未命中（`pool.acquire` 不回答）。
 
+### 8.88 池的命中：在调用之前看一眼 `live`
+
+★ `InstancePool::acquire` 只说“给你一个 handle”，不说它是不是热的。但 `PluginSet` 自己有一张 `live: handle → instance`
+—— 调用**之前**这个 handle 在不在表里，正好就是“池交给你的槽位是否已经有实例”。
+
+★ 一次调用记一个：`plugin_pool_hit_total` 或 `plugin_pool_miss_total`。池拒绝（到达实例上限）的调用在 `acquire` 就返回
+了，到不了这里，所以两者之和就是池真正服务过的调用数 —— 一个“只记 miss”的实现会让热池永远看起来是冷的。
+
+★ 语义写清楚：这是**池的行为**，不是引擎的花费。一个 trap 之后实例被丢弃的调用仍然算 hit（池确实交出了热的那个），
+下一次才会 miss。
+
+★ 测试：core 672 条（新增一条：同一插件调两次 → miss 1、hit 1；scripted 的 stateless 策略让第二次拿到同一个 handle），
+clippy `-D warnings`、guards 12 项。
+**仍然缺**：daemon 侧的 `plugins_installed`/`plugins_active` 与 `plugin_install_total`（安装与列表都在窗口里）。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
