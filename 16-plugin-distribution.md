@@ -668,7 +668,8 @@ pub struct UpdateInfo {
       在跑，指纹可以按自己的节奏比对。**仍然缺**：没有“永远不要这个发布者”的一键拒绝（要去列表里 Revoke）。
       ★ **一键拒绝也有了**：提示里三个答案 —— Trust this key / Never trust this publisher / Not now；后两个都关闭提示，
       但只有前者写 `trusted`，中间那个写 `revoked`（之后这个 key 的包会在 `publisher-trust` 阶段被拒）。
-      **仍然缺**：设置页里 `ui.theme` 仍是只读 —— 界面目前只有暗色一套 token。
+      ★ **决定：只有暗色一套 token**（28 §6 R22）。设置页把 `ui.theme` 印出来并说明“只有一套调色板”，不再画一个永远只有
+一个选项的控件；`ui.theme` 仍是内核记录，插件通过 `env-dark-mode` 读到它。
 - [x] 撤销清单的内置分发与生效（停用已装的被撤销版本）—— **已实现**（第 78 轮）：
       `synra_plugin_api::revocation`（上面那个文档格式）+ 守护进程的加载路径。
       ★ **两个行为均已落地**：已安装的被撤销版本被**拒绝加载并写入** `enabled = false`
