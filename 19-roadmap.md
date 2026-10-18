@@ -1348,6 +1348,17 @@ artifact 的摘要；签名后改过 wasm 或 manifest 都会被拒绝。测试�
 `one.tgz`。
 **仍然缺**：`publish` 子命令；主题切换；每窗口 CSP。
 
+### 8.47 `publish`：发之前自查
+
+★ `synra-plugin publish --index <file> [--base <url>]`：解析 index → 定位每个 tarball（相对路径按 index 目录，绝对 URL 用
+`--base` 映射）→ 用安装侧的 `synra-registry::extract_tgz` 解包 → 有 `signature.json` 就用安装侧同一个 `sign::verify` 核对 →
+检查 inline manifest 点名的 artifacts 都在。**不上传**。
+★ 解包在临时目录，清理逐个文件/目录（不用递归删除）；失败时成功的版本行仍保留，作者一次就能看到哪几个还没过。
+★ 默认布局修正：`pack --index`（相对）把 tarball 放进 index 所在目录（`dist/@acme/@acme-hello-1.0.0.tgz`），index 在
+`dist/@acme/hello.json`；否则相对名解析到另一个目录。
+★ 测试 4 条：打包产物通过检查；缺 tarball 点名；签名后改 manifest 被拒；绝对 URL 需要 `--base`。
+**仍然缺**：上传本身（`aws s3 cp` 或等价物）；主题切换；每窗口 CSP。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |

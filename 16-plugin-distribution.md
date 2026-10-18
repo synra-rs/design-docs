@@ -407,6 +407,9 @@ pub struct CatalogItem {
 > ★ **tarball 可以相对**：`pack --index`（不带值）写相对文件名，客户端按 index 自身的 URL 解析；带值时写
 > `{base}/{文件名}`。作者在打包时通常不知道桶的公开地址，而“上传这两个文件”应该是发布的最小动作。
 > 客户端拒绝 `..`（不规范化）：一个爬出自己目录的 index 是在请求作者没打算发布的东西。
+> ★ **发之前可以自查**：`synra-plugin publish --index <file>` 读 index → 定位每个 tarball → 用安装侧的 `extract_tgz` 解包 →
+> 有 `signature.json` 就用安装侧同一个 `sign::verify` 核对 → 检查 manifest 点名的 artifacts 都在。它**不上传**：桶是否公开、
+> CDN 是否配置属于托管方；它只回答“装得上的形状对不对”。绝对 URL 的 tarball 需要 `--base` 才能映射回本地文件。
 **仍然缺**：客户端还没有把 `plugins.registry` 指向静态 index（目前只解析，不接网络）；`index.json` 的缓存与 ETag 也
 留给接入时处理。
 > ★ **接上了**：`plugins.registry` 里以 `static:` 开头的地址表示静态 index（如 `static:https://bucket.example/plugins`）。
