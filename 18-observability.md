@@ -849,8 +849,8 @@ pub fn install_panic_hook(paths: &Paths, version: &str) {
       `Work::interface`（`share`/`actions`/`lifecycle`），不在这里再列一遍；trap/超时/内存超限已经在
       `is_misbehaviour` 里判断过，`plugin_faulted_total` 只是把它记下来并带上 `outcome`（`trap`/`timeout`/…）。
       两个宿主都把记录器交给了 `PluginSet`（`with_metrics`），所以这条对 daemon 与窗口同时生效。
-      **仍然缺**：daemon 侧的 `plugins_installed`/`plugins_active` 与 `plugin_install_total`（安装与列表都在有界面的宿主里；
-      调用、内存、fuel、fault、pool 五项两个宿主共用一个 `PluginSet`，已经同时生效）。
+      **仍然缺**：`plugin_install_total` 只在壳里（安装发生在有界面的宿主）；`plugins_installed`/`plugins_active` 两个宿主
+      都设了 —— 壳在 `plugins_list`，daemon 在 `plugins_value`（它没有安装命令，列表是它唯一能学到“装了几个”的地方）。
       ★ **`plugin_memory_bytes{plugin}` 也接上了**：`PluginSet::call` 在 `run_on` 返回之后、池释放句柄之前读
       `PluginInstance::memory_bytes()` —— 那是唯一能看见“这个插件占了多少”的时刻。记 gauge 而不是增量：内存会被还回去。
       ★ **`plugin_fuel_consumed{plugin}` 同一天接上**：`PluginInstance` 新增默认方法 `last_fuel_consumed()`（scripted 返回

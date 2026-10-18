@@ -2054,6 +2054,19 @@ guards 12 项。
 clippy `-D warnings`、guards 12 项。
 **仍然缺**：daemon 侧的 `plugins_installed`/`plugins_active` 与 `plugin_install_total`（安装与列表都在窗口里）。
 
+### 8.89 daemon 也说自己有几个插件
+
+★ `plugins_installed`/`plugins_active` 一直是窗口的 `plugins_list` 设的。daemon 没有安装命令，于是它从不设这两个 ——
+在同一个内核运行的 headless 机器上，面板只能读成“这个内核没有插件”。现在 `plugins_value`（daemon 的 `plugins` 报告）
+在读表之后设这两个 gauge：列表本来就是它唯一能学到“装了几个、几个开着”的地方。
+
+★ `plugin_install_total` 仍然只在壳里：安装是一个界面动作，daemon 没有这条路径。写进文档而不是硬塞一个永远为零的
+序列。
+
+★ 测试：daemon 213 条（新增：两行不同 `enabled` 的插件 → `plugins_installed=2`、`plugins_active=1`；一行两用会被
+这个断言抓住），clippy `-D warnings`、guards 12 项。
+**仍然缺**：`plugin_install_total` 的 daemon 侧（没有安装路径）。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
