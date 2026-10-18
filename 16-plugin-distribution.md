@@ -330,6 +330,11 @@ pub struct CatalogItem {
 > 安装框上多了一个 **From a directory / From the registry** 的切换：模式是控件而不是对文本的猜测（`@acme/hello` 与
 > `C:\plugins\hello` 都是“带斜杠的字符串”）。registry 模式把 `{source:'registry', pluginId}` 交给 `plugins_install`。
 > **仍然缺**：catalog 搜索、镜像/回退、以及 registry 安装前的权限预览（内联 manifest 还没显示）。
+> ★ **权限预览有了**：`plugins_preview`（`pluginId` + 可选 `version`）读 packument 的内联 manifest，返回
+> `InstallPreviewDto{ pluginId, version, title, description?, publisher, publisherName?, capabilities, headless, hasUi,
+> sizeBytes? }`。插件页的 registry 安装先调它，弹一个确认框（名称、版本、发布者、capabilities、runtime、发布者声称的体积），
+> 确认后才下载。它是**问题**不是批准：预览是发布者的说法，签名在字节上校验，装完仍然默认关闭。
+> **仍然缺**：catalog 搜索、镜像/回退。
 
 
 ---

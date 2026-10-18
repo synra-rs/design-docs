@@ -1134,6 +1134,16 @@ packument 与构造的 `.tgz`，断言装上了、库里有行、cache 里的解
 ★ 测试：设置页写 URL 与清空各一次；插件页切到 registry、输入 id、点 Install，断言命令收到的是 registry source。
 **仍然缺**：catalog 搜索、镜像/回退、安装前的权限预览。
 
+### 8.25 安装前先问一句
+
+★ 新命令 `plugins_preview`（契约 45）：读 packument 的内联 manifest，返回 `InstallPreviewDto`（名称、版本、发布者、
+capabilities、runtime、发布者声称的体积）。`choose()` 被预览与安装共用，两者不会对“用户看到的是哪个版本”有分歧。
+★ 插件页的 registry 安装变成两步：先预览，弹确认框显示权限；确认后才 `plugins_install`。框里的每一句都是发布者的说法 ——
+签名在字节上校验，装完默认关闭，所以这个框是**问题**，不是批准。
+★ 测试：本地服务返回带 `synra` 内联 manifest 的 packument，先 `plugins_preview` 断言 capabilities，再安装断言行与 cache
+清理；插件页挂载测试断言点 Install 只触发 `plugins_preview`、确认后才触发 `plugins_install`。
+**仍然缺**：catalog 搜索、镜像/回退。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
