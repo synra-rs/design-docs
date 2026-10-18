@@ -401,6 +401,9 @@ pub struct CatalogItem {
 ★ **作者不用手写它**：`synra-plugin pack --index <base>` 在 tarball 旁边写 `<pluginId>.json`（如 `dist/@acme/hello.json`），
 `tarball` 是 `{base}/{文件名}`，`manifest` 取自 manifest 文件，`publishers` 取自刚刚核对过的签名（无签名则为空）。手写的 index
 是对同一份包的第二种描述，两份会漂移。
+> ★ **发第二个版本是追加，不是覆盖**：目标 index 已存在时读取它，保留其他版本的条目，替换同版本条目、更新 `latest`、合并
+> `publishers`。同一版本重打包替换原条目（解析器拒绝重复版本）；读不懂的现有文件拒绝覆盖 —— 一个工具不该用自己看不懂的
+> 内容去换掉它没写的版本历史。
 **仍然缺**：客户端还没有把 `plugins.registry` 指向静态 index（目前只解析，不接网络）；`index.json` 的缓存与 ETag 也
 留给接入时处理。
 > ★ **接上了**：`plugins.registry` 里以 `static:` 开头的地址表示静态 index（如 `static:https://bucket.example/plugins`）。
