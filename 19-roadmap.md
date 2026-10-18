@@ -972,6 +972,12 @@ worker 出现时忘记它。discovery 的 `stop` 只持有 supervisor 的 **shut
 并检查 64 MiB 总量。
 ★ 本轮只到"装得进去"：接收端的同步回调仍发/收单个 wasm，`plugins_sync_run` 与 `record_received` 都还没换成包。
 
+★ **接上了**：`plugins_sync_run` 把 `plugins/<id>/` 打成 `.synra`（一次一轮，用完删除），`send_to` 发的是包；
+接收侧窗口与 daemon 都在 `on_finished` 里先 `install::from_package`，成功后再 `record_received`。安装失败时回
+`SyncOutcome::refused`，不再写一条"已装"的历史。`proposed_name` 也从 `plugin-<id>.wasm` 改成 `.synra`。
+★ 由此留下的一件事：`record_received` 里的 `insert_plugin` 在安装之后会失败（插件行已经由安装器写好），现在被
+`let _` 吞掉；它不是错的状态，但那行 `let _` 值得在下一轮收成一个显式的"已安装则跳过"。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |

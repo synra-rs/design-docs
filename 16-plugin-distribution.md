@@ -54,6 +54,10 @@
 > `ArchiveLimits::package()` 就是本节 64 MiB / 32 MiB 那一组数字。发送侧 `package_directory` 把已安装目录压成包，
 > 并**跳过已解包的 `ui/`**（包里带的是 `ui.zip`，`ui/` 是本机的产物）。
 > 本轮只到"装得进去"：`install::from_package` 有测试，接收端的同步回调仍发/收单个 wasm，尚未接上。
+>
+> ★ **接上了（设备间同步）**：`plugins_sync_run` 现在把 `plugins/<id>/` 打成 `.synra` 再发；接收侧（窗口与 daemon）
+> 在 `on_finished` 里先 `install::from_package`，成功后才 `record_received`，失败回 `SyncOutcome::refused`。
+> 收件箱里的名字也从 `plugin-<id>.wasm` 改成 `plugin-<id>.synra`。
 
 ### 2.2 摘要的表达
 
