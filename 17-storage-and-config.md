@@ -737,7 +737,13 @@ plugins-manifest.json   # 已装插件清单（id + version + source），用于
       备份留下 `-wal`/`-shm`）；检查全部通过后才把当前库改名成 `synra.db.before-restore-<ms>`、删掉旧库的 WAL/SHM、复制
       备份、再打开副本验证。复制或验证失败会回滚：新文件删掉、旧库改回原名。**内核在跑时拒绝**（控制 socket 能连上就
       说明有进程持有数据库），因为在一个打开它的进程底下换库是把一次恢复变成第二次故障。
-      `.synrabackup` 的 zip 导入/导出仍然没做 —— 现在能恢复的是**单文件备份**，也就是 `synra db backup` 写出来的那个。
+      `.synrabackup` 的导入/导出**当时**没做 —— 那时能恢复的只有单文件备份，也就是 `synra db backup` 写出来的那个。
+      ★ **同日更晚：`.synrabackup` 的导出/导入也做了（19 §8.112）。** 格式就是下面 §646 的四项：`manifest.json`
+      （`format: "synra.backup"`、`version: 1`、`createdMs`、`includes`）、`kernel.db`（仍然是 `VACUUM INTO` 的副本）、
+      `config.json`（按 dotted key 的对象）、`plugins-manifest.json`（id + 活动版本 + 是否启用）。用 `zip` crate 的
+      deflate，没有启用 AES/bzip2/zstd。导入先读 manifest 校验格式与版本，再把 `kernel.db` 解到目标旁边、走与 `restore`
+      同一个 `restore_from`（所以损坏的库在改名之前就被拒），最后**报告**需要重装的插件，不自动重装。第 4 步“一键重装”
+      仍未做；`config.json` 是给人读的，导入以数据库里的配置为准。
 - [ ] 磁盘配额检查（安装前检查可用空间）—— **缺失**：`doctor/storage.rs:66` 的
       `probe_disk_space` 是**诊断探针**，不是安装前检查；`Quota::max_storage_bytes` 是单插件运行时配额。
       ★ **第 128 轮补上了这块缺的能力，但没补上这道闸**，所以本行仍然不勾：

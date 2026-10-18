@@ -2480,6 +2480,27 @@ clippy、guards 12。
 guards 12。
 **仍然缺**：满盘时的写失败只被忽略（这一层没有地方报告）；队列容量是常量，不随磁盘调节；被丢弃的行没有“丢了什么”的摘要。
 
+### 8.112 `.synrabackup`：一台设备装进一个文件
+
+★ 17 §646 写好了格式，实现一直是“还没做”。`synra db backup` 只有一个数据库文件；用户想知道“这个备份里装了什么、什么
+是开着的”，得解包一个 SQLite。容器把这两件事放进两个能直接读的 JSON。
+
+- **四个条目**：`manifest.json`（`format: "synra.backup"`、`version: 1`、`createdMs`、`includes`）、`kernel.db`、
+  `config.json`（按 dotted key 的对象）、`plugins-manifest.json`（`pluginId` + 活动版本 + `enabled`）。数据库仍是
+  `VACUUM INTO` 的副本 —— 同一个一致性机制，不是第二个更弱的。zip 用 `zip` crate 的 **deflate**；AES/bzip2/zstd 没启用：
+  一个需要加密或压缩栈才能读的备份格式，是为依赖而依赖。
+- **导入复用恢复**：解出 `kernel.db` 到目标旁边，走 `restore_from` —— 只读校验、完整性检查、版本检查、改名旧库、复制、
+  验证、失败回滚都在这一条路径上。所以“容器里的库坏了”在旧库被动之前就被拒。
+- **插件只报告不重装**：artifact 按设计不在备份里，导入的回答是“这些要重装”，把决定留给用户。
+- **CLI**：`synra db export <path>`（不覆盖已有文件）与 `synra db import <path>`（内核在跑时拒绝；在打开当前库之前分流，
+  所以当前库坏了也能导入）。
+
+★ 测试：store **236**（+3：四个条目与元数据、导入带回配置与插件记录且旧库保留、覆盖被拒、异种/更新版本的容器被拒且当前
+库未变）、CLI **95**（+2：容器往返、非容器文件被拒）、daemon 221、core 674、app shell 262/261、workspace clippy、`api-guard`
+stability、guards 12。
+**仍然缺**：导入后的一键重装（设计第 4 步）；容器不加密（密钥按设计不进备份，但容器本身仍是明文 zip）；只读版本 1，
+没有旧格式。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
