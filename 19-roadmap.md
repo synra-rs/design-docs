@@ -936,6 +936,11 @@ Blob 编码成 base64，内核解码到 `cache/plugin-transfers/<uuid>/<fileName
 第二次启动在 `app_state` **之前**退出，因此不会开第二个数据库、不会绑第二个端口；锁拿不到（只读目录等）时**继续运行**
 并打印原因 —— 两个实例比一个打不开的窗口轻。
 
+★ **退出路径只有一处**：`run_window` 的 `RunEvent::ExitRequested` 调 `stop_background`，取消 listener 的 token 与
+discovery 的 token；托盘的 Quit 只调 `app.exit(0)`，不自己拼一份停止逻辑。一个按名字列出 worker 的关停，会在下一个
+worker 出现时忘记它。discovery 的 `stop` 只持有 supervisor 的 **shutdown token**（不是 handle）：线程真正读的就是它，
+而这个壳没有"关停报告"要用 handle。
+
 ★ **`env.platformSupports` 接上了真实答案**：宿主在开窗前用 `CommandPlatform::supported_actions()` 生成
 `platformCapabilities` 放进 seed，门面同步查表。两层映射是刻意的：`PlatformAction → 客户端拼写`
 （`open_url`/`clipboard_read`/…）与能力拼写（`platform:open-url`）**不是**一套；`simulate_keys` 只在策略允许时出现，
