@@ -1946,6 +1946,25 @@ guards 12 项。
 `plugin_install_total{result=refused,stage=source}`。两种配置 clippy、check、guards 12 项。
 **仍然缺**：`plugin_fuel_consumed`、`plugin_memory_bytes`（引擎没把读数交出来）、pool 命中/未命中。
 
+### 8.83 卸载的“询问”：从一行确认到一个能问的对话框
+
+★ 卸载的四步在 2026-10-18 就落地了，但页面把 `remove_data` 写死成 `false`：命令一直接受两个取值，**界面只能发一个**。
+这不是少一个按钮，而是“删除我的数据”这个选项在窗口里不存在。
+
+★ **换成 `AModal` + 勾选**：不勾是保留（默认、可逆），勾了才把 `remove_data: true` 传下去；每次打开都重置为不勾 ——
+记住上次的破坏性选择等于第二次访问默认删数据。用 `get-container="false"` 让对话框留在组件内而不是 teleport 到 `body`，
+页面测试才看得见那个勾选框；一个测不到的对话框就是没人验证过的决定。
+
+★ **两次被测试抓住的细节**：
+① 加 `note.value = ...` 之后 eslint 报 `no-use-before-define` —— `note` 声明在 `remove()` 后面，于是把声明挪到前面，
+   而不是加一行 eslint-disable。
+② 页面测试第一次失败是因为按钮按文字找：对话框自己的 OK 按钮（关闭时也在 DOM 里）排在卡片之前，测试点的是它。
+   改成按 `ant-btn-dangerous` 找卡片上的按钮，并额外断言对话框的 `open` 才是真正的证据。
+
+★ 测试：前端 257 条（新增 2：页面“先问再删”整条路径；动作层 `removeData: true` 也发得出去），build、lint 0 error、
+shapes 8 项、guards 12 项。
+**仍然缺**：`RemoveReport`/`bytes_freed`；对话框里显示数据目录路径。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |

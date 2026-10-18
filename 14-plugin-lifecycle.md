@@ -683,8 +683,12 @@ pub async fn remove(&self, plugin_id: &PluginId, opts: RemoveOptions) -> Result<
 > **四步均已落地**（2026-10-18）：`crates/synra-store/src/plugin_files.rs`（含三条测试）、
 > `SynraDb::remove_plugin`（事务，含一条断言两张表都干净）、`commands::plugins::plugins_uninstall`
 > （先记录后目录，含两条）、页面上的 `Remove` + `APopconfirm`。
-> ★ 页面确认句写的是"removed and its data stays on disk"，所以 `remove_data` 恒为 `false` —— 若将来加
-> "同时删除数据"，它必须出现在一个能显示路径的对话框里，而不是一行确认。
+> ★ **2026-10-19：那一行确认换成了一个能问的对话框。** 页面不再用 `APopconfirm`（它的确认句是“数据留在磁盘上”，
+> 所以 `remove_data` 恒为 `false`），改成 `AModal` + “Also delete its data” 勾选：不勾是保留（默认、可逆），勾了才把
+> `remove_data: true` 传给命令。对话框用 `get-container="false"` 留在组件里，测试才看得见那个勾选框；每次打开都把勾选
+> 重置为“不删”，记住上次的破坏性选择等于第二次访问默认删数据。
+> ★ **仍然缺的**：`RemoveReport`/`bytes_freed` 没有被返回（成功后只给一句 `removedKept`/`removedDeleted` 文案）；
+> 对话框里没有显示数据目录的路径 —— 那需要 `PluginSnapshot` 带一个 `dataPath`，是下一次契约改动的事。
 > ★ **仍然缺的**：`RemoveReport`（`bytes_freed` 需要一次测量）没有被返回；命令只回答"删了/没删"。
 
 ## 3. 更新（Update）
