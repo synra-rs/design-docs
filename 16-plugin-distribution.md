@@ -396,6 +396,8 @@ pub struct CatalogItem {
 > 客户端按 `{base}/{pluginId}.json` 取文档并 `parse_static_index`；tarball 用文档给的完整 URL（可以是另一个 CDN 主机，仍受
 > https/loopback 策略约束）。**搜索**只在 npm 兼容的地址上做：静态 index 没有索引可搜，全部是静态时 `plugins_catalog_search`
 > 返回 `Unsupported`，而不是把 404 说成“没有匹配”。
+> ★ **条件请求**：文档的 `ETag`/`Last-Modified` 按 URL 缓存；下一次带 `If-None-Match`/`If-Modified-Since`，304 直接复用上次
+> 解析结果（`synra-fetch` 也因此不再把 304 当重定向）。进程内缓存，靠验证器续期，不设 TTL。
 
 
 ---

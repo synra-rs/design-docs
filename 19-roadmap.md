@@ -1288,6 +1288,16 @@ artifact 的摘要；签名后改过 wasm 或 manifest 都会被拒绝。测试�
 ★ 测试：本地服务 `hello.json` + `pkg.tgz`，配置 `static:http://…`，安装成功；全静态时搜索 `Unsupported`。
 **仍然缺**：`index.json` 的缓存/ETag、静态源的签名目录（signature 清单）。
 
+### 8.40 静态 index 的条件请求
+
+★ `AppState.registry_cache`：按 URL 存 `{ etag, last_modified, document }`。第二次取同一个静态 index 时带
+`If-None-Match` / `If-Modified-Since`；304 直接复用解析结果，不读 body。锁在请求前释放，网络往返不占锁。
+★ **`synra-fetch` 的修正**：`304 Not Modified` 不是重定向，没有 `Location`。之前所有 3xx 都走进重定向分支，于是一个
+缓存命中被报成“304 没有 location”的协议错误。现在 304 作为普通响应返回，测试锁定。
+★ 测试：本地服务第一次回 200 + `etag: "v1"`，第二次只在带 `If-None-Match: "v1"` 时回 304；第二次 `plugins_check_update`
+仍得到缓存里的版本（如果缓存没生效，服务器会回一个不同的 3.0.0 文档）。
+**仍然缺**：缓存失效（目前进程内不过期，靠 ETag 续期）、静态源的签名目录。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
