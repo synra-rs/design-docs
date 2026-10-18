@@ -415,6 +415,9 @@ pub struct CatalogItem {
 > 所以“宿主拒的地址”在这里也会被拒。
 > ★ **失败时说“重传哪个”**：回读不一致的版本会在末尾列出 `re-upload <version> <local file> -> <url>`，作者不需要再从
 > index 反推路径。
+> ★ **上传是作者自己的命令**：`synra-plugin upload --index … --base … --command 'aws s3 cp {file} {url}'` 按 index 顺序
+> 上传 index 与每个 tarball。模板按空白切分、占位符逐 token 替换、**不经过 shell**；`{file}`/`{url}` 各成为一个参数（路径
+> 含空格也一样）。凭据与工具属于作者，这个命令只提供两个它算得准的值：哪个文件、哪个 URL。
 **仍然缺**：客户端还没有把 `plugins.registry` 指向静态 index（目前只解析，不接网络）；`index.json` 的缓存与 ETag 也
 留给接入时处理。
 > ★ **接上了**：`plugins.registry` 里以 `static:` 开头的地址表示静态 index（如 `static:https://bucket.example/plugins`）。

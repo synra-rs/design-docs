@@ -1409,6 +1409,15 @@ artifact 的摘要；签名后改过 wasm 或 manifest 都会被拒绝。测试�
 ★ 测试：桶里 tarball 改一个字节时，输出同时含 `different bytes` 与 `re-upload … 1.0.0`。
 **仍然缺**：自动重传；上传本身。
 
+### 8.54 `upload`：用作者的命令上传
+
+★ `synra-plugin upload --index <file> --base <url> --command '<template>' [--dry-run]`：计划 = index 本身 + 每个版本
+tarball（本地路径按 index 目录/`--base` 解析，URL 按 `--base` 拼），逐个执行模板。
+★ 模板按空白切分，`{file}`/`{url}` 逐 token 替换，**不经过 shell**；路径含空格仍是单个参数。缺任一占位符拒绝启动。
+★ 失败即停，报告哪一条命令退出码非零、其后文件未上传。`--dry-run` 只打印命令。
+★ 测试 4 条：计划顺序与 URL、模板展开（含空格路径）、缺 `{url}` 拒绝、dry-run 不执行且打印两条。
+**仍然缺**：上传后自动 `--verify`；模板中的引号/环境变量（有意不支持，避免再次引入 shell）。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
