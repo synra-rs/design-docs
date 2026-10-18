@@ -732,6 +732,12 @@ plugins-manifest.json   # 已装插件清单（id + version + source），用于
       后者对一个没有写完的副本也成立。
       **还没做的：恢复（导入）与导出。**
       `db/health.rs:42` 只**报告**损坏并提示"restore from a backup"，没有恢复路径。
+      ★ **2026-10-19：恢复做了（19 §8.110）。** `SynraDb::restore_from(backup, database)` + `synra db restore <path>`：
+      先用**只读**连接检查备份能否打开、`integrity_check` 是否通过、schema 是否来自更旧的构建（不先写 pragmas，否则会给
+      备份留下 `-wal`/`-shm`）；检查全部通过后才把当前库改名成 `synra.db.before-restore-<ms>`、删掉旧库的 WAL/SHM、复制
+      备份、再打开副本验证。复制或验证失败会回滚：新文件删掉、旧库改回原名。**内核在跑时拒绝**（控制 socket 能连上就
+      说明有进程持有数据库），因为在一个打开它的进程底下换库是把一次恢复变成第二次故障。
+      `.synrabackup` 的 zip 导入/导出仍然没做 —— 现在能恢复的是**单文件备份**，也就是 `synra db backup` 写出来的那个。
 - [ ] 磁盘配额检查（安装前检查可用空间）—— **缺失**：`doctor/storage.rs:66` 的
       `probe_disk_space` 是**诊断探针**，不是安装前检查；`Quota::max_storage_bytes` 是单插件运行时配额。
       ★ **第 128 轮补上了这块缺的能力，但没补上这道闸**，所以本行仍然不勾：

@@ -2444,6 +2444,24 @@ app shell 262/261、前端 259、workspace clippy、guards 12。
 `bytes_freed` 0，关掉句柄后下一次清扫完成）、daemon 221、core 674、app shell 262/261、前端 259、workspace clippy、guards 12。
 **仍然缺**：清扫只在启动时发生（运行中产生的 leftover 要等下一次启动）；不扫 sandbox 与散落文件（设计如此）。
 
+### 8.110 备份可以放回去了
+
+★ `db integrity` 一直提示“restore from a backup”，而仓库里只有 `db backup`：恢复路径不存在，提示是一句空话。
+
+- **`SynraDb::restore_from(backup, database)`**：先只读打开备份（`open_read_only`，不应用 pragmas —— 否则会给备份留
+  `-wal`/`-shm`），跑 `integrity_check`，确认 schema 不比本构建新。**检查全部通过之后**才动当前库：改名为
+  `synra.db.before-restore-<ms>`、删掉旧库的 WAL/SHM（否则旧日志会被回放到副本上）、复制、打开副本再验证；任何一步失败
+  都回滚（删新文件、旧库改回原名）。
+- **`synra db restore <path>`**：在打开当前数据库之前分流 —— 一个“恢复”命令如果需要当前库健康才能运行，就不是恢复。
+  内核在跑时拒绝（控制 socket 能连上即说明有进程持有数据库）。输出说明备份来自哪里、旧库现在在哪里。
+- **旧库保留**：删除它会让一次错误诊断变成单向门，而“看起来坏了”是程序的判断。
+
+★ 测试：store **233**（+3：备份的值被恢复且旧库仍在、损坏的备份被拒且当前库未被改、没有当前库时 `previous` 为
+`None`）、CLI **93**（+3：恢复后配置是备份里的值、损坏备份被拒、`db restore` 解析）、daemon 221、core 674、workspace
+clippy、guards 12。
+**仍然缺**：`.synrabackup` zip 的导入/导出；恢复没有“确认”步骤（命令本身就是确认）；跨 schema 版本的回退/升级没有
+测试（更旧的备份靠 `open_read_only` 的版本检查与后续 `migrate`）。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
