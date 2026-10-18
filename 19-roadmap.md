@@ -2357,6 +2357,27 @@ daemon 220、store 227、app shell 262/261、前端 259、workspace clippy、gua
 **仍然缺**：其余 host 调用（存储、网络、设备列表）本身没有日志行，所以它们不在这条 trace 里；插件的 **trap 原因**
 仍只在内核的 outcome 里，不是插件自己的一行。
 
+### 8.105 迟到的答案仍然会到达
+
+★ §8.97 的远程动作在发送侧只等 `REMOTE_RESULT_WAIT`（8 s）。更慢的接收端算完了，却把结果发进了一条已经关闭的连接：
+从用户看，动作“还在跑”，永远不会结束。
+
+- **收信端改拨**：listener 把回信发回提问连接失败时，用 `host.address_of(reply.target)` 找到源设备地址，新建一条连接，
+  把**同一个** `INTENT_RESULT` 发过去（`deliver_late`）。这不是新协议：事件、`reply_to`、trace 都已经在信封里。
+- **源端 listener 收下**：`INTENT_RESULT` 现在也是 listener 的 kernel event，daemon 的 `handle_event` 与窗口的同一回调
+  调 `orchestrate::apply_result`。它按 `reply_to` + 发送者匹配一个仍在 `Dispatching` 的意图；找不到就返回 `Ok(None)`，
+  当作“不等待的结果”忽略 —— 迟到的重复、或已取消的意图，都不是协议错误。
+- **事件处理抽成函数**：daemon 的三个 arm 从 `serve` 的闭包里搬进 `runtime::intent::handle_event`，测试调的是 `serve`
+  运行的同一段代码，而不是它的复述。
+- **trace**：迟到的应用也记一行 `late outcome applied`（`trace_id` 来自信封），于是 `--trace` 能看到结果从第二条连接回来。
+
+★ **写明的边界**：源端必须仍能被 dial 到（有记录的地址且 listener 在跑）；否则这一条只在收信端日志里留下一次失败，结果
+丢失。投递本身是“一次尝试”，不排队、不重试 —— 与发送侧的等待一样，是网络内的一次性语义。
+
+★ 测试：core 674、daemon **221**（+1：`handle_event` 收到迟到的 `INTENT_RESULT` 后板上的意图变成 `succeeded`，第二份
+同样的答案仍是 `Handled`）、store 227、observe 286、app shell 262/261、前端 259、workspace clippy、guards 12。
+**仍然缺**：源端不可达时的持久化重投（没有队列）；迟到的 **cancel** 回执（取消本来不要答案）。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |

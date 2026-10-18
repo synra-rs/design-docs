@@ -422,7 +422,9 @@ impl Supervisor {
 >   ③ **一个真的 bug**：`remote::invoke` 造信封时新铸 request id，而板上记的是 `confirm` 的 id —— 于是 `reply_to`
 >   永远匹配不上，收信侧的幂等键也和本侧记录的不是同一个。现在信封携带 `confirm` 的 id，测试断言两者相等。
 >   **写明的限制**：等待 `REMOTE_RESULT_WAIT`（8 s，由 5 s 的 `EXECUTE_BUDGET_MS` 加往返推出，见 19 §8.99）；更慢的回信
->   会丢、不会重试，意图停在 `dispatching`。控制连接已改为每连接一线程（19 §8.98），所以这段等待只占调用者自己的时间。
+>   不再直接丢掉 —— 收信端发现提问的连接已经关闭时，会**改拨回源设备**投递同一个 `INTENT_RESULT`（19 §8.105），
+>   源端 listener 用 `apply_result` 收下；前提是源端仍可被 dial 到，否则这一条会记日志并丢失。控制连接已改为每连接一线程
+>   （19 §8.98），所以这段等待只占调用者自己的时间。
 >   测试：core **673**、daemon **218**、ipc **123**、workspace clippy、guards 12。
 > * ★ **幂等没有在这里实现，而是用了已有的**：`Board::raise` 在**创建任何东西之前**
 >   就按 `(origin, request)` 查重，重发会拿到第一次的 intent、`created == false`，于是动作不会跑第二次。
