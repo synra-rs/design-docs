@@ -917,7 +917,9 @@ pub fn install_panic_hook(paths: &Paths, version: &str) {
       ★ 端口用 0：问的是“这台机器有没有空闲端口”，而不是“我们已经占用的端口忙不忙” —— 后者会把我们自己的 listener
       报成故障。宿主事实留空（`HostFacts::default()`），于是 WebView/钥匙串探针回答 `unknown` 并说明原因，与 CLI 一致。
       ★ 同一天更晚，导出与 Recent log 也接进了这一节（§8.75/§8.76），所以“少一个界面”这句已经不成立。
-      **仍然缺**：`DoctorReport` 的汇总与“只看失败”没有界面（窗口看的是原始探针结果，不是 doctor 的排版）。
+      ★ **再看一眼就能处理**：报告上方是一行计数（`N OK · N warnings · N failed`，由结果算出来而不是另存一份），
+      下方一个 “Only problems” 勾选把通过的行藏起来。**仍然缺**：`DoctorReport` 自己的排版与退出码语义没有界面 ——
+      窗口展示的是原始探针结果，不是 doctor 的过滤参数。
       ★ **2026-10-19：导出有了界面** —— 设置页 “Diagnostics” 一节：两个自愿勾选（审计、debug 日志，后者才显示
       行数）+ Export，结果回显路径与 `included`/`excluded`。`DiagExportResult` 同时从壳的私有类型搬进
       `synra-ipc` 的 DTO，页面因此不再手抄形状（镜像由 `dto-coverage` 盯着）。**探针的展示仍然没有**：这一节调用

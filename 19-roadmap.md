@@ -1854,6 +1854,18 @@ lint 0 error、build、guards 12 项。
 js 34 条 + `pnpm run check`，两种配置 clippy、build、shapes、guards 12 项。
 **仍然缺**：`DoctorReport` 的汇总与“只看失败”没有界面；探针的 WebView/钥匙串事实仍然由 CLI/窗口共同留空。
 
+### 8.78 探针报告的摘要与过滤
+
+★ 八个到十二个结果读起来是一屏。报告上方一行**从结果算出来的**计数（`N OK · N warnings · N failed`），下方一个
+“Only problems” 勾选把通过的行藏起来 —— 这两个都是页面的事，不需要新命令，也**不另存一份计数**：`probeReport` 是唯一
+来源，摘要与列表都是它的视图（存一份计数是第二次让它们可能不一致）。
+
+★ **单数/复数**在这一行里是代码：`warning` / `warnings`。界面文案的复数规则不交给调用方，否则每个调用点都会自己拼。
+
+★ 测试：前端 255 条（扩展现有的探针用例：摘要 `1 OK · 1 warning · 0 failed`，勾选后 `tcp_port_available` 消失、
+`wasm_backend` 仍在），build、lint 0 error、shapes 8 项、guards 12 项。
+**仍然缺**：`DoctorReport` 自己的排版与退出码语义（窗口看原始结果，不看 doctor 的过滤参数）。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
