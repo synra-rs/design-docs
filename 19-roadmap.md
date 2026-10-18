@@ -1220,6 +1220,15 @@ worker 还是把 id 留给 listener。按钮在请求期间 loading，失败走 
 ★ 测试：点 Cancel 只打开问题、命令**没有**被调用；再触发确认才断言 `transfer_cancel` 收到 id。
 **仍然缺**：没有“不再问”的选项（每次取消都问）。
 
+### 8.34 确认是一次偏好
+
+★ 新增配置 `transfers.confirmCancel`（默认**问**；缺席等价于 true）。设置页 “Transfers” 一节给了开关；首页按这个值决定
+Cancel 外面是 `APopconfirm` 还是按钮本身。
+★ 默认是问而不是不问：丢字节的按钮默认应当有一次摩擦，用户明确关掉才省掉。
+★ 测试：设置页第二个开关写 `{ transfers.confirmCancel: false }`；首页在 store 里放 false 时没有 `APopconfirm`、一次点击
+就调 `transfer_cancel`。
+**仍然缺**：主题仍是只读；每窗口 CSP。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
