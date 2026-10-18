@@ -1113,6 +1113,17 @@ worker（桌面命令已经是这样，见 §8.15）。
 自己就拒绝写这种条目）、符号链接、单文件上限、前缀不匹配、gzip 损坏。
 **仍然缺**：没有网络客户端与命令 —— `plugins_catalog_search`、`InstallSourceDto::Registry` 还是拒绝的。
 
+### 8.23 Registry 的第三步：真的能装
+
+★ `commands/registry.rs`：配置键 `plugins.registry`（缺失 → `Unsupported`，不猜默认）。一条 `GET {base}/{id}` 取
+packument（`/` 编码成 `%2F`），`dist-tags.latest` 或指定版本，`dist.tarball` **必须与 base 同 origin**（一个让设备去取
+别处的 packument 是在索取未被配置的权限）。下载走 `fetch_bytes`，交给 `extract_tgz`（`package/` 前缀），再走**同一个**
+`install_directory` —— 签名、限额、manifest、store 都还只有一份实现。
+★ `http` 只对 loopback 放开（本地镜像/测试）；公网走 `https`，这是 `NetworkGuard` 的默认而不是这里加的规则。
+★ `plugins_install` 的 `Path` 分支被抽成 `install_directory`，registry 分支与它共用。测试用一个本地 `TcpListener` 服务
+packument 与构造的 `.tgz`，断言装上了、库里有行、cache 里的解包目录被清掉；没有配置 registry 时仍是 `Unsupported`。
+**仍然缺**：`plugins_catalog_search`、镜像/回退（§4.2）、设置页里的 registry 配置与安装 UI。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |

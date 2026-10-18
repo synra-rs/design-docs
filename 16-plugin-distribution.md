@@ -321,6 +321,11 @@ pub struct CatalogItem {
 > `strip_prefix`，不带前缀的包会被拒，而不是解到错误的深度。
 > **仍然缺**：registry 客户端本身 —— 地址配置、`plugins_catalog_search`、`InstallSourceDto::Registry`，以及把下载的
 > tarball 接到 `from_directory`。
+> ★ **第一版客户端接上了**：配置键 `plugins.registry`（base URL；缺失时 `Unsupported`，不猜默认）。`plugins_install`
+> 的 `Registry` 分支取 packument → `dist-tags.latest` 或指定版本 → `dist.tarball`（**必须同 origin**，否则拒绝：一个让
+> 设备去取别处的 packument 是在索取未被配置的权限）→ `synra-fetch::fetch_bytes` → `synra_registry::extract_tgz`（`package/`
+> 前缀）→ 现有的 `from_directory` 管线。`http` 只允许 loopback（本地镜像/测试），公网必须 `https`。
+> **仍然缺**：catalog 搜索端点、镜像/回退策略（§4.2）、设置页里的 registry 配置与安装 UI。
 
 
 ---
