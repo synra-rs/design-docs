@@ -1198,6 +1198,13 @@ capabilities、runtime、发布者声称的体积）。`choose()` 被预览与�
 接收方向（正是这两个测试先失败，才发现“有 token 才是发送端”这条区分）。
 **仍然缺**：界面还没有取消按钮（发送与接收都没有），这条命令目前只有 API 可达。
 
+### 8.31 传输行上的取消
+
+★ 首页 “Sending now” 的每一行加了一个 **Cancel**：调 `transfer_cancel`，两个方向同一个命令 —— 行不需要知道内核是去停
+worker 还是把 id 留给 listener。按钮在请求期间 loading，失败走 `ErrorNotice`；行由 `TransferFinished` 事件移除。
+★ 测试：向 store 塞一条 `transferUpdated`，点 Cancel，断言命令收到 `{ transferId }`。
+**仍然缺**：没有进度条（行只显示对端与状态），也没有“取消前的确认”。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
