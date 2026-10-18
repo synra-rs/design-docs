@@ -851,11 +851,12 @@ pub fn install_panic_hook(paths: &Paths, version: &str) {
       ★ **命令读的是表，不是环**（同日更晚）：`plugins_audit` 走 `audit_trail_for(plugin, offset, limit)`，SQL 是
       `at_ms DESC, id DESC`，所以新→旧由查询保证，动作层不再反转。两个宿主都装了 sink，表是环的**超集**，
       因此重启之后昨天的拒绝仍然看得到。“Clear history” 同时删表里的行与环里的记录 —— 只删一份会让另一份把它救回来；
-      `AppState::new` 在构造时按 7 天 prune 一次（`audit_retention_days` 这个配置键还没进目录）。
+      `AppState::new` 在构造时 prune 一次，窗口来自配置键 `audit.retentionDays`（缺省 7 天，夹在 1–3650 之间），
+      设置页的 “Audit history” 一节就是它的编辑器。
       ★ **“查看完整历史”是 offset**：第一次请求不带 `offset`（可选参数），卡片上的 **Show more** 用“已显示的行数”作
       下一页的 offset 并**追加**；只有上一页**满页**时才出现 —— limit-only 查询唯一能给的“可能还有”信号。
       页短即到底，按钮消失。
-      **仍然缺的**：保留期的配置键；`trace_id` 仍是 `None`（行里没有 trace）。
+      **仍然缺的**：`trace_id` 仍是 `None`（行里没有 trace）。
       ★ **仓库里有两个审计环，只有一个有生产者。**
       * `PluginSet` 的环（`crates/synra-core/src/dispatch/plugins.rs:312`）**有**：每个实例被装上 session，
         调用记录了能力与结果，`drain_audit` 把 session 记下的排进环，`audit_for`/`refusals_for` 读回来。
