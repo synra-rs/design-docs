@@ -1240,6 +1240,20 @@ registry 可达。结果存在页面本地的 `updates` map 里，显示版本�
 与提示文本。
 **仍然缺**：`plugins_update`（真正安装新版本）仍未实现，所以卡片只报告“有新版本”，没有“更新”按钮。
 
+### 8.36 真正安装新版本
+
+★ `plugins_update`（契约里是 `Unit`，现在注册）：registry 取 `latest` → 下载 → 与安装**同一条**校验/写盘管线
+（`install::update_from_directory`，内部是 `from_directory` 的 replace 分支）→ 目录切换 → 记录新版本。
+★ 顺序与回滚：先完整校验并写到 staging；再把旧目录改名为 `.install-staging/previous-<id>`；新目录就位；`plugin_versions`
+记新行；全部成功后才删除旧目录。任一步失败都把旧目录改回去 —— 更新失败等于没有更新，而不是两个版本的混合。
+★ **权限变了就关掉**：新旧 manifest 的 capability 集合比较；新版本多要任何一项，插件回来时 `enabled=false` 且
+`trusted=false`（旧批准只覆盖旧清单），由同意屏幕重新问；权限没变则保留用户原来的开关与信任。
+★ 目录树删除移到 `synra_store::remove_tree`（`plugin_files.rs` 是守卫允许的两个 owner 之一），`install.rs` 不再调用
+`remove_dir_all`；`remove_tree` 带 `is_within` 检查。
+★ 插件卡的 “Update” 按钮只在检查到新版本时出现；更新后重新读列表。
+★ 测试：daemon 两条（同权限保留 enabled/trusted；多一个 capability 则两者都清），更新后 active 版本与 digest 已换、无备份残留。
+**仍然缺**：安装前的 `synra-plugin pack`（npm 兼容 `.tgz`）还没有，registry 发布仍是手工。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
