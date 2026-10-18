@@ -1007,6 +1007,18 @@ worker 出现时忘记它。discovery 的 `stop` 只持有 supervisor 的 **shut
 ★ **仍然缺的**：插件页的 `transfer.send` 还是同步等结束（`plugin_ui_rpc` 直接调同步函数），分块/流式上传也还没有；
 取消的 worker 在阻塞的 `link.send_chunk` 里要等当前块写完才会看到 token。
 
+### 8.16 插件页的分块上传
+
+★ 页面通道的 4 MiB 上限是**一条 IPC 消息**的上限，不是传输的上限。新增四个 `PluginUiOp`：
+`transfer.begin`（返回 `uploadId`，建目录与文件）、`transfer.chunk`（base64，每块 ≤1 MiB，追加写）、
+`transfer.finish`（核对字节数后走桌面发送路径）、`transfer.abort`（删除半成品）。整文件上限 64 MiB（16 §2.1）。
+★ `Uploads` 挂在 `AppState`，键是宿主生成的 `uploadId`；每个 upload 记住 `plugin_id`，**只有开始的插件能追加/完成**。
+写块时锁只覆盖 map 的读写，文件 I/O 在锁外 —— 一个页面的慢磁盘不能卡住另一个上传。
+★ 门面 `synra.transfer.send` 不再一次调用：begin → 循环 1 MiB 块 → finish，任何一步失败都尽力 `transfer.abort`，
+不留半成品。`transfer.send`（单条）仍保留给旧页面。
+★ **仍然缺的**：`finish` 仍是同步发送，页面 `send` 还是要等传输结束才拿到 id；真正的“页面提前返回”要等 finish 走
+worker（桌面命令已经是这样，见 §8.15）。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
