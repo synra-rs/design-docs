@@ -611,7 +611,7 @@ Content-Security-Policy:
 > ★ **2026-10-18 晚：`plugins_sync_plan` 不再是"读一张没人写的表"。** 它现在对每台已配对设备问一次插件清单
 > （`_synra.plugin.list.request/response`，答半在 core 的 listener），把答复替换进 `sync_records`，再用答复里的本插件状态
 > 喂 `decide`；`online` 因此表示"它答复了"。安装管线也第一次写 `plugin_versions`，否则 `active_plugin_version`
-> 在生产里永远是 `None`。细节与四段改动在 `19 §8.8`、`16 §第 178 轮`；**仍缺的一件**是 `plugins_sync_run`。
+> 在生产里永远是 `None`。细节与四段改动在 `19 §8.8`、`16 §第 178 轮`；运行器随后落地（第 180 轮），插件卡现在也调用了它。
 > ★ **2026-10-18 更晚：接收侧不再只有半段。** `record_received` 从 daemon 搬进了 `synra_core::plugin_sync`，
 > 壳的 `on_finished` 现在调的是同一个函数：写历史、写对端持有什么、写 `plugins` 行，并**回一个 `SyncOutcome`** ——
 > 在此之前壳只写 `sync_records` 且返回 `None`，发起端等不到结果。细节在 `16 §第 179 轮`。
