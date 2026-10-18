@@ -1205,6 +1205,14 @@ worker 还是把 id 留给 listener。按钮在请求期间 loading，失败走 
 ★ 测试：向 store 塞一条 `transferUpdated`，点 Cancel，断言命令收到 `{ transferId }`。
 **仍然缺**：没有进度条（行只显示对端与状态），也没有“取消前的确认”。
 
+### 8.32 传输行的进度
+
+★ 同一行现在有一条 `AProgress` 与一句 “5 B of 10 B”：百分比来自 `receivedBytes / totalBytes`（total 为 0 时为 0，上限 100），
+字节数用 `formatBytes`（B/KiB/MiB/GiB/TiB，一位小数）。
+★ 为什么两个都要：只写 “transferring” 是一个用户无法判断的状态，只有进度条没有数字则无法在报告里引用。测试断言
+“50%” 与 “5 B of 10 B” 同时出现。
+**仍然缺**：取消前的确认。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
