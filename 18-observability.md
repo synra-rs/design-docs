@@ -832,9 +832,14 @@ pub fn install_panic_hook(paths: &Paths, version: &str) {
       现在 `AppState::new` 先建记录器再把它交给 `state.host`，listener 自己那个 `Host` 也一样（一个进程两个 Host，
       两处都要）。单测直接调 `Host::count_frame_sent`，断言**壳的记录器**里出现那一行 —— 这正是"接上了"与"函数存在"
       的区别。
-      **仍然缺（网络组）**：壳的**拨号**链路走的是 `dial_peer` + `PeerLink`，绕开了 `Host::send`，所以那些帧仍然不
-      计数（`frames_received_total` 在 listener 的 `handle_within` 一支里，拨号侧的对称位置没有）；`bytes_*`、
-      `links_closed_total`、`reconnect_attempts_total` 两个宿主都还没有；`transfer_throughput_bps`。
+      **仍然缺（网络组）**：壳的**拨号**链路走的是 `dial_peer` + `PeerLink`，绕开了 `Host::send`，所以那些**帧**仍然不
+      计数（`frames_received_total` 在 listener 的 `handle_within` 一支里，拨号侧的对称位置没有）；`links_closed_total`、
+      `reconnect_attempts_total` 两个宿主都还没有；`transfer_throughput_bps`。
+      ★ **字节数也接上了（同日更晚）**：`bytes_sent_total` / `bytes_received_total` 在 `PeerLink` 上 —— 链接是唯一
+      拿着 payload 的地方（Host 只数帧，加不出一个它从没取过的数）。计的是 **payload 字节**，不是线上字节：帧头是
+      传输层自己的账，而读者问的是“这台设备搬了多少”。计数在写成功之后 / 解析成功之后，失败的写一个字节都没动；
+      两个方向各一条序列。`Host` 把它自己的记录器传给 `dial` 与 `accept` 造出的链接，壳的四处拨号
+      （传输、配对、同步计划、同步执行）也都走 `with_metrics`。
       ★ **插件组的前三项也接上了（同日更晚）**：`plugin_calls_total{interface,plugin}`、
       `plugin_call_duration_us{interface,plugin}`、`plugin_faulted_total{outcome,plugin}`。落点是 `PluginSet::call` ——
       匹配的 `can-handle`、动作调用与生命周期 tick 都经过它，所以一处覆盖全部调用；`interface` 用

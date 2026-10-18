@@ -1755,6 +1755,24 @@ guards 12 项。
 **仍然缺**：`plugin_fuel_consumed`、`plugin_memory_bytes`（引擎没把读数交给调用方）、`plugin_pool_hit_total` /
 `plugin_pool_miss_total`（`pool.acquire` 不回答命中与否）、`plugin_install_total`（安装路径没有按阶段上报）。
 
+### 8.73 链路自己数字节
+
+★ `bytes_sent_total` / `bytes_received_total` 落在 `PeerLink`，因为它是唯一拿着 payload 的地方：`Host` 只数帧，
+加不出一个它从没取过的数；信封在 `Host::send` 里已经计数，块根本不经过那个函数。
+
+★ **payload 字节，不是线上字节**：帧头（长度、kind、chunk_id）是传输层自己的账。读者问的是“这台设备搬了多少
+内容”，把 header 加进来会让同一个文件在两端报出两个略有差别的数字。计数在 `write_frame` 成功之后、`parse_envelope`
+/ chunk 解码成功之后 —— 被拒绝的写一个字节都没动。
+
+★ **`with_metrics` 是 builder**：`PeerLink::new` 的调用点有测试、daemon 与壳几十处；给构造器加参数会让每一处都
+改一次，而其中大多数不记账。`Host` 在 `dial` 与 `accept` 造出链接后把**自己的**记录器传进去（`Option` 为 None 时
+链接仍然是一条链接），壳的四处拨号（传输、配对、同步计划、同步执行）也各自 `with_metrics`。
+
+★ 测试：core 671 条（新增 1：一条链接把 4 字节的块计进发送与接收两条序列，信封无 payload 时贡献 0），
+clippy `-D warnings`、guards 12 项。
+**仍然缺**：`links_closed_total` / `reconnect_attempts_total`；拨号侧的**帧**计数（Host 的 `send` 不在那条路径上）；
+`transfer_throughput_bps`。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
