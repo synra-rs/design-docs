@@ -2390,7 +2390,7 @@ daemon 220、store 227、app shell 262/261、前端 259、workspace clippy、gua
 
 ★ 测试：前端 259（插件页测试里健康报告的 `usage` 换成真实配额，断言 `64.0 MiB`、`20 calls/s`、`5 s per call`；
 `usage: {}` 的旧 fixture 会抓住“这一行永远渲染”的实现）、`pnpm run lint` 0 error、build、shapes 8 项。
-**仍然缺**：配额里其余字段（`callFuel`、`maxStorageBytes`、各速率的 burst）没有展示；这一行是只读的，不能在这里改配额。
+**仍然缺**：配额里其余字段现在在 `All limits` 披露里（§8.114）；这一行是只读的，不能在这里改配额。
 
 ### 8.107 卸载会说出它没能删掉的路径
 
@@ -2518,6 +2518,21 @@ stability、guards 12。
 ★ 测试：observe **289**（+1）、CLI **96**（+1）、daemon **222**（+1）、core 674、store 236、app shell 262/261、前端 259、
 workspace clippy、guards 12。
 **仍然缺**：被丢弃的行的**内容摘要**没有（只有计数）；写失败后不会自动降级/换文件；shell 侧的状态报告还没有暴露这两个数。
+
+### 8.114 配额的其余字段也有地方看
+
+★ §8.106 的卡只画了四个数字，其余配额字段仍在 `usage` JSON 里。四个回答“它能不能工作”；剩下的回答“host 到底决定了
+什么”，而需要后者的人已经在看这张卡了。
+
+- 卡片在 **Limits** 行下面加一个原生 `<details>` 披露，列出全部 13 个字段（内存、实例、存储、并发 transfer、调用速率、
+  burst、事件速率、网络速率/并发、设备发送、文件系统操作、单次 fuel、超时）。
+- **原生 `<details>` 而不是 popover**：同样的披露，没有需要定位的 portal；内容在关闭时也在 DOM 里，测试可以直接读。
+- 摘要行仍是四个可行动的数字；超时的标签从 `s per call` 改为 `call timeout`，值是 `5 s` —— 旧写法在“0.5 s”时会变成
+  “0.5 s s per call”。
+
+★ 测试：前端 259（插件页健康报告带完整配额，断言 `All limits`、`128.0 MiB`、`fuel` 的 `1000000`）、`pnpm run lint`
+0 error、build、shapes 8 项。
+**仍然缺**：这一行只读；配额改了以后卡片要等下一次 `plugins_list` 才更新；`burst` 与速率的关系没有画出来。
 
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
