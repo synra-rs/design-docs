@@ -1013,6 +1013,18 @@ worker 出现时忘记它。discovery 的 `stop` 只持有 supervisor 的 **shut
 ★ 没有 join：两个循环各自在 `POLL` / 250 ms 的间隔里看到 token 后返回，而退出本来就不等任何人。**这是一个决定**：
 等一个可能正在 `emit` 的线程没有收益，而阻塞退出换来的“干净”只是进程结束时操作系统本来就会做的事。
 
+### 8.18 abort 在接收端也要留下“没有文件”
+
+★ 发送端取消会发 `file.transfer.abort`；接收端以前只是 `self.receiving = None` 然后报 `Decision::Failed` —— **半成品
+文件留在 inbox，界面上的接收行也永远停在“arriving”**（那一行由 progress 回调在 Accepted 时打开，而 `on_finished` 不会来）。
+现在：
+- `inbound` 在进入块循环前记下 `partial`，`Received::Aborted` 与 `Received::Failed` 两条路径都 `remove_file` —— 取消在
+  两边是同一个意思；
+- `InboundProgressEvent` 多一个 `aborted`，`Decision::Failed` 时用最后一次 `InboundProgress` 发一个“结束”事件；
+  窗口的 progress 回调看到它调 `transfers::withdraw_received`（只发 `TransferFinished`，不声称 completed）。
+★ 为什么不用 `on_finished`：它的语义是“文件到了”，一个没有文件的传输不能借用它；而 abort 需要一个“结束”的信号，
+`aborted` 就是那个信号。
+
 ### 8.15 发送提前返回与取消
 
 ★ `transfer_send_file` / `transfer_send_text` 不再等传输结束：准备（解析地址、打开 sender、建行）仍同步完成，失败仍是
