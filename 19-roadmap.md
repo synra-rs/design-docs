@@ -1229,6 +1229,17 @@ Cancel 外面是 `APopconfirm` 还是按钮本身。
 就调 `transfer_cancel`。
 **仍然缺**：主题仍是只读；每窗口 CSP。
 
+### 8.35 检查更新
+
+★ `plugins_check_update`（契约里一直是 `Maybe`，现在注册）把已安装版本与 registry 的 `latest` 比较；版本不同则返回
+`UpdateInfo{ version, needsNewConsent, addedCapabilities }`，其中新权限 = 新版内联 manifest 有、本机 manifest.json 没有的
+capability。相同版本返回 `null`。
+★ 检查是**用户动作**（插件卡上的 “Check for updates”），不是挂载时的 fan-out：十个插件就是十次请求，打开页面不该依赖
+registry 可达。结果存在页面本地的 `updates` map 里，显示版本与新增权限。
+★ 测试：本地 packument 最新 2.0.0 + 内联 manifest 多要 `device:send:*`，断言 `addedCapabilities`；页面点击后断言命令参数
+与提示文本。
+**仍然缺**：`plugins_update`（真正安装新版本）仍未实现，所以卡片只报告“有新版本”，没有“更新”按钮。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
