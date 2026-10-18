@@ -1141,7 +1141,11 @@ Content-Security-Policy:
       `commands::plugin_ui::initialization_script(label, token)` 生成脚本、`open_request` 组装、`plugin_ui_open` 建窗口；
       **仍缺**协议 handler（`register_uri_scheme`）与 CSP，所以页面还打不开。
       不是"没实现闭包"，是还没有可以闭包的东西。
-- [ ] 导航范围限制（`on_navigation`）—— **未做**，全仓 0 命中。
+- [x] 导航范围限制（`on_navigation`）—— **做了**：`plugin_ui::stays_on_page(candidate, opened)` 只允许打开时的那一页
+      （忽略 `#` 之后的片段）；另一页、另一插件 origin、`https`/`file`/`data` 都被拒（测试覆盖前缀陷阱与外部 scheme）。
+      ★ **窗口关闭即会话结束**：`on_window_event` 的 `Destroyed` 调 `plugin_ui::forget_window`，删除 `hosted_ui` 条目并
+      `revoke` 对应 nonce；`CloseRequested` 可能被取消，所以选 `Destroyed`。此前 `hosted_ui` 只增不减，一个关掉的页面仍能
+      通过 `plugin_ui_ready` 与协议 handler 得到回答。
 - [ ] 前端 stores：`ui`/`devices`/`pairing`/`plugins`/`intent`/`transfers`/`config`/`diagnostics` —— **1/8**。
       只有 `src/stores/devices.ts`，其余七个没有文件。
       ★ 现存这一个确实是忠实的只读镜像：`:70` 整体替换快照、`:82/:94/:99` 只记录、

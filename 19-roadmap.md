@@ -1376,6 +1376,15 @@ artifact 的摘要；签名后改过 wasm 或 manifest 都会被拒绝。测试�
 ★ 测试：`document_response` 的状态与四个关键指令（默认 / 连接 / 脚本 / 表单）。
 **仍然缺**：`'self'` 在自定义协议 origin 下的真实语义仍需一次运行确认；上传本身。
 
+### 8.50 关闭窗口即结束会话
+
+★ `plugin_ui::forget_window`：删除 `hosted_ui` 条目并 `ui_sessions.revoke(nonce)`。`plugin_ui_open` 在窗口
+`Destroyed` 时调用它；`CloseRequested` 可能被取消，所以不用它。
+★ 修的是“只增不减”：此前 `hosted_ui` 没有任何删除点，一个关掉的页面仍能通过 `plugin_ui_ready` 与协议 handler 得到回答，
+同 label 的新窗口还会继承旧 nonce。
+★ 测试：会话存在 → `forget_window` → `hosted_ui` 无条目且 `validate` 拒绝。
+**仍然缺**：多窗口（同一插件两个页面）的会话计数 —— 现在一个 label 一个会话，关掉一个就结束。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
