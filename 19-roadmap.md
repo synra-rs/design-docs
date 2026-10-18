@@ -2197,6 +2197,31 @@ workspace clippy、guards 12 项。
 路由的 `trace`），core 672 条、workspace clippy、guards 12 项。
 **仍然缺**：远端完成（`apply_result`）没有 trace；daemon 的 `eprintln!` 自述仍未进日志文件。
 
+### 8.97 远程动作闭环：收信、回信、应用结果
+
+★ 设计里“发信、收信后本地跑插件、回 `INTENT_RESULT`”三件都写在 07，代码里却只有**发信**在生产路径上：
+`accept_remote` / `accept_cancel` 只有测试在调，listener 收到 `INTENT_INVOKE` 只记一个事件名就落到 “nothing is wired”；
+发送侧发完立刻 `bye`，所以回信即使产生也没有连接可回，本侧也从不读。一个远程 decide 的结果是：对面没跑，本侧永远
+`dispatching`。
+
+本轮补齐三处：
+
+- **收信**：listener 新增 `KernelEventCallback` / `KernelEventOutcome`（`Handled` / `Reply` / `Refused` / `Ignored`，
+  `#[non_exhaustive]`），由 daemon 在 `serve` 里用 `accept_remote` / `accept_cancel` 实现。回信在**发起请求的那条连接**
+  上发出 —— reply 属于提问者，换一条连接回答等于回答一个没人听的问题。
+- **应用结果**：`orchestrate::apply_result` 用 `reply_to` + `from` 找到 `Board::dispatched_to` 的意图并 `conclude`；
+  发送侧 `send_outbound(outbound, wait)` 在 invoke 后等 3 s（`REMOTE_RESULT_WAIT`），拿到就 checkpoint，`intent_decide`
+  用真实的 `ok/result/state` 回答。没等到就保持 `dispatching`，并写明**不会重试**、更慢的回信会丢。
+- **一个真的 bug**：`remote::invoke` 造信封时新铸 request id，而板上 `Dispatching` 记的是 `confirm` 的 id ——
+  `reply_to` 于是永远匹配不上，收信侧的幂等键也不同于本侧记录。现在信封携带 `confirm` 的 id；测试断言
+  `outbound.envelope.request_id == decided.request_id`。这条 bug 只有在“真的等回信”时才会暴露，正是本轮做的原因。
+
+★ 测试：core 673（+1 `dispatched_to` 的两个半键与结束后不再命中）、daemon 218（+2：`apply_result` 把 dispatching
+变成 succeeded 且重复回答被忽略；一条真实 TCP 连接上 `INTENT_INVOKE` 得到同一链接上的 `INTENT_RESULT`，`reply_to`
+等于请求 id）、ipc 123、workspace clippy、guards 12。
+**仍然缺**：3 s 之外的迟到结果（无重试、无离线队列）；远端取消没有回执（取消本身不需要答案）；控制 socket 仍是一次一个客户端，
+所以这段等待是别的命令排队的时间。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |

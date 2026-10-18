@@ -410,6 +410,19 @@ impl Supervisor {
 >      ★ **四件全部完成（已提交）。** `orchestrate::accept_remote` 是收信端：
 >      读出 `Invoke`、以 `IntentSource::Direct` 上牌（正因为它点名了插件与动作，`raise` 会直接进 `Dispatching`，不需匹配）、
 >      跑插件、`conclude`、回 `INTENT_RESULT`（`reply_to` 是请求的 id，供对方关联）。
+> * ★ **2026-10-19：这条路终于在生产路径上闭环。** 在此之前，`accept_remote` / `accept_cancel` 只有测试在调：
+>   listener 收到 `INTENT_INVOKE` 只把事件名记进 `events`，然后落到 “nothing is wired up to deliver it”；
+>   发送侧 `send_outbound` 发完立刻 `bye`，于是对方即使回了结果也没有连接可回，本侧也从不读 ——
+>   意图永远停在 `dispatching`，动作在对面根本没跑。本轮三处：
+>   ① listener 增加 `KernelEventCallback` / `KernelEventOutcome`（`#[non_exhaustive]`），由 daemon 用
+>   `accept_remote` / `accept_cancel` 实现；回信在**发起请求的那条连接**上发出，这是“reply 属于提问者”的唯一实现。
+>   ② 发送侧 `send_outbound(outbound, wait)`：invoke 之后等回信（`REMOTE_RESULT_WAIT` = 3 s），
+>   `orchestrate::apply_result` + `Board::dispatched_to` 把结果写回板上并 `checkpoint`；`intent_decide` 用真实的
+>   `ok/result/state` 回答，而不是一律 `dispatching`。
+>   ③ **一个真的 bug**：`remote::invoke` 造信封时新铸 request id，而板上记的是 `confirm` 的 id —— 于是 `reply_to`
+>   永远匹配不上，收信侧的幂等键也和本侧记录的不是同一个。现在信封携带 `confirm` 的 id，测试断言两者相等。
+>   **写明的限制**：等待 3 s（控制 socket 一次只服务一个客户端）；更慢的回信会丢、不会重试，意图停在 `dispatching`。
+>   测试：core **673**、daemon **218**、ipc **123**、workspace clippy、guards 12。
 > * ★ **幂等没有在这里实现，而是用了已有的**：`Board::raise` 在**创建任何东西之前**
 >   就按 `(origin, request)` 查重，重发会拿到第一次的 intent、`created == false`，于是动作不会跑第二次。
 >   一个自带缓存的 handler 会是**第二个**“我见过这个请求吗”的答案。
