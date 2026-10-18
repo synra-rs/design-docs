@@ -916,6 +916,15 @@ Blob 编码成 base64，内核解码到 `cache/plugin-transfers/<uuid>/<fileName
 没有 id，壳无法关掉它开的行）；壳的接收回调先 announce `completed` 快照、再 `TransferFinished`。
 两个旧入口（`serve` / `handle`）以空回调委托，daemon 不需要改。
 
+### 8.11 托盘与关窗语义
+
+★ 窗口的关闭键是"收起来"，不是"退出"：这个进程是内核（监听端口、传输在飞、插件已载入），对别的设备可达；把
+"整理窗口"和"结束服务"绑在同一个手势上，会让一个只想让窗口让开的用户停掉所有传输。托盘菜单只有 **Show** 与
+**Quit**；Quit 先 `cancel()` 那个被 `manage` 的 listener token，再 `app.exit(0)` —— 退出本来会释放端口，但重启时与
+旧进程抢同一个端口，正是这个 token 存在的原因。
+`tray_menu` 与 `tray` 分开：前者的 id → 动作映射不需要 Tauri，所以它在跑测试的构建里也有断言；后者是事件循环与
+图标的接线，失败只报告不致命（有的 Linux 桌面没有 indicator host，窗口仍必须能开）。
+
 ★ **`env.platformSupports` 接上了真实答案**：宿主在开窗前用 `CommandPlatform::supported_actions()` 生成
 `platformCapabilities` 放进 seed，门面同步查表。两层映射是刻意的：`PlatformAction → 客户端拼写`
 （`open_url`/`clipboard_read`/…）与能力拼写（`platform:open-url`）**不是**一套；`simulate_keys` 只在策略允许时出现，
