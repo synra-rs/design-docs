@@ -1175,3 +1175,29 @@ daemon 的 `record_received` 写三张表（历史、对端持有什么、`plugi
 
 ★ 仍然没有的是**真正的解包**：收下的是单个 `plugin-<id>.wasm`，不是带 manifest 的包目录，而安装管线要的是目录。
 两个宿主现在做的是同一件「写行」的事，而它们都还没有做「校验包并落到 `plugins/<id>/`」——那要等包格式。
+
+## 第 180 轮：计划有人执行了
+
+★ 第 178 轮说这条线「剩下的是让 `sync_records` 有新鲜数据」，第 179 轮让接收侧回了一个结果。这一轮把**发送端**补上：
+`plugins_sync_run` 接一份 `SyncPlanDto`，对每台 `needs_artifact` 的设备拨号、`core::send_bundle`、读结果。
+
+★ 前置是一件小事，但它决定了这个命令能不能开工：`plugin_versions.artifact` 存了文件名（相对 `plugins/<id>/`），
+而唯一的读者 `active_plugin_version` 只返回 `(version, digest)`。所以加了 `SynraDb::active_plugin` →
+`ActiveVersion { version, artifact, digest }`，并让旧的读者变成它的一层投影 —— **两个读者不会对「哪个版本生效」有两个答案**，
+这是 `SyncTable` / `sync_records` 那次的同一个教训。
+
+★ **`verdict(events, pushed)` 是这一轮真正新写下的规则**，三个答案而不是两个：
+
+| 事件 | 结论 | 写不写 `sync_records` |
+| --- | --- | --- |
+| 没有 `Verified` | `Unconfirmed` | ❌ 一次没被确认的传输说不出对端有什么 |
+| `SyncResult` 且 `ok: false` | `Refused` | ❌ 它什么都没装 |
+| `SyncResult` 且 `ok`、有版本 | `Installed(版本)` | ✅ 记**接收端说的**版本 |
+| `SyncResult` 且 `ok`、无版本 | `Refused` | ❌ 自相矛盾；补上我推的版本就是编造 |
+| 有 `Verified`、无 `SyncResult` | `Installed(pushed)` | ✅ 旧构建不发结果时的唯一事实 |
+
+★ 最后一行是刻意的：远端可能跑一个不送 `SyncResult` 的版本，而字节确实被确认了 —— 拿「我推的版本」记下来，
+比「什么都没发生」好。它也是唯一允许用**本机**版本的地方。
+
+★ 于是命令注册数从 33 变成 34，`plugins_sync_run` 从 `NOT_YET_REGISTERED` 移出。**仍然没有的**：接收端真正的解包
+（见第 179 轮最后一段）——所以一次同步的终点是「对端说它装了」，不是「对端能跑」。

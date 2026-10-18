@@ -606,6 +606,10 @@ Content-Security-Policy:
 > ★ **2026-10-18 更晚：接收侧不再只有半段。** `record_received` 从 daemon 搬进了 `synra_core::plugin_sync`，
 > 壳的 `on_finished` 现在调的是同一个函数：写历史、写对端持有什么、写 `plugins` 行，并**回一个 `SyncOutcome`** ——
 > 在此之前壳只写 `sync_records` 且返回 `None`，发起端等不到结果。细节在 `16 §第 179 轮`。
+> ★ **而 `plugins_sync_run` 也注册了（壳侧 34 条）。** 它接一份计划，对每台缺这个插件的设备拨号、`send_bundle`、
+> 读回 `SyncResult`，再用 `verdict` 决定 `sync_records` 能不能写：没确认、被拒绝、或说装了却不给版本，都不写。
+> 为此 `SynraDb::active_plugin` 多返回了 artifact 的文件名。细节在 `16 §第 180 轮`、`19 §8.8`。
+> **同步链仍未完成的一件事是包格式**：接收端写行，但收到的是单个 wasm，没有 manifest 与目录可以落到 `plugins/<id>/`。
 > ★ **worker 的第一步被一个细节挡住（2026-10-18）**：把两条发送命令改成 `async` + `spawn_blocking` 是最省力的修法，
 > 但那要求把 `AppState` move 进去 —— 而 `AppState` **只有 `#[derive(Debug)]`，没有 `Clone`**（`state.rs:39`），
 > `tauri::State` 又借不着 `'static`。两条路：让 `AppState` 变成可 `Clone`（字段大多已是 `Arc`/`Mutex`，

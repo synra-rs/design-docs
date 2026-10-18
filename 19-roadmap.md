@@ -801,21 +801,20 @@ M0 ──▶ M1 ──▶ M2 ──▶ M3
    而 upsert 看不见"没有"），再用答复里的本插件状态喂 `decide`。`online` 的语义因此变成"**它答复了**"，
    而不是"它有地址"；没答复的对端仍按"需要发"计入 —— 安全方向。
 
-**剩下的一件**是 `plugins_sync_run`：计划说得出发什么，还没有东西真的发一个 bundle 并读回 `SyncResult`。
-`transfer_send_file` 走的是 `TransferSender::open`（附件），`core::send_bundle` 的调用者在 daemon，壳里没有。
-★★ **而它开工前的缺口查过一次，下一轮不必再找**（其中第 2 条已在第 179 轮解决）：
-1. **artifact 路径没有读者**：`plugin_versions.artifact` 存的是文件名（如 `plugin.wasm`，相对于 `plugins/<id>/`），
-   而 `active_plugin_version` 只返回 `(version, digest)`。发一个包需要路径，所以要加一个读者（或让它多返回一列）；
-2. ~~**壳的 listener 收到包不安装**~~ —— **已解决（第 179 轮）**：`record_received` 搬进了 core，两个宿主共用一份；
-   壳现在写同样的三张表（历史、对端持有什么、`plugins` 行）并回 `SyncResult`。**仍然没有的是真正的解包**：
-   收下的单个 `plugin-<id>.wasm` 不是带 manifest 的包目录，而安装管线要的是目录 —— 这是包格式的缺口，不是宿主的缺口；
-3. **`send_bundle` 的同步轮次**：它要 `SyncRound { plugin_id, version, session: SessionId }`，
-   而 `SessionId` 由发起端命名（第 166 轮的决定）—— 壳里还没有生成它的地方。
-这三件都不是"接线"，所以 `plugins_sync_run` 至少是两轮：先让壳能安装（或明确它只对 daemon 同步），再谈运行器。
-★ **第 179 轮之后只剩两件**（artifact 路径的读者、`SessionId` 的生成处），而"壳能不能安装"已经有了答案：
-它能做 daemon 做的那些（写三张表和一行插件），**不能**做真正的解包——那要等包格式。
-所以 `plugins_sync_run` 的第一步现在是"给 `active_plugin_version` 一个带 artifact 的兄弟"，
-而不是搬任何东西。
+**`plugins_sync_run` 也已经落地（同日晚些时候）**，那三个缺口各自有答案：
+1. **artifact 的读者**：`SynraDb::active_plugin` 返回 `ActiveVersion { version, artifact, digest }`
+   （`artifact` 是相对 `plugins/<id>/` 的**文件**名；UI-only 插件是空串），`active_plugin_version` 变成它的一层投影，
+   两个读者因此不会对"哪个版本生效"给出两个答案；
+2. **接收侧**：第 179 轮起两个宿主共用 `record_received`，壳也回 `SyncResult`；
+3. **轮次**：`SyncRound { plugin_id, version, session: SessionId::new() }` —— 发起端命名，协议里本来就有构造器。
+运行器在壳的 `commands/sync_run.rs`：每台 `needs_artifact` 的设备一次拨号 + `core::send_bundle`，然后
+`verdict(events, pushed)` 把答复分成三种 —— **装上了**（记接收端说的版本）、**拒绝了**（什么都不记）、
+**没有确认**（不记：一次没被确认的传输说不出对端有什么）。`ok: true` 却不给版本按拒绝处理：
+拿"我推过去的版本"补上，会让下一次计划跳过一次可能需要的发送。
+
+**仍然没有的**是真正的解包：接收端写 `plugins` 行，但 `plugin-<id>.wasm` 还留在 inbox 里，没有 manifest、
+没有签名覆盖目录，也没有 `plugins/<id>/` 下的文件。所以这条同步链的下一步不是"再发一次"，而是**包格式**：
+在它存在之前，一次同步的终点是"对端说它装了"，而不是"对端能跑"。
 
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
