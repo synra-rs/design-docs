@@ -912,10 +912,12 @@ pub fn install_panic_hook(paths: &Paths, version: &str) {
       我是从一份子代理报告里转述的，没有自己打开 `run_probes` 看 ——
       这正是我在别人代码里反复找的那类问题（**断言的是说法，不是那个说法所指的东西**），
       写在文档里同样成立。教训记在这里而不是悄悄改掉。
-      剩下的确实缺的只有一半：**设置页的诊断展示**。app 的 `src/pages` 只有
-      Devices/Home/Plugins/Settings 四个，没有任何 doctor/探针的调用方。
-      探针本身不是没人用的 —— `synra doctor`（CLI，已注册）就是它们的调用方
-      （`DoctorReport::run` → `run_probes`），所以这半是"少一个界面"，不是"少一套实现"。
+      ★ **2026-10-19：探针有了窗口调用方** —— 设置页 Diagnostics 的 “Run checks”（`diag_probes`）跑 `run_probes`，把
+      `ProbeResult` 摊成契约的 `ProbeResultDto`（`status` 只有 `ok`/`warn`/`fail` 三个词），每个结果带名字、说明与建议。
+      ★ 端口用 0：问的是“这台机器有没有空闲端口”，而不是“我们已经占用的端口忙不忙” —— 后者会把我们自己的 listener
+      报成故障。宿主事实留空（`HostFacts::default()`），于是 WebView/钥匙串探针回答 `unknown` 并说明原因，与 CLI 一致。
+      ★ 同一天更晚，导出与 Recent log 也接进了这一节（§8.75/§8.76），所以“少一个界面”这句已经不成立。
+      **仍然缺**：`DoctorReport` 的汇总与“只看失败”没有界面（窗口看的是原始探针结果，不是 doctor 的排版）。
       ★ **2026-10-19：导出有了界面** —— 设置页 “Diagnostics” 一节：两个自愿勾选（审计、debug 日志，后者才显示
       行数）+ Export，结果回显路径与 `included`/`excluded`。`DiagExportResult` 同时从壳的私有类型搬进
       `synra-ipc` 的 DTO，页面因此不再手抄形状（镜像由 `dto-coverage` 盯着）。**探针的展示仍然没有**：这一节调用

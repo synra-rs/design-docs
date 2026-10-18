@@ -1828,6 +1828,32 @@ Export；结果回显**路径 + 包含的章节 + 略过的章节**，因为只�
 lint 0 error、build、guards 12 项。
 **仍然缺**：探针/`doctor` 的界面展示。
 
+### 8.77 窗口也能跑探针了
+
+★ `run_probes` 的调用方一直只有 CLI。窗口要问同一组问题，就需要一个命令、一份契约形状和一个界面 —— 三件都在这一轮
+补上：`diag_probes`（`Diag`/`Host`/`One`/非 mutating）、`ProbeReportDto`/`ProbeResultDto`、设置页 Diagnostics 的
+“Run checks”。
+
+★ **`status` 在契约里是字符串**（`ok`/`warn`/`fail`），不是 `synra-observe` 的枚举：DTO 复用那个枚举会为一格字段把
+观察 crate 拖进 `@synra/protocol` 的镜像，而镜像要逐字段对照 Rust 的，边界上多一个 crate 就多一处会漂的东西。
+
+★ **端口用 0**，与 CLI 同一个理由：探针问的是“这台机器有没有空闲端口”。在已经在跑的窗口里探已经绑定的端口，会得到
+“被占用”，而占用者正是我们自己 —— 那会把正常运行报成故障。
+
+★ **宿主事实留空**：命令层没有拿到窗口的 WebView 版本与钥匙串的句柄，所以 `HostFacts::default()`；那两个探针回答
+`unknown` 并写明原因。编一个事实比缺一个更糟：这份报告是维护者当证据读的。
+
+★ **按需运行，不在挂载时跑**：探针会绑端口、写文件、读时钟；每次打开设置页都跑一遍是用户没要求的工作。
+`FakeKernel` 同样补了答案（一条 ok + 一条 warn），否则开发构建里点下去只会拿到 `undefined`。
+
+★ **两处被测试抓住的计数**：契约从 46 变 47，`commands.test`/`registration.test` 里两个硬编码的 46 同时红了 ——
+它们本来就是钉住“解析器没有漏条目”的；README 的 47/45/32 也同步，且现在由 `readme-counts` 检查（上一轮加的）。
+
+★ 测试：壳 254 条（新增 1：窗口问的探针名与 CLI 相同 —— `tcp_port_available`/`data_dir_writable`/`webview_version`，
+状态都在三个词里），前端 255 条（新增 1：点 Run checks 前不调用、点后出现名字/状态/建议），core 123 条 IPC 测试，
+js 34 条 + `pnpm run check`，两种配置 clippy、build、shapes、guards 12 项。
+**仍然缺**：`DoctorReport` 的汇总与“只看失败”没有界面；探针的 WebView/钥匙串事实仍然由 CLI/窗口共同留空。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |

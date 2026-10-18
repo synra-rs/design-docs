@@ -132,8 +132,9 @@
 
 // ─────────── diagnostics ───────────
 #[tauri::command] async fn diag_export(state: State<'_, AppState>, options: DiagExportOptions) -> Result<DiagExportResult, IpcError>;
+#[tauri::command] async fn diag_probes(state: State<'_, AppState>) -> Result<ProbeReportDto, IpcError>;
 #[tauri::command] async fn diag_metrics(state: State<'_, AppState>) -> Result<MetricsSnapshot, IpcError>;
-#[tauri::command] async fn diag_logs_tail(state: State<'_, AppState>, lines: u32) -> Result<Vec<String>, IpcError>;
+#[tauri::command] async fn diag_logs_tail(state: State<'_, AppState>, lines: Option<u32>) -> Result<Vec<String>, IpcError>;
 ```
 
 
@@ -667,7 +668,7 @@ Content-Security-Policy:
 >   一次插入把新测试放在了 `#[test]` 与它的函数之间，于是属性重复、
 >   而原来那个函数**一个属性都没有**。编译器只是很小声地说了一句 warning，
 >   而 `cargo test` 输出里看不出少了一条 —— 直到这次重构让它变成了错误。
-- [ ] ~40 个 Tauri command（见 §2.2）—— **22/40**（2026-10-18）。
+- [ ] ~40 个 Tauri command（见 §2.2）—— **45/47**（2026-10-19；本轮把 `diag_probes` 接上）。
       ★ `plugins_install` 是第 22 条，它进得来是因为**安装管线搬进了内核**：`synra_core::install` 现在是
       daemon 与 Tauri 壳共用的那一份（校验顺序、staging、回滚、写行），两个宿主各自只提供"这台机器能做什么"
       （`HostFacts`）。在此之前，安装能力只有 CLI 有，而界面的插件页连"装一个"都无处可点。
