@@ -1036,6 +1036,11 @@ worker 出现时忘记它。discovery 的 `stop` 只持有 supervisor 的 **shut
 **仍然缺的**：表只有安装这一个写者。没有 `plugins_publisher_trust` / `plugins_publisher_revoke` 命令，也没有指纹确认
 UI —— 用户还不能把 `seen` 变成 `trusted`，TOFU 的后半段（“首次使用即信任”）还没接上。
 
+★ **写者有了**：`plugins_publishers`（列表）与 `plugins_publisher_decide`（`seen|trusted|revoked`）进了契约，插件页
+新增 Publishers 区：id、指纹、状态、Trust / Revoke。命令只改**已存在**的行：一个没被签名见过的 key 不能被信任，
+否则界面可以信任一个从未出现过的公钥。列表改成和 `plugins_list` 并行读（少一次等待），两个答案分别报错。
+**仍然缺**：安装后没有即时的指纹确认步骤。
+
 ### 8.15 发送提前返回与取消
 
 ★ `transfer_send_file` / `transfer_send_text` 不再等传输结束：准备（解析地址、打开 sender、建行）仍同步完成，失败仍是

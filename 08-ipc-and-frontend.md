@@ -111,6 +111,8 @@
 #[tauri::command] async fn plugins_update(state: State<'_, AppState>, plugin_id: PluginId, to: String) -> Result<(), IpcError>;
 #[tauri::command] async fn plugins_sync_plan(state: State<'_, AppState>, plugin_id: PluginId) -> Result<SyncPlanDto, IpcError>;
 #[tauri::command] async fn plugins_sync_run(state: State<'_, AppState>, plan: SyncPlanDto) -> Result<SyncReport, IpcError>;
+#[tauri::command] async fn plugins_publishers(state: State<'_, AppState>) -> Result<Vec<PublisherDto>, IpcError>;
+#[tauri::command] async fn plugins_publisher_decide(state: State<'_, AppState>, publisher_id: String, trust: String) -> Result<(), IpcError>;
 #[tauri::command] async fn plugins_audit(state: State<'_, AppState>, plugin_id: PluginId, limit: u32) -> Result<Vec<AuditEntryDto>, IpcError>;
 #[tauri::command] async fn plugins_request_registry_search(state: State<'_, AppState>, query: String) -> Result<Vec<CatalogItem>, IpcError>;
 
