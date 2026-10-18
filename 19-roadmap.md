@@ -2717,7 +2717,7 @@ publisher 提示，见 §8.123）—— 都工作，但重复，统一到核心�
 
 ★ 测试：daemon **229**（+2）、core 675、store 236、CLI 103、control 67、app shell 262/261、workspace clippy、`api-guard`、
 guards 12。
-**仍然缺**：shutdown 仍不 join 连接线程（进程退出时它们随进程结束）；仪表与日志由 §8.125 补上。
+**仍然缺**：shutdown 现在会等连接自己结束（5 秒上限，§8.126）；仪表与日志由 §8.125 补上。
 
 ### 8.125 控制连接数进了指标，拒绝进了日志
 
@@ -2737,6 +2737,24 @@ guards 12。
 guards 12。
 **仍然缺**：shutdown 仍不 join 连接线程；连接线程本身的 panic 没有逐连接记录（只有线程名与 stderr）；`status` 里的仪表
 没有专门的 UI 行（它在 metrics 列表里）。
+
+### 8.126 关闭时等连接自己结束（有上限）
+
+★ §8.124 的上限解决了“无限多”，但没有解决“关闭时还有连接在用数据库和 runtime”。进程退出时线程随进程结束，一个正在跑的
+命令会在**别人拆掉它脚下的东西**时停止。
+
+- **`wait_for_idle(timeout)`**：`parking_lot::Mutex<()>` + `Condvar`，`Permit` 的 drop 在同一把锁下减计数并 `notify_all`
+  —— 等待者不会在“检查计数”和“睡下去”之间漏掉通知。超时返回 `false`。
+- **shutdown 排空 5 秒**：`drain_control(&gate)` 在控制循环退出后等待；超时只 `tracing::warn!` 说出还有几条，不阻塞进程。
+  连接不能无限期拖住关闭，但正常情况下命令有机会写完。
+- **连接线程的 panic 也记录**：`catch_unwind(AssertUnwindSafe(...))` 包住 `serve_stream`，panic 只记事实（不打印 payload，
+  可能含请求数据），连接关闭、守护进程继续。
+- **测试**：门新增一个用例 —— 有连接时 `wait_for_idle(1ms)` 返回 `false`，归还后返回 `true`。
+
+★ 测试：daemon **231**（+1）、core 675、store 236、CLI 103、control 67、app shell 262/261、workspace clippy、`api-guard`、
+guards 12。
+**仍然缺**：等待是 5 秒常量，不随命令类型调整；被放弃的连接没有“它在跑什么”的记录（只有数量）；`catch_unwind` 只包了
+`serve_stream`，spawn 之前的任何 panic 仍然直接结束进程。
 
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
