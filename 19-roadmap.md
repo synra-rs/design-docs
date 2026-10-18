@@ -1089,6 +1089,17 @@ worker（桌面命令已经是这样，见 §8.15）。
 ★ 过滤是客户端行为（`visible = installed.filter(...)`），不新增命令；`plugins_catalog_search` 仍只在契约里，
 `InstallSourceDto::Registry` 仍按名拒绝。
 
+### 8.21 Registry 的第一步：字节响应
+
+★ `synra-fetch` 原来只有 `fetch` → `Response { body: String }`。registry 的 tarball 是二进制，按文本读会在签名检查之前
+先把字节改坏。新增 `fetch_bytes` → `BinaryResponse { body: Vec<u8> }`，**共用**同一个 `NetworkGuard`、同一个重定向循环、
+同一个 `max_response_bytes` 上限；差别只在最后一步是否解码。
+★ 内部把公共部分收成 `request()` + `send(mode)`，两个公开入口只是把 `Fetched` 塑成不同形状 —— 复制一份重定向循环会
+让“每个 hop 都重新校验”这条规则出现第二个实现。
+★ 测试：本地 `TcpListener` 直接写原始字节（`0x00 0xFF 0xFE …`），断言字节原样回来；同一上限对二进制也生效
+（4 字节上限读 16 字节 → `ResponseTooLarge`）。
+**仍然缺的**：还没有 registry 客户端 —— packument 解析、`.tgz` 安全解包、命令与 UI 都在下一步。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
