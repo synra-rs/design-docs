@@ -891,7 +891,13 @@ core 的响应把重定向后的地址丢掉了。门面把 host 的纯文本 bo
 把测试里的 `synra.self.invoke('clear')`（插件 action，不是命令）当成了命令；现在只认 `kernel` / `client` / `bridge`
 三个接缝对象，并允许 `call<T>(...)` 的类型参数。被调用命令数从 11 修正为 16。
 
-**仍然缺的**：transfer.*（需要 WebView 到内核的大文件通道），以及插件页的导航范围限制。
+**仍然缺的**：transfer.*（需要 WebView 到内核的大文件通道）。
+
+★ **导航范围限制也做了**：`plugin_ui_open` 现在装 `on_navigation`，谓词是 `stays_on_page(candidate, opened)` ——
+**只能留在打开的这一个页面**（含 `#` 片段路由），另一个路径、另一个插件的 origin、`https:`/`file:`/`data:` 全部拒绝。
+为什么不是"同插件 origin"：初始化脚本挂在 WebView 上而不是地址上，跳到同 bundle 的另一页会**保留本页的 token 与
+授权**却显示打开者没选过的内容。`window.open` 一并 `Deny` —— 新窗口没有初始化脚本，等于一个没有 token 的页面。
+谓词在无 WebView 的构建里照样编译并有测试，只有把它交给 builder 的那一行在 `tauri-shell` 里。
 
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
