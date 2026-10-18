@@ -1100,6 +1100,19 @@ worker（桌面命令已经是这样，见 §8.15）。
 （4 字节上限读 16 字节 → `ResponseTooLarge`）。
 **仍然缺的**：还没有 registry 客户端 —— packument 解析、`.tgz` 安全解包、命令与 UI 都在下一步。
 
+### 8.22 Registry 的第二步：文档与归档
+
+★ 新 crate `synra-registry`（Internal）装两件纯函数：
+- `Packument::parse`：`dist-tags` 用显式 `rename = "dist-tags"`（`rename_all = "camelCase"` 会拼成 `distTags`，字段解析成空
+  会让每个文档都像没有 `latest`）。`latest()` 返回标签指向的版本；标签指向不存在的版本时返回 `None`，**不**退化成“键排序
+  最大”。
+- `extract_tgz`：gzip + tar；按**类型**先拒绝符号链接/硬链接（一个叫 `manifest.json` 的链接看起来最普通），再按
+  `Path::components` 拒绝 `..`/绝对路径/Windows 前缀；条目数、单文件、总量三道上限在写之前检查；失败按写入清单逆序删除，
+  只 `remove_dir` 不递归。npm 的 `package/` 前缀由调用方传 `strip_prefix`，不带前缀直接拒。
+★ 测试 10 条：latest 与指定版本、标签缺失、非 packument；正常解包、`../` 逃逸（用手写 tar 头构造，因为 `tar::Builder`
+自己就拒绝写这种条目）、符号链接、单文件上限、前缀不匹配、gzip 损坏。
+**仍然缺**：没有网络客户端与命令 —— `plugins_catalog_search`、`InstallSourceDto::Registry` 还是拒绝的。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |

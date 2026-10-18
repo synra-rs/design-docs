@@ -315,6 +315,13 @@ pub struct CatalogItem {
 1. **主来源**：npm registry 的搜索端点（`/-/v1/search?text=keywords:synra-plugin`）；
 2. **可选**：自建 catalog 服务（聚合 + 缓存 + 评分）；
 
+> ★ **解析与解包已经有了（`synra-registry`）**：`Packument`（`dist-tags` 的 `latest` 决定版本，**不**按 key 排序猜；
+> `versions[v].dist.tarball`；内联 manifest 用契约自己的 `Manifest` 解析）与 `extract_tgz`（gzip + tar；只接受普通文件与
+> 目录，拒绝 `..`/绝对路径/符号链接/硬链接与超限；失败按写入清单清理，不递归删除）。npm 的 `package/` 前缀由调用方传入
+> `strip_prefix`，不带前缀的包会被拒，而不是解到错误的深度。
+> **仍然缺**：registry 客户端本身 —— 地址配置、`plugins_catalog_search`、`InstallSourceDto::Registry`，以及把下载的
+> tarball 接到 `from_directory`。
+
 
 ---
 
