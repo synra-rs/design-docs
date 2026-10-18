@@ -2610,8 +2610,36 @@ decisions 的插件。于是重装后的插件“在磁盘上、不能运行”�
 ★ 测试：store 236（容器里的 grants 只含 `log:*`，被拒绝的 `net:read-title` 不在列表里；`plugins_in_backup` 读到同一份）、
 CLI **102**（+2：安装→同意→启用的顺序；旧容器/无 grants 时既不同意也不启用）、core 675、daemon 221、app shell 262/261、
 workspace clippy、`api-guard`、guards 12。
-**仍然缺**：重装仍不是事务（同意失败会留下已安装但未同意的插件）；容器格式仍是 version 1，新增字段靠 serde 默认值兼容；
-重装不恢复 `health` 等运行期字段（它们由加载时重新观察）。
+**仍然缺**：重装不是事务（前一个插件成功、后一个失败时前面的保留；单个插件的半成品由 §8.119 收回）；容器格式仍是
+version 1，新增字段靠 serde 默认值兼容；重装不恢复 `health` 等运行期字段（它们由加载时重新观察）。
+
+### 8.119 同意失败就把半成品收回去
+
+★ §8.118 的恢复顺序里，安装成功、同意失败会留下一个“在磁盘上、不能运行、还被列出来”的插件 —— 比没装更糟：用户看到的
+状态和真实状态相反。
+
+- **失败即回滚**：同意或启用被拒时，`reinstall` 发 `PluginRemove { remove_data: false }` 把刚装的插件收回，然后把原因与
+  回收结果拼在一句里：`@acme/a was installed but its consent could not be restored: …; the partial install was removed`。
+- **清理失败也要说**：回收被拒时句子变成 `; the partial install could not be removed: …`，不静默。
+- **仍然按插件而非整体**：前一个插件成功、后一个失败时，前面的保留（用户得到的是部分恢复），句子只描述失败的那个。
+
+★ 测试：CLI **103**（+1：安装→同意失败→remove 的顺序，句子含“partial install was removed”）。
+
+### 8.120 日志可以按需 flush
+
+★ §8.111 的非阻塞 writer 带来一个真实竞态：集成测试写一行后立刻读文件，报告“消息没到磁盘”——在安静机器上通过、在忙的
+机器上失败。这不是测试的错：**异步写入的语义就是“稍后”，而读者需要的是“现在”**。
+
+- **`Message::Flush(ack)`**：worker 收到后 flush 目标文件并回 ack；`Worker::flush` 用阻塞 `send` 排队，等 ack。
+- **`LogGuard::flush(&self)`**：先 flush 脱敏 writer（排掉残余），再让 worker 追平并等待。公开方法，因为 shell 的
+  `diag_export` 也需要它：一个“出事后几秒生成”的诊断包，正好是解释那行还在队列里的时候。
+- **测试改写成不猜时序**：集成测试在第一次读文件前调用 `guard.flush()`；非阻塞 writer 新增单元测试，证明 flush 后内容
+  在 sink 上、而且 writer 还活着（`drop` 会结束日志，不是这里想要的）。
+- **shell 的诊断包**：`diag_export` 在取 log tail 之前 flush；没有日志 guard 时什么也不做。
+
+★ 测试：observe **290**（+1）、CLI 103、core 675、store 236、daemon 221、app shell 262/261、前端 259、workspace clippy、
+`api-guard`、guards 12。
+**仍然缺**：`synra logs`（daemon 侧）不 flush —— 它没有 guard，只能看到已经落盘的行；这是“稍后”语义的诚实残余。
 
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
