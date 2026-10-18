@@ -916,6 +916,10 @@ pub fn install_panic_hook(paths: &Paths, version: &str) {
       Devices/Home/Plugins/Settings 四个，没有任何 doctor/探针的调用方。
       探针本身不是没人用的 —— `synra doctor`（CLI，已注册）就是它们的调用方
       （`DoctorReport::run` → `run_probes`），所以这半是"少一个界面"，不是"少一套实现"。
+      ★ **2026-10-19：导出有了界面** —— 设置页 “Diagnostics” 一节：两个自愿勾选（审计、debug 日志，后者才显示
+      行数）+ Export，结果回显路径与 `included`/`excluded`。`DiagExportResult` 同时从壳的私有类型搬进
+      `synra-ipc` 的 DTO，页面因此不再手抄形状（镜像由 `dto-coverage` 盯着）。**探针的展示仍然没有**：这一节调用
+      的是导出，不是 `doctor`；`run_probes` 的界面调用方仍然不存在。
 - [x] `install_panic_hook` + `CrashReport` 落盘 —— **★ 本次补上了缺的那一半**。
       `CrashReport`(`crash.rs:54`)、`CrashStore::write`(`:254`) 原本就是真的，
       但 **`install_panic_hook` 不存在，全仓 0 处 `std::panic::set_hook`/`take_hook`** ——

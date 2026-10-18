@@ -131,7 +131,7 @@
 #[tauri::command] async fn config_set(state: State<'_, AppState>, patch: ConfigPatch) -> Result<(), IpcError>;
 
 // ─────────── diagnostics ───────────
-#[tauri::command] async fn diag_export(state: State<'_, AppState>, opts: DiagExportOptions) -> Result<Utf8PathBuf, IpcError>;
+#[tauri::command] async fn diag_export(state: State<'_, AppState>, options: DiagExportOptions) -> Result<DiagExportResult, IpcError>;
 #[tauri::command] async fn diag_metrics(state: State<'_, AppState>) -> Result<MetricsSnapshot, IpcError>;
 #[tauri::command] async fn diag_logs_tail(state: State<'_, AppState>, lines: u32) -> Result<Vec<String>, IpcError>;
 ```

@@ -1789,6 +1789,27 @@ clippy `-D warnings`、guards 12 项。
 **仍然缺**：`transfer_retries_total`（没有重传机制）、`links_closed_total` / `reconnect_attempts_total`、拨号侧的帧计数、
 `plugin_fuel_consumed` / `plugin_memory_bytes` / pool 命中、存储与进程两组。
 
+### 8.75 诊断导出有了界面，它的答案也进了契约
+
+★ `diag_export` 注册了很久，实现也写过测试，但**界面没有调用方** —— 一个用户在窗口里找不到
+“把诊断发给我”。现在设置页最后的 “Diagnostics” 一节有两个自愿勾选（审计轨迹、debug 日志；后者才显示行数）与一个
+Export；结果回显**路径 + 包含的章节 + 略过的章节**，因为只给一个路径，用户没法在把文件发出去之前确认审计没有混进去。
+
+★ **`DiagExportResult` 从壳搬进了 `synra-ipc` 的 DTO**。它原来是 `commands::diag` 里的私有结构，于是页面要读它
+就只能手抄一份 —— 而手抄的形状不会在内核加字段时编译失败。搬进 DTO 还有一个副作用：`dto-coverage` 的正向检查从此会
+要求 `ui.ts` 有同名 interface，所以那份镜像不会再悄悄落后。顺带修正了 08 §2.2 里两处过时的签名
+（`opts`/`Utf8PathBuf` → `options`/`DiagExportResult`）。
+
+★ **两处刻意的选择**：两个可选章节默认关（它们分别会说出用户装了哪些插件、可能带上用户没打算分享的内容）；
+`logLines` 只在 debug 勾选时发送，而不是永远带一个默认值 —— 一个没被要求的行数不该出现在请求里。
+
+★ **dev 构建也有答案**：`FakeKernel` 补了 `diag_export` 的返回（路径 + 四个必含章节）与 `REQUIRED_ARGS` 的 `options`，
+否则在没有 Tauri 的开发构建里点 Export 会拿到 `undefined`，而 `commands.test` 的 arity 表也补了它。
+
+★ 测试：前端 251 条（新增 1：勾选审计、点 Export、断言请求只带 `includeAudit`、回显路径与两个章节列表），
+壳 253 条、js 34 条 + `pnpm run check`、两种配置 clippy、build、shapes、guards 12 项。
+**仍然缺**：探针/doctor 的界面展示；`diag_logs_tail` 的界面（日志只在导出里出现）。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
