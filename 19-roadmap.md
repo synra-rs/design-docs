@@ -899,11 +899,13 @@ core 的响应把重定向后的地址丢掉了。门面把 host 的纯文本 bo
 所以按钮不会提供一个宿主会拒绝的动作。`PlatformAction` 是 `non_exhaustive`，未命名的动作被丢弃（答案 false），
 而不是猜一个名字。
 
-★ **已知不一致（未修，留作独立一轮）**：剪贴板能力有两种拼写 —— 生成的契约表与 host 闸门用
+★ **剪贴板能力拼写统一了**：生成的契约表与 host 闸门一直是
 `platform:read-clipboard` / `platform:write-clipboard`，而 `synra-capability` 的文档、`PlatformAction::capability()`
-与 `admission` 的映射用 `platform:clipboard:read` / `platform:clipboard:write`。**实际被检查的是前者**；后者仍在
-`supported_actions` 等地方被广播。统一它要同时改 WIT 生成的表、能力语法与已存 grant 的迁移，所以单独一轮；本轮的
-`platformSupports` 用客户端自己的拼写，不受这个分歧影响。
+与 `admission` 的映射用 `platform:clipboard:read` / `platform:clipboard:write` —— 于是按文档写的 manifest 声明了一个
+闸门从不检查的权限。现在以契约为准：`PlatformAction::capability` 与 `admission` 改成平铺名；
+`synra-capability::canonical_spelling` 在**边界**（manifest 读取、grant 迁移）把旧拼写改成正名 —— 不在匹配器里教第二遍，
+否则旧名会永久存在。store 的 v11 迁移修正已存 grant，并处理同一插件同时有两种拼写的碰撞（保留正名那一行）；
+设计文档 02/10/14/22 的示例同步更新。
 
 ★ **导航范围限制也做了**：`plugin_ui_open` 现在装 `on_navigation`，谓词是 `stays_on_page(candidate, opened)` ——
 **只能留在打开的这一个页面**（含 `#` 片段路由），另一个路径、另一个插件的 origin、`https:`/`file:`/`data:` 全部拒绝。

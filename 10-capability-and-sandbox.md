@@ -67,7 +67,7 @@ NAME       ::= [a-z][a-z0-9-]{0,63}
 | `network`  | 网络（宿主代理）      | `network:fetch:api.github.com`、`network:fetch:api.x.com:POST`、`network:websocket` |
 | `fs`       | 文件系统（沙箱内）    | `fs:read:/data/**`、`fs:write:/cache/*`、`fs:watch` |
 | `file`     | 大对象传输            | `file:transfer:send`、`file:transfer:receive`      |
-| `platform` | 宿主系统能力          | `platform:open-url`、`platform:simulate-keys`、`platform:clipboard:read` |
+| `platform` | 宿主系统能力          | `platform:open-url`、`platform:simulate-keys`、`platform:read-clipboard` |
 | `action`   | 跨插件动作            | `action:declare:format-date`、`action:invoke:*:format-date` |
 | `ui`       | **仅 UI 插件**：界面能力 | `ui:page`、`ui:navigate`、`ui:toast`、`ui:confirm`、`ui:notify`、`ui:modal` |
 | `env`      | 只读环境信息（无闸门） | 不需要声明                                          |
@@ -522,8 +522,8 @@ pub fn validate_event_name(plugin_slug: &PluginSlug, event: &str) -> Result<()> 
 | `platform:open-url`         | 钓鱼（打开恶意站点）                     | 显示确认弹窗（可配置为"仅 https"）           |
 | `platform:open-path`        | 执行任意文件（如果打开的是可执行文件）      | ★ 拒绝可执行扩展名；或强制"仅用默认应用打开"且不在 PATH 中 |
 | `platform:simulate-keys`    | **最强的能力**：可模拟任意按键            | ★ 独立的、默认关闭的授权；UI 上红色警示        |
-| `platform:clipboard:read`   | 读取密码等敏感内容                       | 权限 + 用户可见指示器（"某插件正在读剪贴板"）  |
-| `platform:clipboard:write`  | 污染剪贴板                               | 权限                                        |
+| `platform:read-clipboard`   | 读取密码等敏感内容                       | 权限 + 用户可见指示器（"某插件正在读剪贴板"）  |
+| `platform:write-clipboard`  | 污染剪贴板                               | 权限                                        |
 | `platform:notify`           | 骚扰                                    | 速率限制                                    |
 | `platform:reveal-path`      | 信息泄露（揭示路径存在性）                | 路径必须在沙箱内                             |
 

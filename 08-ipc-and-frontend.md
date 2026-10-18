@@ -1108,9 +1108,9 @@ Content-Security-Policy:
 
       ★ **`env.platformSupports` 接上了真实答案**：seed 增加 `platformCapabilities`，由
       `CommandPlatform::supported_actions()` 生成（`simulate_keys` 只在策略允许时出现），门面同步查表。
-      ★ **已知不一致（未修）**：剪贴板能力在生成契约表里是 `platform:read-clipboard`/`write-clipboard`，在
-      `synra-capability`/`PlatformAction::capability`/`admission` 里是 `platform:clipboard:read`/`write`。实际生效的是
-      前者；统一需要改 WIT 生成表与已存 grant，留作独立一轮。
+      ★ **剪贴板能力拼写统一了**：以生成契约为准（`platform:read-clipboard`/`write-clipboard`），
+      `PlatformAction::capability` 与 `admission` 改用平铺名；`canonical_spelling` 在 manifest 读取与 store v11
+      grant 迁移两处把旧拼写改成正名（不在匹配器里教第二遍）。
 - [x] **协议 handler 做了，CSP 受框架限制**（2026-10-18）。
       `builder()` 里 `register_uri_scheme_protocol("synra-plugin", …)`（Tauri 2.12 的方法名是
       `register_uri_scheme_protocol`，handler 收的是 `UriSchemeContext` 而不是 `AppHandle` —— 猜一次就错，读

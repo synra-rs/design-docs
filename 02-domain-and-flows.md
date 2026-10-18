@@ -150,7 +150,7 @@ DeviceCard = f(
    → 复用/建立与手机的链路
    → 下发 Intent { action: "clipboard.set", args: { text, mime } }
 [手机] 内核收到
-   → 过闸门：来源已配对？目标插件有 platform:clipboard:write？
+   → 过闸门：来源已配对？目标插件有 platform:write-clipboard？
    → 写入本地剪切板
    → 前台：显示"已从 PC 复制"
    → 后台：系统通知（可点按复制）；做不到则排队（[R-03](./22-risks.md)）

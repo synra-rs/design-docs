@@ -435,7 +435,7 @@ pub enum ConsentDiff {
 
 **UI 要求**：
 - 通配能力必须**展开显示**（"访问任意网站"）；
-- 高风险能力（`platform:simulate-keys`、`platform:clipboard:read`、`fs:write`）用醒目样式；
+- 高风险能力（`platform:simulate-keys`、`platform:read-clipboard`、`fs:write`）用醒目样式；
 - 显示"这个插件来自哪"（registry + 包名 + 版本 + 发布者签名状态）；
 - 升级时只显示**差异**（避免用户疲劳 → 一路点同意）；
 - 用户拒绝后，插件保持 `Available`（不是 `Failed`），并能看到"被拒绝的能力"。

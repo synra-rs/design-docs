@@ -297,7 +297,7 @@ iOS 是否进 M5 由 M4 结束时的评估决定（[R-14]）。
 
 **选项**：A. 全部默认勾选 / B. **最小安全集默认勾选，高风险能力默认不勾**（推荐） / C. 全部默认不勾
 
-**建议**：**B**。高风险能力（`platform:simulate-keys`、`platform:clipboard:read`、`fs:write`）默认不勾且用醒目样式。
+**建议**：**B**。高风险能力（`platform:simulate-keys`、`platform:read-clipboard`、`fs:write`）默认不勾且用醒目样式。
 
 **影响**：决定 [14 §2.4](./14-plugin-lifecycle.md) 的 `ConsentRequest.optional` 默认值，
 以及 [10 §2.4](./10-capability-and-sandbox.md) 的"高风险能力"清单是否需要标 `default_deny`。
