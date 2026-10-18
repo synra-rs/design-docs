@@ -2121,7 +2121,7 @@ that nothing has made yet”。这个决定后来做过了（窗口的卸载对�
 ★ 测试：control 66 条（`every_request_round_trips` 增加 remove）、daemon 215 条（删行+artifact、数据默认保留、
 未安装即 `PluginNotInstalled`）、CLI 88 条（`--data` 进入请求；prose 句子）、store 225 条（`size_of` 的 4/8/0 字节），
 workspace clippy、guards 12 项。
-**仍然缺**：`plugin remove` 不报告“哪些文件没删掉”（`PluginFiles::remove` 要么整棵删掉要么拒绝）；守护进程仍不知道窗口
+**仍然缺**：守护进程仍不知道窗口
 是否正打开着这个插件。
 
 ### 8.93 `--follow` 真的跟随：读写入者写的那个文件
@@ -2391,6 +2391,25 @@ daemon 220、store 227、app shell 262/261、前端 259、workspace clippy、gua
 ★ 测试：前端 259（插件页测试里健康报告的 `usage` 换成真实配额，断言 `64.0 MiB`、`20 calls/s`、`5 s per call`；
 `usage: {}` 的旧 fixture 会抓住“这一行永远渲染”的实现）、`pnpm run lint` 0 error、build、shapes 8 项。
 **仍然缺**：配额里其余字段（`callFuel`、`maxStorageBytes`、各速率的 burst）没有展示；这一行是只读的，不能在这里改配额。
+
+### 8.107 卸载会说出它没能删掉的路径
+
+★ `RemoveReport.leftovers` 一直是空列表，因为 `PluginFiles::remove` 要么整棵删掉、要么返回错误。可数据库行在文件之前
+就删了：一次删不掉的目录（Windows 上被加载的引擎打开、权限拒绝）于是让卸载**失败**，而插件已经从列表里消失 ——
+文件留在磁盘上，没有任何地方说。
+
+- **尽力删除**：`remove_below` 只在“目标逃出根目录”时返回错误（那是安全不变量）；`remove_dir_all` 的其他失败被记为
+  leftover，继续删下一个根。返回值从 `Result<(), _>` 变成 `Result<Vec<PathBuf>, _>`。
+- **两个宿主**：daemon 的 `plugin_remove` 把路径放进 JSON 的 `leftovers`，窗口的 `plugins_uninstall` 放进
+  `RemoveReport.leftovers`。
+- **两处呈现**：CLI 的句子追加 `; could not remove <path>, …`；插件页在报告句后追加条数（完整路径在报告里）。都不静默。
+- **测试**：Windows 上用 `share_mode(0)` 独占打开插件目录里的文件，删除必然被拒 —— 断言 leftover 正好是那个目录、目录
+  仍在；关掉句柄后第二次删除 leftover 为空。这条测试只有在 Windows 上才有意义，所以 `#[cfg(windows)]`。
+
+★ 测试：store **228**（+1）、CLI **90**（+1：带有 leftover 的报告句子）、daemon 221、core 674、app shell 262/261、
+前端 259、`pnpm run lint` 0 error、build、shapes 8、workspace clippy、guards 12。
+**仍然缺**：leftover 不会自动重试（下次卸载/重启后手工清理）；`size_of` 仍按删除前的目录大小报告，留下的字节数没有从
+“freed”里扣掉 —— 这一点写在报告的字段语义里，不假装精确。
 
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 

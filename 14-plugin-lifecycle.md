@@ -701,6 +701,9 @@ pub async fn remove(&self, plugin_id: &PluginId, opts: RemoveOptions) -> Result<
 > 页面把 `bytes_freed` 格式化后放进报告句（`removedKept`/`removedDeleted`），`formatBytes` 同时从 HomePage 抽到
 > `src/format.ts`，两个页面共用一个实现。
 > ★ 这一节的两项（删除前询问、删除后报告）都已闭环。
+> ★ **同日更晚：`leftovers` 不再恒空（19 §8.107）。** `PluginFiles::remove` 改为**尽力删除**：一个目录删不掉
+> （Windows 上被进程打开、权限拒绝）不再让整个卸载失败 —— 数据库行已经删了，拒绝只会让文件留在磁盘上而且没人知道。
+> 它返回删不掉的路径，两个宿主都把它放进 `RemoveReport.leftovers`；CLI 的句子列出路径，插件页报告条数。
 
 ## 3. 更新（Update）
 
