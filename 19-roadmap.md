@@ -2378,6 +2378,20 @@ daemon 220、store 227、app shell 262/261、前端 259、workspace clippy、gua
 同样的答案仍是 `Handled`）、store 227、observe 286、app shell 262/261、前端 259、workspace clippy、guards 12。
 **仍然缺**：源端不可达时的持久化重投（没有队列）；迟到的 **cancel** 回执（取消本来不要答案）。
 
+### 8.106 插件卡片上的配额不再只是 JSON
+
+★ §8.91 的健康卡只画了档位与一句解释；`usage` 里的配额是整块 JSON，界面没把任何字段拿出来。用户看得到“它被降级了”，
+看不到“它被允许做什么”。
+
+- 卡片新增 **Limits** 一行，取 `usage` 里四个能行动的数字：`maxMemoryBytes`（用 `formatBytes`）、`maxInstances`、
+  `hostCallsPerSec`、`callTimeoutMs`（毫秒换成秒）。没有配额的报告不画这一行 —— 一个只有标签没有事实的行比没有更糟。
+- `usage` 在 DTO 里仍是 `unknown`/JSON：配额层拥有字段表，把它冻进 DTO 会让每次配额调整都变成一次协议变更。页面用
+  一个小函数只读这四个键，其余不猜。
+
+★ 测试：前端 259（插件页测试里健康报告的 `usage` 换成真实配额，断言 `64.0 MiB`、`20 calls/s`、`5 s per call`；
+`usage: {}` 的旧 fixture 会抓住“这一行永远渲染”的实现）、`pnpm run lint` 0 error、build、shapes 8 项。
+**仍然缺**：配额里其余字段（`callFuel`、`maxStorageBytes`、各速率的 burst）没有展示；这一行是只读的，不能在这里改配额。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
