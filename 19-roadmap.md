@@ -1261,6 +1261,7 @@ registry 可达。结果存在页面本地的 `updates` map 里，显示版本�
 ★ 可复现：mode `0644`、mtime `0`、成员顺序固定 —— 同样的输入两次打包字节相同，registry 的摘要不会因为构建时钟变化。
 ★ 测试 4 条：用 **`synra_registry::extract_tgz`**（registry 安装实际用的解包器）读回三个文件；两次打包字节相等；缺 artifact
 时点名拒绝；默认文件名是 `@acme-hello-2.0.0.tgz`。
+★ **先跑 `verify`**：pack 在写文件之前执行与安装同源的检查；失败时返回报告（exit 1）而不是出包。
 ★ 发布仍然不在这个工具里：`npm publish dist/*.tgz` 或上传到自建 registry；账号、scope、策略属于发布目标。
 **仍然缺**：`publish` 子命令、静态 index 适配层。
 

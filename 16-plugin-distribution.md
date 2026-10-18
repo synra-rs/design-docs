@@ -255,6 +255,8 @@ UI 显示：
 > ★ **`synra-plugin pack` 产出的就是这种 tarball**：`package/` 前缀，里面是 `manifest.json`、manifest 点名的
 > artifacts、以及 `signature.json`（有签名时）；mode 固定 `0644`、mtime 固定 0，所以同样的输入两次打包字节相同（注册表的
 > 摘要不会因为构建时钟而变）。只打包 manifest 点名的文件，不把源码/测试带进分发。
+> ★ **pack 先跑 `verify`**：与安装时同一套检查，任何一项失败就不出包 —— 一个已经存在的 tarball 比一份被跳过的报告更容易被
+> 信任。
 > 发布：`npm publish dist/@acme-hello-1.2.3.tgz`（或把同一个 tarball 上传到自建/兼容 registry）。**仍然缺**的是
 > `publish` 子命令：账号、scope、registry 策略都属于发布目标，不属于归档。
 
