@@ -991,6 +991,10 @@ worker 出现时忘记它。discovery 的 `stop` 只持有 supervisor 的 **shut
 行的消失靠 `transferFinished` 事件（不在页面里提前删）。
 **仍然缺的**：提示不是全局浮层（用户在别的页面时看不到），也没有"记住这个对端"的偏好。
 
+★ **提示改为全局浮层了**：`TransferPrompt.vue` 挂在 `App.vue` 根部（`fixed`，不占布局），从 intents store 里取
+`state === "offered"` 的第一行；HomePage 的按钮撤掉，免得同一个问题有两个回答入口。一次只显示一个 —— 一张提示
+对应一次等待中的连接。仍然没有"记住这个对端"的偏好。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
