@@ -3451,6 +3451,22 @@ listener 的两条在 `--features tauri-shell` 下跑。
 
 **仍然缺**：没有"在文件管理器中显示"（reveal）或删除；Open 的平台错误只有错误条，没有逐个文件的 inline 原因。
 
+### 8.166 收件列表跟着通知刷新，而不是停在打开那一刻
+
+★ §8.164 的列表是 mount 时的快照。文件在本页打开期间到达时，`NoticeHost` 会弹出横幅，列表却还是旧的——
+用户读到"Received notes.txt"，往下一看没有那一行，只能重开页面。§8.164 把这条写进了"仍然缺"。
+
+- Home 把收件箱读取抽成 `refreshReceived()`，并 `watch` notices store 的 `latest`：
+  **只有 `notice.received` 重读**。其他 notice 也走同一个 store，为它们重读是一次没人要求的查询。
+- 整页的 `load()` 仍然一次读三个列表；`refreshReceived` 只读收件箱，不碰 intents/transfers。
+- 这是"事件触发一次读取"，不是轮询：没有定时器，窗口不看 Home 时没有额外请求。
+
+**测试**：Home +1（第一次返回空、notice 到达后第二次返回一个文件，断言读取发生了两次且行出现）。
+前端 287、`pnpm run build`（含 vue-tsc）、`pnpm run shapes`、`pnpm lint` 0 error 通过。
+
+**仍然缺**：Home 没打开时不会刷新（回来时 `load()` 会重读）；通知被替换/关闭不影响下一次读取；
+列表没有删除动作。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
