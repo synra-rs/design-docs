@@ -4152,6 +4152,21 @@ stderr 里失败，窗口照常打开——用户以为更新了。
 **仍然缺**：`report_of` 不检查安装报告里的 `publisher_id` 是否已被信任；更新通知的警告没有分级；
 `plugins_update` 的命令返回值仍是 Unit（报告只用于通知，不回到 UI 的同步调用处）。
 
+### 8.207 包通知直接落到那个插件的卡片上
+
+★ §8.204 的 **Open plugins** 只把用户送到插件页；装/更新的是哪一个，用户还得自己找。
+
+- `review()` 把 `params.pluginId` 带进路由：`/plugins?plugin=<id>`；没有 id 时仍只到 `/plugins`。
+- `PluginsPage` 挂载时读 `window.location.search`，把 `plugin` 填进**已有的** `query` 过滤器：
+  没有第二条过滤规则，用户看到的正是"在过滤框里输入 id"的结果。
+- 不引入 `useRoute`：页面已有的测试不挂 router，读 `location.search` 让这条增强不必重写所有 fixture；
+  这也意味着同一路由内的 query 变化不会重新应用——从通知进来的这一次是 mount。
+- 测试：notice host 断言 query 是 `@acme/hello`；plugin page +1（带 query 时过滤器被填、卡片仍在）；
+  前端 308。
+
+**仍然缺**：插件页不会滚动/高亮到卡片，只是过滤；同页内再次点通知不会更新过滤（不是 mount）；
+query 里未知 id 时页面显示空列表，没有"不认识的插件"说明。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
