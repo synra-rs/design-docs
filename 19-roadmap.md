@@ -3302,6 +3302,24 @@ IPC 契约 123、app 277、前端 267、`pnpm run build`（含 vue-tsc）全绿�
 
 **仍然缺**：没有按方向分行/分组；`abortReason` 已到达前端但没有显示在行里。
 
+### 8.158 扫描可以取消：`devices_scan_start` 的 id 终于被留下来
+
+★ `devices_scan_cancel(scanId)` 在契约、壳命令和测试里都有，界面却把 `devices_scan_start` 返回的 scan id
+直接丢掉——扫描只能等它自己结束（3 秒），而 Scan 按钮在扫描期间是 disabled 的，用户没有任何别的动作可做。
+启动命令一直在回答 id，缺的是页面把它留下来。
+
+- `scan()` 把网络扫描返回的 id 存进 `scanId`；cached 扫描在回答前就结束，存 `undefined`。
+- 扫描进行中（`devices.scanning`）显示 **Cancel scan**，调用 `devices_scan_cancel { scanId }`；
+  内核按 id 核对"这是不是它正在跑的那一次"，所以一次过期的点击不会停掉后来的扫描。
+- 取消后清空 id 并重读 snapshot；失败走同一个错误条与 Retry。
+- 测试按命令名模拟：第一次 snapshot 不在扫描、第二次在扫描，点击 Scan 后断言 Cancel 出现，
+  点击后发出 `{ scanId: 'scan-1' }`。
+
+**测试**：设备页 4 条、前端 275 通过；`pnpm run build`（含 vue-tsc）与 `pnpm lint`（0 error）通过。
+
+**仍然缺**：扫描进度是事件/快照驱动的，取消后的"已找到几个"不会保留一条最终报告；按钮没有区分
+"网络扫描"与"读取缓存"两种模式。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
