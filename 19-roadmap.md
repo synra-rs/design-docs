@@ -3547,6 +3547,25 @@ listener 的两条在 `--features tauri-shell` 下跑。
 
 **仍然缺**：没有"收到文件时通知"的开关；通知在窗口已经在前台时仍会弹（没有焦点判断）；通知点击不会聚焦窗口。
 
+### 8.172 收件通知有了开关：`transfers.notifyOnReceive`
+
+★ §8.171 的系统通知没有关法。一个每次收文件都弹的系统通知，是用户学会关掉整个应用通知的原因；
+而"关掉它"不是重新编译一个版本。
+
+- 配置键 `transfers.notifyOnReceive`（缺省 **on**）：缺省是"用户没关"，不是"用户开了"——
+  设计要的是文件到达被看见，静默必须是用户做的决定。
+- listener 在通知前读一次这个键（落地后、`record_received` 的库锁已经释放）；坏值也按缺省处理，
+  因为值是内核写的，坏值是一个 bug，静默处理只会把它藏起来。
+- Settings 的 Transfers 区加第二个开关；页面上的值从 `config_get` 来，写入走 `config_set`，
+  与 `confirmCancel` 同一个形状。
+- 测试：listener +1（缺省 on、写 false 后 off）；设置页 +1（第三个 switch，断言写入
+  `transfers.notifyOnReceive: false`），原来的"两个 switch"断言更新为三个。
+
+**测试**：app Rust 281、前端 291、两套 clippy 全绿；`pnpm run build`（含 vue-tsc）、`pnpm run shapes`、
+`pnpm lint` 0 error 通过。
+
+**仍然缺**：窗口在前台时仍会弹（无焦点判断）；通知点击不聚焦窗口；开关只影响接收，不影响其他平台通知。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
