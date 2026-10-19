@@ -2965,9 +2965,8 @@ clippy、`api-guard`、guards 12。
 前端 1 条挂载测试（页面显示的是宿主给的句子而不是自己编的）。daemon 侧的
 `safe_mode_loads_nothing_and_says_why` 仍然守同一条规则。
 
-**仍然缺**：壳不跑目录发现（`record_discovered_plugins` 仍在 daemon）。从界面安装的插件有行，所以能装载；
-但手工拷进 `plugins/` 的目录窗口看不见，而 daemon 看得见——两个宿主对"什么算已安装"因此还有一个分歧。
-把那段扫描搬进 `synra_core::plugin` 是下一步。
+**仍然缺**：目录发现本身已经统一（§8.140）。手工拷入的目录在两个宿主里都只是"已安装、未启用"，
+这是设计（发现不等于批准），不是缺口。
 
 ### 8.139 开关、同意、更新、卸载都当场生效
 
@@ -2986,6 +2985,21 @@ clippy、`api-guard`、guards 12。
 **仍然缺**：这仍是"编译并让插件可被调用"，不是激活状态机——`activate()` / `deactivate()` 没有调用者，
 `PluginSlot` 仍无生产驱动者（[14 §1](./14-plugin-lifecycle.md)）。所以 `state` 里的 `running` 意思是"可被路由到"，
 不是"已跑过 `activate`"；这个区分写在卡片的文档注释里，而不是让读者从状态词猜。
+
+### 8.140 目录发现也回到内核：一个机器不再有两个"已安装"
+
+★ 8.136–8.139 让壳装得上、列得出、加载得了从**界面**安装的插件，但壳从来不扫自己的 `plugins/` 目录：
+那段扫描（`record_discovered_plugins`）只在守护进程里。于是一个作者把插件目录拷进窗口的数据目录后，
+**同一台机器上的两个宿主对"装了什么"给出两个答案**——而窗口恰恰是他要看的那个。
+
+- `record_discovered_plugins` 与 `Discovered` 搬进 `synra_core::plugin`（`plugin/discovery.rs`），
+  连同目录名与 `sanitise_component(id)` 一致性的检查、以及"签名不覆盖这里的字节就拒绝"的第二道门。
+- 守护进程的 `runtime::plugins` 只剩引擎构建，`Discovered` / `record_discovered_plugins` 改为 `pub use`。
+- 壳在 `with_plugins_or_refuse` **建引擎之前**扫一次：发现与"能不能跑"无关，没有引擎的构建也应该看见装了什么。
+  写下的行照旧是 `enabled = false, trusted = false`——发现是可见性，不是批准。
+
+**测试**：壳 +1（拷进数据目录的目录出现在列表里，状态 `disabled`、能力列表为空）；daemon 的 89 条 runtime 测试
+（含目录名不一致、签名覆盖其他字节、重复发现幂等）现在跑的是内核里的同一份实现，全部保持绿。
 
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
