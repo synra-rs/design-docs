@@ -3772,6 +3772,26 @@ M4 的"分享入口"于是只剩半个——应用能显示别人送来的分享
 **仍然缺**：`navigator.onLine` 只说明"有链路"，不说明"能到 registry/peer"；没有把断网与
 `devices_snapshot` 的 `online` 字段合并成一句话；没有重连后的自动重试。
 
+### 8.185 开机自启：读平台，不存自己的偏好
+
+★ M4 的系统集成写着"开机自启"。它和主题不同：**平台知道自己有没有登记**，页面存一份布尔值只会和操作系统
+的真实状态分叉。
+
+- 接入 `tauri-plugin-autostart`（Rust `init(LaunchAgent, None)` + 前端包 + `autostart:default` capability）。
+- Settings 新增 **Startup / Launch at login**：挂载时调 `isEnabled()`，切换时调 `enable()` / `disable()`，
+  **不存内核配置键**——注册状态的所有者是平台。
+- 平台不支持时开关禁用并说明原因（`This build cannot register itself to start at login.`），
+  不把它画成一次普通的错误。
+- 插件是**动态 import** 的：静态 import 会和 `@tauri-apps/api` 的静态图混在一起，Vite 报
+  `INEFFECTIVE_DYNAMIC_IMPORT`；页面的其余部分不需要为这个开关先加载它。
+- 测试 mock 三个函数：挂载读 `isEnabled`、切换调 `enable`；原有"三个 switch"的断言更新为四个。
+
+**测试**：前端 297（+1）；`pnpm run build`、`pnpm run shapes`、`pnpm lint` 0 error；
+`cargo check --all-targets` 与 `cargo clippy --all-targets` 通过。
+
+**仍然缺**：没有"启动时最小化到托盘"选项；Linux 的注册方式（.desktop）未实测；移动端不应显示这个开关
+（尚未按平台隐藏）。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
