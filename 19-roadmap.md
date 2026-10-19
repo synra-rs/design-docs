@@ -3831,6 +3831,24 @@ sink 在 `PluginSet` 的锁内调用，订阅者必须很快返回（目前的�
 **仍然缺**：`overreaching` 与 `degraded` 的颜色/文案仍由页面的通用 warning 覆盖，没有单独措辞；
 健康计数在事件里不携带，card 上的计数会停在最后一次 `plugins_list`。
 
+### 8.188 重试一个 faulted 插件不再假装它从未加载过
+
+★ `plugins_reload` 一直是 unload + 重新 `load_plugin`：为了再调一次 `activate`，它丢掉编译好的 artifact 和整条
+生命周期记录，然后从 `Installed` 重新爬。用户看到的是"重试"，实现做的却是"重装"。
+
+- `PluginSet::clear_fault(id, now)`：只对 `Faulted` 生效，apply `ClearFault` → `Grant { partially_denied }`
+  （把加载时存下的 partial 标志带上，不猜 `false`）；同时 `Budget::reset(now)`，否则生命周期允许跑、阶梯仍拒绝。
+- 新增 `plugin::reactivate_loaded(set, id, activation, now)`：取回 `set.quota`，调既有的 `activate`，再
+  `mark_active`。壳的 `apply_lifecycle` 只在生命周期确实是 `Faulted` 时走这条；其他重载原因不变。
+- 失败仍然 unload，并返回 `it loaded but did not activate: …`，与旧路径同一句话。
+- 测试沿用真实的 ladder：fault 后 `clear_fault` 返回 true，状态回到 `Granted`（不是 `Active`），
+  `health_of` 回到 `Good`；第二次 `clear_fault` 返回 false——它不是幂等的"再清一次"。
+
+**测试**：core 700、daemon 233、app Rust 283 通过，core/app clippy 全绿。
+
+**仍然缺**：`Deactivate` / `Park` 仍没有生产路径；壳的这条分支没有独立单测（core 的 clear/activate 两半有）；
+清除故障后健康计数归零，历史不再可见。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
