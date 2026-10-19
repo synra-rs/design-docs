@@ -2823,6 +2823,27 @@ uptime 与进程指标，`status` 的 metrics 里也没有日志。
 **仍然缺**：仪表只在读的时候更新（没有日志写入时的推送）；`log_write_errors` 只有计数，没有“哪一次写失败”；CLI 的
 `--output json` 里 metrics 仍只在 `status` 下。
 
+### 8.131 安装包的两种形状，以及一个藏了很久的目录名错误
+
+★ `.synra` 是这个产品自己的容器，但两个宿主都只接受**目录**：`plugin install ./chat.synra` 回“不是目录”，而解包器和安装器
+都早就在（同步与 registry 都会产生 `.synra`）。
+
+- **文件即包**：`synra_core::install::from_package` / **新增** `update_from_package`（同一个内层，只有最后一步是“移开旧目录”）。
+  daemon 的 `plugin_install` 与壳的 `run_install` 都按 `is_file()` 选路径/包；`--data`/更新语义不变。
+- **顺带抓到一个更严重的问题**：安装器用 **raw** plugin id 拼目录，`@acme/hello` 变成 `plugins/@acme/hello`（嵌套两层），而
+  `Paths::plugin_dir`、卸载、清扫、数据沙箱都用 `sanitise_component`（`plugins/acme+hello`）。于是**卸载删的是一个从不
+  存在的目录，artifact 原样留下**。安装器现在用 `sanitise_component`，与其它所有地方一致。
+- **两个消费者随之修正**：壳的 `installed_capabilities` 用 `plugin_dir` 而不是裸拼；daemon 的更新测试按备份名（`previous-`）
+  而不是 `@acme` 前缀断言 —— 后者在修复前是“碰巧通过”。
+- **测试**：core 的包往返断言 `installed.path == plugins/acme+hello`；新增 `a_package_can_replace_an_installed_plugin`
+  （版本行从 1.0.0 到 2.0.0、来源注记指向新包）；壳的 `installing_a_package_file_uses_the_same_pipeline` 从 fixture 目录
+  打一个 `.synra` 再安装。
+
+★ 测试：core **676**（+1）、daemon **231**、store 237、registry 21、CLI 103、app shell **265/264**、前端 259、workspace
+clippy、`api-guard`、guards 12。
+**仍然缺**：`.synra` 的 UI 解包目录（`ui/`）在安装包里被跳过、安装后由 `ui.zip` 重新展开（设计如此）；包安装仍先解包到
+staging 再走目录管线，两份临时空间在峰值上同时存在。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
