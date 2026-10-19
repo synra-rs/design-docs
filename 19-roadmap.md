@@ -3621,6 +3621,25 @@ listener 的两条在 `--features tauri-shell` 下跑。
 没有读 `lifecycle`；`PluginSlot` 本身（带 `Move`/`StopRecord` 的那一层）仍未接上，本轮接的是更底层的
 `Lifecycle`。
 
+### 8.176 健康阶梯的最后一格就是状态机的 Fault
+
+★ §8.175 让生命周期记录了 `Granted → Active`，但 `Fault` 仍然没人调用。于是同一个插件有两份账：
+`Budget` 的 health 说它已经不可信，`Lifecycle` 还说它 `Active`，而 `call` 谁都不问，继续把工作交给它。
+
+- `PluginSet::call` 在取到 `Loaded` 后先看生命周期：`Faulted` 直接返回 `PluginSetError::Faulted { id, reason }`，
+  不再运行。**一个不会拒绝调用的 fault 状态只是标签。**
+- misbehaviour 记进 `Budget` 后，如果 `health() == Health::Faulted`，就对生命周期 apply
+  `Transition::Fault { reason }`；reason 用 ladder 自己的 `explanation`，不在这里另写一句话。
+- 测试用真实的 ladder 而不是手工 apply：每个窗口 20 次 trap、跨 8 个窗口，循环在**第一次被拒绝时**停下，
+  不写死“第 60 次”；随后断言状态是 `Faulted` 且拒绝是 `PluginSetError::Faulted`。
+
+**测试**：core +1（到底部后状态 Faulted、下一次调用被拒）；core 700、daemon 233、app Rust 281 通过，
+core clippy 全绿。
+
+**仍然缺**：`Deactivate` / `Park` / `ClearFault` 仍没有生产路径；`Faulted` 之后的 `plugins_reload` 是
+unload + 重新 load，不走 `ClearFault`，所以“清除故障”不是一个显式动作；shell 的卡片仍用 `load_error`
+判 faulted，没有读 `lifecycle`。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
