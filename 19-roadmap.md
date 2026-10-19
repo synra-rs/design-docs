@@ -3131,6 +3131,20 @@ core loader 10 条、daemon 全量 232 条、app 272 条全部保持绿。
 
 **仍然缺**：插件自己的设置（用户写的那些）没有存处，也没有界面；`locale`/`darkMode` 是环境，不是配置。
 
+### 8.148 壳的 Host 也回答 `ui.locale` 和 `ui.darkMode`
+
+★ §8.147 让 `activate(config)` 带上宿主的语言和主题，但壳的 `DesktopHost::locale` / `dark_mode` 仍是硬编码的
+`""` / `false`：daemon 读 `ui.locale`，壳不读。于是窗口用 `zh-CN` 深色时，插件被告知"没有语言、浅色"——
+`env.locale()` 与 `activate(config.locale)` 同时错，而且这个错误的答案看起来完全正常。
+
+- `DesktopHost::setting(key)` 与 daemon 的同名函数同形：读 `config()` 行，值是 JSON 文本。
+- `locale()` / `dark_mode()` 解析 `ui.locale` / `ui.darkMode`，缺省仍是空串 / false（"没有设置"与"没有这个能力"
+  在契约里都是默认值，这不是猜）。
+- 测试写两条配置再问 host，断言 `zh-CN` 与 `true`；旧实现会以 `""` 与 `false` 失败。
+
+**仍然缺**：设置页没有语言/主题控件，配置目前只能由 `config_set` 写；`locale` 的缺省是空串而不是系统语言——
+"宿主不知道"和"没有语言"在契约里仍然只能用一个值表示。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
