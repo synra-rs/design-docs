@@ -3725,6 +3725,20 @@ M4 的"分享入口"于是只剩半个——应用能显示别人送来的分享
 **仍然缺**：没有拖拽入窗；没有 `Clipboard` 变体的入口；文件路径来自 picker，但没有校验存在性
 （那是 board/插件在读取时的事，页面不该先猜）。
 
+### 8.182 撤掉一个会必然失败的按钮：文件分享没有壳层支持
+
+★ §8.181 加了 **Share files**，但 `commands/intent.rs` 的 `item_for` 对 `IntentSourceDto::ShareFiles` 一直是
+**拒绝**："sharing files needs a transfer first, and no interface starts one yet"。于是那个按钮按下去只会
+弹错误条——**一个永远走不通的入口比没有入口更糟**：用户会以为是自己选错了文件。
+
+- 移除 Home 的 **Share files**、`sharingFiles` 与文件选择器调用；文本分享保留。
+- 保留契约里的 `ShareFiles` 与它的拒绝：拒绝本身是正确的，缺的是"先建传输、再把 TransferId 放进
+  `ShareItem.transfers`"这条路径。文件分享不是一个 UI 按钮能补的。
+- 测试相应减少一条（294），其余不变；build / shapes / lint 全绿。
+
+**仍然缺**：文件分享需要 `transfer_send_file` 之外的"本地暂存 + ShareItem.transfers"管线；拖拽与
+`Clipboard` 入口也仍未接。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
