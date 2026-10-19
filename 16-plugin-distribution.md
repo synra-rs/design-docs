@@ -63,6 +63,11 @@
 > `check_integrity`（没有 integrity 就拒绝）→ `extract_tgz` 到 `.install-staging` → `install_from_directory`。
 > 管线目前在 daemon 侧；壳的 `plugins_install` 仍拒绝 `Registry`，直到它移到共享层。
 > 收件箱里的名字也从 `plugin-<id>.wasm` 改成 `plugin-<id>.synra`。
+>
+> ★ **2026-10-19 更正：上面两句都已过期。** 壳的 `plugins_install` 支持 `Registry`（[19 §8.122](./19-roadmap.md) 起），
+> 而且 [§8.146](./19-roadmap.md) 把两份管线里**安全关键的那一半**合并成了
+> `synra_core::install::unpack_published_tarball`：完整性检查在解包之前，解包用 `synra_registry::extract_tgz` 的规则，
+> 两个宿主调同一个函数。版本选择、镜像与缓存仍是各宿主自己的。
 
 ### 2.2 摘要的表达
 

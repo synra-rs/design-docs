@@ -3091,6 +3091,25 @@ core loader 10 条、daemon 全量 232 条、app 272 条全部保持绿。
 **仍然缺**：这些词仍由壳的 `life_state` 推导，而不是从 `PluginSlot` 查询；`active` 的含义是"已装载并激活"，
 不是"此刻有调用在跑"。
 
+### 8.146 发布的 tarball 只有一条“先校验、再解包”的路径
+
+★ 两个宿主各有一份 registry 下载管线：daemon 的 `runtime/registry_install.rs` 与壳的 `commands/registry.rs`。
+它们今天对同一件事给出同样的顺序（摘要 → 解包 → 安装），但那是**两份各自维护的代码**；
+"被篡改的字节绝不会被解开"在一边为真、在另一边被改坏，只要一次提交。
+
+- 新函数 `synra_core::install::unpack_published_tarball`：要求完整性字符串存在，`check_integrity` 通过后才创建目录，
+  再用 `synra_registry::extract_tgz` 的安全规则解开；失败时不留目录。返回 `UnpackedTarball`，
+  调用方拿 `path()` 安装、`cleanup()` 清理。
+- daemon 删掉自己的 `check_integrity` + `extract_tgz` + `discard`；壳删掉 `PackageDir`、`verify_tarball` 与
+  `extract_tgz` 调用。两份测试（daemon 5 条、壳的 registry 11 条 + 安装管线 1 条）都跑在新函数上。
+- `InstallRefusal::code` 增加 `"integrity" -> IntegrityMismatch`：这个阶段原来会落到 `InvalidArgument`，
+  让一个被篡改的包看起来像一个格式错误的请求。
+
+**测试**：core +2（没有摘要、摘要不符），daemon 全量 233、core 697、app 272 全部保持绿。
+
+**仍然缺**：版本选择、镜像、缓存、static index 仍是各宿主自己的；这次统一的是**安全关键的那一半**，
+不是整条安装管线。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
