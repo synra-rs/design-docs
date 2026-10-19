@@ -2772,6 +2772,24 @@ guards 12。
 ★ 测试：store **237**（+1）、core 675、daemon 231、CLI 103、app shell 264/263、前端 259、workspace clippy、`api-guard`、
 guards 12。
 
+### 8.128 版本请求可以是范围
+
+★ 两条 registry 安装链都把 `--version` 当成**精确字符串**去版本表里查，于是 `--version ^1.9` 的结果是“没有这个版本”，尽管
+它匹配好几个。版本范围的匹配是排序问题：字符串里 `1.10.0` 排在 `1.9.0` 前面，语义版本里相反。
+
+- **一个实现，放在解析 packument 的 crate 里**：`synra_registry::Packument::select(requested)` —— 精确版本优先，其次是
+  `semver::VersionReq`，在匹配的版本里取最高；没有 `latest` 或范围无匹配各有自己的 `SelectError`。
+- **两条链都改用它**：壳的 `choose` 从“查 key”变成 `select`；daemon 的 `install_from_registry` 从 plugin-host 的
+  `Packument` 换成 `synra_registry::Packument`（同一个解析器、同一个选择器），同时保留 plugin-host 的
+  `check_integrity`。这是两条管线向一套类型靠的第一步。
+- **测试**：`^1.9` → 1.10.0、`~1.9.0` → 1.9.0、精确 1.10.0、`None` → latest、`^3`／非法字符串 → `NoSuchVersion`、
+  无 latest 的文档 → `NoLatest`；daemon 的假 registry 补上 `name`（`synra_registry` 的版本条目要求它）。
+
+★ 测试：registry **20**、daemon 231、core 675、store 237、CLI 103、app shell 264/263、前端 259、workspace clippy、
+`api-guard`、guards 12。
+**仍然缺**：预发布版本的顺序（`semver` 已处理，但 `latest` 仍由发布者决定、不会被范围覆盖）；两条管线的网络/镜像策略仍
+各自实现；范围只用于安装，不用于 `check_update` 的“有没有更新”。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
