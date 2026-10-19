@@ -3814,6 +3814,23 @@ M4 的"分享入口"于是只剩半个——应用能显示别人送来的分享
 sink 在 `PluginSet` 的锁内调用，订阅者必须很快返回（目前的实现只是入队）；
 `pluginHealthChanged` 没有在事件分发测试里被断言（只测了 store 的处理）。
 
+### 8.187 `degraded` 也有地方显示了，而不只是 `faulted`
+
+★ §8.186 只把 `faulted` 写进卡片。健康阶梯有三档非 good：`overreaching`、`degraded`、`faulted`；前两档
+插件仍在跑，只是配额被收紧。事件到了，store 却只认最后一档——于是"它开始问得太频繁"这条消息仍然要等刷新。
+
+- `markHealth` 现在把**任意** rung 写进卡片已有的 `health` 报告（保留 `callsAdmitted` / `callsRefused` /
+  `usage`，只替换 `health` 与 `explanation`）；只有 `faulted` 同时改 `state` 与 `stateReason`。
+- 卡片本来就有 `health !== 'good'` 的 alert 分支，这一步只是让它收到实时数据。
+- `exactOptionalPropertyTypes` 下不能把 `undefined` 赋给可选字段：改成条件展开，只有存在时才写 `health` /
+  `stateReason`。
+- 测试 +1：`degraded` 后状态仍是 `active`、`health.health` 与解释更新、计数保留。
+
+**测试**：前端 299；`pnpm run build`、`pnpm run shapes`、`pnpm lint` 0 error 通过。
+
+**仍然缺**：`overreaching` 与 `degraded` 的颜色/文案仍由页面的通用 warning 覆盖，没有单独措辞；
+健康计数在事件里不携带，card 上的计数会停在最后一次 `plugins_list`。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
