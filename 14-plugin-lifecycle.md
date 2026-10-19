@@ -6,8 +6,11 @@
 > `plugins_install` 都走它），per-capability 同意由 `synra_core::consent` 与 `plugin_grants` 落在库里，
 > `synra_core::plugin::load_installed` 在**两个宿主启动时**装载已启用且已同意的插件，壳还会在
 > `enable` / `consent` / `update` 之后就地把一个插件装进集合、在 `disable` / `uninstall` 时把它拿出去。
-> 安全模式也因此第一次对窗口生效（[18 §10](./18-observability.md)）。**仍然没有**的是激活状态机
-> （`PluginSlot` 仍无生产驱动者）：这里的"装载"是编译并让插件可被调用，不是运行 `activate()`。
+> 安全模式也因此第一次对窗口生效（[18 §10](./18-observability.md)）。
+> **装载现在也真的会 `activate`**（2026-10-19，见 [19 §8.141](./19-roadmap.md)）：`load_plugin` 在编译之后调用
+> 插件的 `lifecycle.activate("{}")`，失败就把它从集合里拿掉并记录原因；`deactivate` 在停用 / 卸载前调用。
+> **仍然没有**的是 `PluginSlot` 那套类型状态机本身：生产路径直接调契约的两个函数，
+> 没有经过 `Installed → Activating → Active` 的槽位记录，所以"Faulted"仍只是卡片上的一个原因，不是一个可查询的状态。
 >
 > 下面这段是 2026-10-18 的原始诊断，逐条证据在那一天都是真的：
 

@@ -648,6 +648,8 @@ Content-Security-Policy:
 > **用户看得到原因**：`PluginSnapshot.stateReason` 是新增字段（Rust DTO → `@synra/protocol` 镜像 → 卡片上的告警），
 > 所以"崩溃 3 次所以这次没启动任何插件"与"这个构建没有引擎"不再都显示成 `unavailable`。
 > 启用 / 同意 / 更新之后**就地装载**，停用 / 卸载之后**就地卸载**——开关不再需要一次重启才生效。
+> 装载现在也真的调用插件的 `lifecycle.activate`，卸载前调用 `deactivate`：失败时插件被移出集合并把原因写进摘要，
+> 所以"编译成功"不再等于"可路由"。
 > 目录发现（`record_discovered_plugins`）也搬进了 `synra_core::plugin`，壳在建引擎之前扫自己的 `plugins/`：
 > 一个作者拷进窗口数据目录的插件不再是"窗口看不见、守护进程看得见"。发现写下的行仍是 `enabled = false,
 > trusted = false`——发现是可见性，不是批准。

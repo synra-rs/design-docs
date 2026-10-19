@@ -2982,9 +2982,10 @@ clippy、`api-guard`、guards 12。
 
 **测试**：壳 +3（开关进出集合、同意后就地装载、卸载后集合为空），既有的同意/卸载测试保持绿。
 
-**仍然缺**：这仍是"编译并让插件可被调用"，不是激活状态机——`activate()` / `deactivate()` 没有调用者，
-`PluginSlot` 仍无生产驱动者（[14 §1](./14-plugin-lifecycle.md)）。所以 `state` 里的 `running` 意思是"可被路由到"，
-不是"已跑过 `activate`"；这个区分写在卡片的文档注释里，而不是让读者从状态词猜。
+**仍然缺**：这仍是"编译、`activate`、然后可被路由"，而不是 `PluginSlot` 的那套类型状态机——
+生产路径没有经过 `Installed → Activating → Active` 的槽位记录（[14 §1](./14-plugin-lifecycle.md)）。
+所以 `Faulted` 仍只是卡片上的一个原因，不是一个能查询、能重试的状态；`activate` 失败后用户能做的是修正后重新启用，
+而不是从一个状态机上重试。§8.141 把两个契约函数接上了，状态机本身仍未驱动。
 
 ### 8.140 目录发现也回到内核：一个机器不再有两个"已安装"
 
@@ -3000,6 +3001,28 @@ clippy、`api-guard`、guards 12。
 
 **测试**：壳 +1（拷进数据目录的目录出现在列表里，状态 `disabled`、能力列表为空）；daemon 的 89 条 runtime 测试
 （含目录名不一致、签名覆盖其他字节、重复发现幂等）现在跑的是内核里的同一份实现，全部保持绿。
+
+### 8.141 装载之后真的调用 activate，停用之前真的调用 deactivate
+
+★ 8.136 的装载只做到"编译并放进集合"，而契约里每个插件都必须导出 `lifecycle.activate` / `deactivate`。
+结果是**编译成功的插件就已经被当成可路由的**：一个 `activate` 会拒绝的插件照样会匹配一次分享，
+然后在 `execute` 里以别的方式失败——错误发生在离原因很远的地方。
+
+- `synra_core::plugin::load_plugin` 在 `set.load(..)` 之后调 `Work::Activate { config_json: "{}" }`，
+  预算用 `CallBudget::from_quota(&Quota::default())` —— 与任何一次调用同一个上限。失败时**先 `unload` 再返回原因**，
+  所以摘要里的拒绝是"它装了但没启动"，而不是一条留在集合里的半活记录。
+- `config_json` 是 `{}`，因为这一版没有插件设置表；契约的字段是真的，值只是诚实地表示"没有设置"。
+- `pub fn deactivate(set, id, now)`：调 `Work::Deactivate`，无论它成功还是 trap，随后 `unload`。
+  壳的 `apply_unload` 与守护进程的 `plugin remove` / `disable` 都改用它——一个已经被删掉文件的插件
+  不该还能回答一次分享。
+- 守护进程的 `enable` 仍只写标志：它手上没有吊销列表，装载一个不检查吊销的插件是这里不能走的捷径；
+  下一次启动会经过 `load_installed`，那里检查。
+
+**测试**：core +1（`script_for` 让 `activate` 返回 `Failed`，断言摘要里有插件自己的句子、集合里没有它），
+core loader 10 条、daemon 全量 232 条、app 272 条全部保持绿。
+
+**仍然缺**：`activate` 的配置只有 `{}`；没有 `migrate()` 的调用点（更新版本时数据迁移仍不做）；
+`PluginSlot` 状态机仍未驱动（§8.139 的"仍然缺"）。
 
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
