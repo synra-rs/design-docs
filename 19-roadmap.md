@@ -4182,6 +4182,24 @@ query 里未知 id 时页面显示空列表，没有"不认识的插件"说明�
 **仍然缺**：清除后不会重新定位到卡片（只是恢复完整列表）；通知指向未知插件时没有"这个插件不在了"的
 专门文案；过滤器的清除按钮与输入框的 allow-clear 是两个入口。
 
+### 8.209 拖一个包进窗口，或让 macOS 把文件交给应用
+
+★ §8.199 只覆盖了"命令行参数里有 `.synra`"。桌面用户还有两个入口：把包**拖到窗口上**，以及 macOS 的
+"打开文档"Apple Event——后者根本不经过 argv。
+
+- 把安装/更新判断收进 `open_package(app, package)`：一个入口，三种来源（argv、拖放、macOS Opened）都调用它。
+- 主窗口 `on_window_event` 监听 `WindowEvent::DragDrop(DragDropEvent::Drop { paths, .. })`；只接受扩展名
+  `synra` 的路径，其他文件忽略（这个壳还没有接收文件的目的地）。
+- `RunEvent::Opened { urls }` 在 macOS 上同时处理 `file:`（`.synra` → `open_package`）和 `synra:`（交给
+  `deeplink::receive`）。这段是 `#[cfg(target_os = "macos")]`，Windows 构建看不到它。
+- 包的安装/更新语义没有第二套：拖放和双击落到同一个 `launch::action`，版本比较与通知文案完全共享。
+
+**测试**：Windows 上 `cargo check`、clippy、app 283 全绿；macOS 分支未在本机编译（没有 mac 目标），
+这是**未验证**的一行，不是"已验证跨平台"。
+
+**仍然缺**：拖放**非包文件**没有反馈（静默忽略）；macOS 的 `Opened` 分支未编译验证；
+没有拖放视觉反馈（窗口不显示"松开以安装"）；文件分享到设备仍没有入口。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
