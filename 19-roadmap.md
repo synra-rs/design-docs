@@ -2334,7 +2334,8 @@ workspace clippy、guards 12。
   所以宏里用闭包；**clippy 先拒绝了直接调用的闭包**（`redundant_closure_call`），改成先绑定 `&mut || …` 再调用才通过 ——
   这条弯路记在这里，因为它是这类宏的固定坑。
 - **覆盖**：审计、意图、配置、插件存储、插件行/授权/版本、同步记录、设备、配对、发布者、身份。**不覆盖**迁移（启动时
-  schema 变更，不是用户等待的写）与 `backup_to`（写的是另一份文件，不是这个连接上的写）。这条边界写在观察者的文档里。
+  schema 变更，不是用户等待的写）；`backup_to` 起初也被排除，§8.127 把它收了进来 —— 备份写的确实是另一份文件，但它是用户
+  等得最久的那次写。
 - **两个宿主**：daemon 的 `runtime::observe_db_writes` 与 shell 的 `state::observe_db_writes` 是同一个形状的命名函数，
   测试调的是同一个函数而不是自己再造一个同名直方图。窗口里最早出现的 `kind=audit` 是**真的**：建状态时写了身份与审计行，
   所以 `an_empty_shell_reports_no_metrics_rather_than_refusing` 允许它，并写清为什么。
@@ -2342,7 +2343,8 @@ workspace clippy、guards 12。
 ★ 测试：store 227（+1：一次审计、一次配置、一次设备写的 kind 与耗时报到观察者）、daemon 220（+1：`serve` 用的那个安装
 函数把一次配置写记进 recorder）、app shell 262（默认特性）/261（`--no-default-features`，+1：窗口的 recorder 看到
 `db_write_duration_us{kind=config}`）、前端 259、core 674、workspace clippy、guards 12。
-**仍然缺**：迁移与备份的耗时；直方图的标签使设计里的“单一直方图”变成按 kind 分组（更有用，但确实是偏离，记在这里）。
+**仍然缺**：迁移的耗时（启动时观察者还没装上）；直方图的标签使设计里的“单一直方图”变成按 kind 分组（更有用，但确实是
+偏离，记在这里）。
 
 ### 8.104 插件的日志行带上动作的 trace
 
@@ -2755,6 +2757,20 @@ guards 12。
 guards 12。
 **仍然缺**：等待是 5 秒常量，不随命令类型调整；被放弃的连接没有“它在跑什么”的记录（只有数量）；`catch_unwind` 只包了
 `serve_stream`，spawn 之前的任何 panic 仍然直接结束进程。
+
+### 8.127 备份也算一次写
+
+★ §8.103 的写耗时把 `backup_to` 排除在外，理由是“写的是另一份文件，不是这个连接上的写”。理由是真的，结论却错了：备份是
+用户等得**最久**的那次写（大库上是一次完整 vacuum），恰恰是最需要数字的一次。
+
+- `backup_to` 包进 `timed_write!(self, "backup", { … })`；目标已存在的拒绝在计时之外 —— 那是一次立刻失败的检查，把它的
+  零耗时记进直方图只会污染样本。
+- **测试**：`a_backup_is_timed_like_every_other_write` 用观察者断言 kind 是 `backup`、耗时不到一秒、且只有一次报告。
+- **迁移仍然不计时**：观察者在宿主打开数据库之后才装上，而迁移在那之前跑完；要计时就得在数据库还没验证时先装指标，那是
+  把诊断层放在被诊断对象之前。这条边界留在 §8.103 的“仍然缺”里，并写清原因。
+
+★ 测试：store **237**（+1）、core 675、daemon 231、CLI 103、app shell 264/263、前端 259、workspace clippy、`api-guard`、
+guards 12。
 
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
