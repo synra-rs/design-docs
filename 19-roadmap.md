@@ -2984,8 +2984,8 @@ clippy、`api-guard`、guards 12。
 
 **仍然缺**：这仍是"编译、`activate`、然后可被路由"，而不是 `PluginSlot` 的那套类型状态机——
 生产路径没有经过 `Installed → Activating → Active` 的槽位记录（[14 §1](./14-plugin-lifecycle.md)）。
-所以 `Faulted` 仍只是卡片上的一个原因，不是一个能查询、能重试的状态；`activate` 失败后用户能做的是修正后重新启用，
-而不是从一个状态机上重试。§8.141 把两个契约函数接上了，状态机本身仍未驱动。
+`Faulted` 现在至少是卡片上的状态词（§8.143），但仍不是一个能查询、能重试的状态；没有重试命令，
+用户能做的是重新启用（那会再走一次 `apply_lifecycle`）或卸载。§8.141 把两个契约函数接上了，状态机本身仍未驱动。
 
 ### 8.140 目录发现也回到内核：一个机器不再有两个"已安装"
 
@@ -3041,6 +3041,23 @@ core loader 10 条、daemon 全量 232 条、app 272 条全部保持绿。
 全量 daemon 233 条、core 695 条保持绿。
 
 **仍然缺**：`enable` 与 `disable` 仍然没有事件——CLI 拿回答复后不需要订阅，但两个宿主的事件模型仍只为窗口服务。
+
+### 8.143 装载失败在卡片上是 `faulted`
+
+★ 设计里 `Activating` 失败的去处是 **Faulted**，而插件页的 `stateColour` 早就有 `faulted => error` 这一条——
+但它从来没有被触发过：`life_state` 没有看装载摘要，任何失败都落到 `unavailable`。于是"插件坏了"和"这个构建没有引擎"
+在颜色与状态词上是同一个答案，而页面那条红色分支是死代码。
+
+- `snapshot` 只读一次 `plugin_loads`，把 `refusal_for(plugin)` 与 `safe_mode` 一起取出（两次加锁在同一个列表里是
+  自找的挂起），传给 `life_state` 与 `state_reason`。
+- `life_state(row, loaded, manifest_readable, load_refused)`：已启用、已信任、可读、未装载，但摘要里有这个插件的拒绝
+  → `faulted`；没有拒绝才是 `unavailable`（那才是"可能没有引擎"的处境）。
+- `state_reason` 的 `faulted` 分支直接给摘要里的句子；摘要被清空后回落到"it failed to start"。
+
+**测试**：壳的 `a_plugin_that_failed_to_load_says_why_on_its_card` 断言状态词是 `faulted` 且原因是缺失的 artifact；
+安全模式与无引擎两条仍断言 `unavailable`，三种处境现在各有自己的词。
+
+**仍然缺**：没有"重试"命令或按钮；状态词来自一次装载报告，不是 `PluginSlot` 的可查询状态。
 
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
