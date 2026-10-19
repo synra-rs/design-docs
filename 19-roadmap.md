@@ -3515,6 +3515,22 @@ listener 的两条在 `--features tauri-shell` 下跑。
 **仍然缺**：`total` 与 `plugins` 只在壳的 `app_state` 里记录，没有单测（需要 Tauri `AppHandle`）；
 没有阈值告警，也没有把"窗口首帧"算进去——它只到 `app_state` 返回为止。
 
+### 8.170 性能面板把冷启动和 500ms 预算放在一起
+
+★ §8.169 记录了 `startup_duration_ms{phase=total}`，但面板只是把它当成又一行指标列出来；M4 的"500ms"只写在文档里，
+没有出现在读数字的人眼前。**没人比较的数字不是预算。**
+
+- Settings 的性能区在指标列表上方加一行 **Startup**：从 `startup_duration_ms{phase=total}` 取最近观测的均值，
+  显示 `N ms` 与 "within / over the 500 ms budget"；超出时用 `text-error`。
+- 只认 `phase=total`：`phase=state` 与 `phase=plugins` 是诊断"增长来自哪一段"的，不是预算本身。
+- 没有 `total` 序列、或观测次数为 0 时**不画**这一行——`undefined` 不是"0ms 且达标"。
+- 测试的指标快照里放两条 `startup_duration_ms`，断言只取 `total` 的均值（700/2 = 350ms）并显示 within。
+
+**测试**：设置页 +1；前端 290、`pnpm run build`（含 vue-tsc）、`pnpm run shapes`、`pnpm lint` 0 error 通过。
+
+**仍然缺**：这是**均值**，不是分位数；重启后的第一次观测才有意义，面板轮询时不会区分是哪一次启动；
+预算 500ms 仍是硬编码在界面文案里，没有从配置读。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
