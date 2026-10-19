@@ -4091,6 +4091,20 @@ stderr 里失败，窗口照常打开——用户以为更新了。
 "published version" 更新，不读这里的比较；`compare_plugin_versions` 对预发布/构建元数据的规则仍由内核定义，
 页面不解释。
 
+### 8.203 包装成"安装 / 更新 / 不变"，并且说清楚是哪一种
+
+★ §8.202 的版本判断写在壳的嵌套 `match` 里：能工作，但**不可单独测试**，而且更新成功仍复用
+`notice.installed`——用户看到 "Installed 2.0.0" 而不是 "Updated to 2.0.0"。
+
+- `launch::action(installed, offered) -> PackageAction`：`Install` / `Update` / `AlreadyInstalled` /
+  `NewerInstalled`。比较仍用 `compare_plugin_versions`；测试给出四个明确用例，包括 `1.9.0 → 1.10.0`。
+- 壳按四种动作分支，不再嵌套；`Update` 发布新键 `notice.updated`，文案 `Updated X to Y.`
+- 安装路径和更新路径的失败仍然只 `eprintln!`，不假装成功。
+- 测试：`launch` +1（四种动作），notice host +1（更新文案），前端 306。
+
+**仍然缺**：动作枚举只用于文件关联，`plugins_update` 的注册表路径没有复用；"已安装"与"更新"通知
+没有可点的动作（去插件页）；强制降级仍无入口。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
