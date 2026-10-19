@@ -3217,6 +3217,25 @@ IPC 契约 123、app 277、前端 267、`pnpm run build`（含 vue-tsc）全绿�
 
 **仍然缺**：提示里没有"哪些插件被停用了"；那仍在插件页的卡片上，用户要自己切过去。
 
+### 8.153 守护进程的传输指标：把 `kind` 写对，并补上吞吐
+
+★ 18 §4.1 的 `transfer_throughput_bps{kind}` 在壳侧早就有了，守护进程的发送路径只记 `transfer_bytes` 与
+`transfer_duration_ms`，而且两者的 `kind` **硬编码成 `attachment`**。于是一个插件包：
+- 在 `transfer_retries_total` 里是 `bundle`；
+- 在 size/duration 里是 `attachment`；
+
+两端对“过了什么”各说各话，而数字本身完全正常——这是最难看出来的错。
+
+- `kind` 由 `bundle.is_some()` 决定，同一个词喂给 size、duration、throughput 与已有的 retry 计数。
+- `transfer_throughput_bps{kind}` = `bytes / (elapsed_ms / 1000)`，只在 `elapsed_ms > 0` 时记：除零不是数据。
+- 测试不再只断言“收到了包”：`a_bundle_arrives_as_a_bundle` 现在断言 `{kind=bundle}` 的 size 与 throughput 存在，
+  且 `{kind=attachment}` **不存在**——旧实现会在这一条上失败。
+
+**测试**：daemon 233 通过，`cargo clippy -p synra-daemon --all-targets -D warnings` 通过。
+
+**仍然缺**：`transfers_total{outcome}` 在守护进程的发送侧仍没有（每个早退出口不汇合，见 §8.127 的说明）；
+接收侧的 kind 仍由 listener 决定，这次没有改动它。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |

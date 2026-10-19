@@ -850,6 +850,10 @@ pub fn install_panic_hook(paths: &Paths, version: &str) {
       那是用户问“这次传输多快”时的答案；取消/abort 没有速率，因为它们没有搬完自己的字节。
       ★ **可验证性的边界**：`listener::spawn` 要一个 `AppHandle`，所以记录逻辑抽成 `record_received` 并由单测断言，
       而“它真的被那两个回调调用”目前只有编译期证据（与 `frames_received_total` 在 listener 里的处境相同）。
+      ★ **守护进程的发送侧也补齐了（[19 §8.153](./19-roadmap.md)）**：`transfer_bytes` / `transfer_duration_ms` /
+      `transfer_throughput_bps` 现在都从同一个 `kind`（`bundle` 或 `attachment`）出发。此前 size 与 duration 写死
+      `attachment`，一个插件包被记成附件，两端对“过了什么”各说各话；吞吐由字节数除以这次尝试的时长算出，
+      只在时长大于零时记（除零不是数据）。测试用一次真实的 bundle 发送断言 `{kind=bundle}` 存在、`{kind=attachment}` 不存在。
       ★ **发现组也接上了（同日更晚）**：`scans_total{result=ran|unavailable}`、`scan_duration_ms`、
       `candidates_found`。`unavailable` 在 `devices_scan_start` 拒绝（绑不上 socket）时记；`ran` 在一次真正的网络扫描
       结束时记。`candidates_found` 读的是 worker 维护的一个**设备 id 集合**而不是计数器 —— 一台设备在一个扫描窗口里
