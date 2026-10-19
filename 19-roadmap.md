@@ -3657,6 +3657,24 @@ unload + 重新 load，不走 `ClearFault`，所以“清除故障”不是一�
 **仍然缺**：故障发生时没有主动 `PluginUpdated` 事件，用户要刷新列表才看到红色；`plugins_reload` 仍然
 unload + 重新 load，不走 `ClearFault`；`Deactivate` / `Park` 仍没有生产路径。
 
+### 8.178 收件行可以"在文件夹中显示"
+
+★ §8.165 只有 **Open**：它能打开文件，但用户想知道"它落在哪、旁边还有什么"时，只能从路径字符串里猜。
+`synra-platform` 的 `reveal_path` 早就有，缺的是与 Open 同一个收件箱边界的入口。
+
+- 新命令 `transfer_reveal`（Transfer / Host / **Unit** / read）：复用 `inbox_file` 的 canonicalize +
+  `starts_with(<data>/inbox)` + `is_file`，再调 `reveal_path`。
+- ★ 包含性检查不是只对 Open 重要：reveal 同样把磁盘上有什么告诉页面，能用任意路径调用就是文件浏览器。
+- Home 的每个 Received files 行在 **Open** 旁加 **Show in folder**；失败走同一条错误条，不静默。
+- 测试仍只测边界与调用（不真的打开文件管理器）：箱内文件通过，箱外/缺失以 `InvalidArgument` 拒绝；
+  页面断言点击后发的是 `transfer_reveal`。
+
+**测试**：IPC 契约 123、app Rust 282、前端 292、`pnpm run build`（含 vue-tsc）、`pnpm run shapes`（53/51/44）、
+`pnpm lint` 0 error、app/IPC clippy 全绿。
+
+**仍然缺**：没有删除或重命名；一行两个按钮在窄窗口会换行；reveal 的平台错误只有页面级错误条，
+没有逐文件 inline 原因。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
