@@ -3497,6 +3497,24 @@ listener 的两条在 `--features tauri-shell` 下跑。
 
 **仍然缺**：两个按钮并列在窄窗口会换行；注册表模式不需要选择器，这一排只对本地模式出现。
 
+### 8.169 冷启动有数字了：`startup_duration_ms{phase}`
+
+★ M4 的退出条件里写着"冷启动 < 500ms"，但这一版启动过程没有记录任何耗时。没有数字的预算只能靠秒表，
+而秒表不会在用户机器上跑。
+
+- `AppState::new` 从进入函数开始计时，构造完成后在**同一个 recorder** 上记 `startup_duration_ms{phase=state}`；
+  这就是 `diag_metrics` 与性能面板读到的数字。
+- `shell::app_state` 另记 `{phase=plugins}`（只含插件编译/激活那一段，从 `with_plugins_or_refuse` 前开始）与
+  `{phase=total}`（从 `app_state` 第一行到日志启动之后）。三个数分开，才能看出增长来自数据库、插件还是外壳装配。
+- ★ 这一条改变了 `diag_metrics` 的一条旧测试的语义：`an_empty_shell_reports_no_metrics…` 现在改名为
+  `a_fresh_shell_reports_what_building_it_measured_and_nothing_else`，并把 `startup_duration_ms` 列进允许的行——
+  **构建本身就是一次真实观测**，不是测试发明的样本。
+
+**测试**：state +1（构造出来的 state 里存在 `{phase=state}`）；app Rust 281 通过；两套 clippy 全绿。
+
+**仍然缺**：`total` 与 `plugins` 只在壳的 `app_state` 里记录，没有单测（需要 Tauri `AppHandle`）；
+没有阈值告警，也没有把"窗口首帧"算进去——它只到 `app_state` 返回为止。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
