@@ -636,6 +636,20 @@ Content-Security-Policy:
 > 消费这两个事件。**命令的返回值因此只承诺"已排队"，而不是"已送达"** —— 那是后台化的真正代价，也是它必须写进
 > 命令文档注释的一句话（今天的注释说"阻塞"；改后台时那里要改成"排队"）。
 
+> ★ **2026-10-19：桌面壳第一次真正装载了插件，而这条路上有两个"测试全绿"的假象。**
+> ① `with_plugins_or_refuse` 建了一个**空的** `PluginSet` 就交给窗口：插件被列出、能被启用、**永远不可调用**，
+>    所以 `intent_dispatch` 匹配不到任何东西、卡片永远是 `unavailable`。
+> ② 装载器按 `plugins_dir.join(plugin_id)` 找文件，而安装器写的是 `plugins/acme+hello`（`sanitise_component`）——
+>    两个宿主的夹具都用手写的两层路径，于是**装得上、列得出、加载不了**三个事实同时成立而没有一条测试发现。
+>    守护进程的目录扫描有同样的问题，并且它用目录名当 id；现在它从 manifest 的 `id` 取标识并要求目录名与
+>    `sanitise_component(id)` 一致，不一致就报出该用的名字。
+> 装载逻辑本身搬进了 `synra_core::plugin`（`load_installed` / `load_plugin` / `LoadedSummary`），
+> 两个宿主共用一份；壳在 `app_state` 里装 panic hook、取 `StartupVerdict`，safe mode 时一个都不装。
+> **用户看得到原因**：`PluginSnapshot.stateReason` 是新增字段（Rust DTO → `@synra/protocol` 镜像 → 卡片上的告警），
+> 所以"崩溃 3 次所以这次没启动任何插件"与"这个构建没有引擎"不再都显示成 `unavailable`。
+> 启用 / 同意 / 更新之后**就地装载**，停用 / 卸载之后**就地卸载**——开关不再需要一次重启才生效。
+> 壳侧测试 +4（启动装载、安全模式卡片、失败原因、开关/同意/卸载），core 9 条 loader 测试，daemon 的同一批测试改到安装器的真实路径上。
+>
 > ★ 这一节在实现之前写就，长期整节未勾选。逐条核对源码后：**这一节目前没有一条可以勾。**
 > 三样东西是真的（`IpcError` 三件套、`KernelEventEnvelope` 带 `seq`、`EventDispatcher` 的 gap/unknown 逻辑），
 > 但三样都缺"接上去"的那一半；其余九条是从未开工。

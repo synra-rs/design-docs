@@ -2916,6 +2916,69 @@ clippy、`api-guard`、guards 12。
 30 秒的扫描是常量；没有确认/顺序，同一答案可能被投两次（接收端 `apply_result` 对过期结果幂等，这是它能安全重投的原因）；
 队列堆积没有上限，只有每条的 10 次/24 小时。
 
+### 8.136 装载回到内核：两个宿主一份实现
+
+★ 装载本来在 `apps/synra-daemon/src/runtime/plugins.rs` 里，而**桌面壳从来没有那一份**：它在
+`with_plugins_or_refuse` 里建了一个空的 `PluginSet`，此后再没往里放过任何东西。后果不是"启动慢一点"，
+而是插件被列出、能被启用、**永远不可调用**——`intent_dispatch` 匹配不到任何东西，卡片永远是 `unavailable`。
+
+- 新模块 `crates/synra-core/src/plugin.rs`：`load_installed`、`load_plugin`、`LoadedSummary`、`Refused`、
+  `INSTANCE_LIMIT`，连同"拒绝而不是取交集"的同意检查与吊销检查。守护进程的模块只剩引擎构建、目录发现和签名核对，
+  `load_installed` 一行 `pub use` 转出来，88 条 runtime 测试一条没改（后来只有路径相关的那几条改了）。
+- `load_plugin` 是公开的，因为"启动时装载"不是唯一的时刻：启用、同意、更新都要**就地**装载一个插件。
+- 摘要类型搬进内核后多了一个 `refusal_for` 与 `record_loaded` / `record_refused` / `record_unloaded`，
+  宿主不必自己维护"哪个插件为什么没跑"的第二份表。
+
+**测试**：core loader 9 条（真实 store + 真实目录 + scripted 引擎）：同意范围、安全模式、无决定、摘要变了、
+吊销、UI-only、未启用、逐条记录/撤销、缺 artifact。
+
+### 8.137 安装器写哪个目录，装载器就去哪个目录
+
+★ 这一条是本轮最重要的发现，而且它解释了 8.136 的一半：**安装器与装载器对"插件住在哪"有两个答案。**
+
+`synra_core::install` 写 `plugins/<sanitise_component(id)>`（`@acme/hello` → `plugins/acme+hello`），
+因为 `Paths::plugin_dir`、卸载、启动清扫与数据沙箱都用这个名字；装载器却读 `plugins_dir.join(plugin_id)`，
+也就是 `plugins/@acme/hello`，一个安装器从不创建的路径。守护进程的目录扫描同样按"两层 + 目录名就是 id"来读。
+于是**安装成功、列表可见、加载失败**可以同时为真，而两个宿主的夹具都手写两层路径，测试一直是绿的。
+
+- 装载器改用 `synra_store::sanitise_component`，与安装器同一个函数。
+- 目录扫描改成一层，**标识取自 manifest 的 `id`**；目录名不等于 `sanitise_component(id)` 时，报
+  "这个目录叫 `x`，但这个 id 应该住在 `acme+hello`"，而不是记一行永远加载不到的行。
+- 守护进程里读 manifest 的两处（`plugin consent`、插件报告）也改用同一个函数。
+- 夹具改成经 `Paths::plugin_dir` / `sanitise_component` 写，**不再手写路径**——这正是让这个 bug 活了这么久的形状。
+
+**测试**：daemon `a_directory_named_differently_from_its_manifest_is_reported_rather_than_recorded`；
+既有 88 条 runtime 测试全部改到安装器的真实布局上并保持绿。
+
+### 8.138 壳启动就装载，崩溃循环就进安全模式
+
+★ 壳的 `app_state` 现在在建库**之前**装 `CrashStore` 与 `install_panic_hook`，再取一次 `StartupVerdict`，
+传给 `with_plugins_or_refuse`。安全模式时引擎照建、集合照有（设置页必须能打开），但**一个插件都不装**。
+
+- 装载摘要存进 `AppState.plugin_loads`；引擎建不起来时 `engine_refusal` 存下那句话。
+- `plugins_list` 每张卡多一个 `stateReason`：安全模式的句子、某个插件的拒绝原因、或者"这个构建没有引擎"。
+  **没有这个字段，`unavailable` 把三种完全不同的处境压成同一个词。**
+- `PluginSnapshot.stateReason` 同时进 `@synra/protocol` 的镜像与 `check-shapes` 的 dto-coverage；
+  插件页把它画成一条 warning。
+
+**测试**：壳 3 条（启动装载、三份崩溃报告 → 真实 verdict → 卡片句子、缺 artifact 的拒绝上卡），
+前端 1 条挂载测试（页面显示的是宿主给的句子而不是自己编的）。daemon 侧的
+`safe_mode_loads_nothing_and_says_why` 仍然守同一条规则。
+
+### 8.139 开关、同意、更新、卸载都当场生效
+
+★ 启动装载只解决"重启之后"。设计里的 `enable` 是 **Activating**，不是"记一个偏好、下次启动再说"。
+
+- `set_enabled` 写库之后调 `apply_lifecycle`：该跑就 `load_plugin`，不该跑就 `unload` 并把它从摘要里忘掉。
+  失败时先记摘要、先发 `PluginUpdated`，**再**返回 `PluginTrapped`——用户看到的是"开关开了但这张卡说为什么没在跑"，
+  而不是一个显示成功却什么都没发生的开关。
+- `plugins_consent_respond` 之后也调一次：用户可能先开开关、后同意，那一刻才是插件变为可运行的时刻。
+  同意本身成功，所以命令返回卡片而不是错误；装载失败以 `stateReason` 出现。
+- `update_directory` 在替换之后重新装载：否则旧 `PluginInstance` 会继续用用户刚替换掉的字节作答。
+- `plugins_uninstall` 先把编译产物从集合里拿掉，再删文件：一个文件已删、实例还在的插件仍能被一次 share 调到。
+
+**测试**：壳 +3（开关进出集合、同意后就地装载、卸载后集合为空），既有的同意/卸载测试保持绿。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |

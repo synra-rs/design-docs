@@ -1021,6 +1021,18 @@ pub fn install_panic_hook(paths: &Paths, version: &str) {
       负控制：把判定那行改成 `if false`，测试立刻红（"safe mode loaded something"）。
       至此这条链路是通的**且有水**：`install_panic_hook` 本次已实现（见上一条），
       panic → 落盘 → 计数 → `verdict` → 不装载插件，整条都有测试。
+       ★ **2026-10-19：壳这一侧也接上了，而它此前从没有过这条链路。**
+       `shell.rs` 的 `app_state` 在建库之前 `CrashStore::new(logs)` + `install_panic_hook`，然后取一次
+       `verdict` 传给 `with_plugins_or_refuse`；后者建完引擎就调 `synra_core::plugin::load_installed`，
+       safe mode 时一个都不装。与守护进程有两处刻意的不同：
+       ① 壳把装载摘要存在 `AppState.plugin_loads`，`plugins_list` 用它给每张卡填 `stateReason` ——
+          M4 的"提示用户"不是控制台里的一行，而是插件卡上"它崩了 3 次，因此这次没启动任何插件"；
+       ② 壳在 `enable` / `consent` / `update` 之后就地把插件装进集合、在 `disable` / `uninstall` 时拿出去，
+          所以安全模式之外，用户不再需要重启一次才能让开关生效。
+       测试：`safe_mode_is_visible_on_the_card_rather_than_just_an_empty_set`（三份报告 → 真实 verdict → 卡片句子）、
+       `the_shell_loads_an_installed_plugin_rather_than_leaving_its_set_empty`、
+       `enabling_and_disabling_move_the_plugin_in_and_out_of_the_set`。负控制：把壳里的 verdict 参数改成
+       `&StartupVerdict::Clean`，第一条立刻红。
 - [x] DB `integrity_check` + 损坏恢复路径 —— **检查有，恢复没有**：
       `SynraDb::health`(`sqlite/mod.rs:174`) + `interpret_integrity` + 测试(`db/tests.rs:249-279`)；
       ★ `health.rs:42` 只提示"restore from a backup"，**无任何恢复代码**。
