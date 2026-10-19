@@ -3360,6 +3360,25 @@ IPC 契约 123、app 277、前端 267、`pnpm run build`（含 vue-tsc）全绿�
 **仍然缺**：文件发送没有进度/确认对话框，传输只在首页在飞列表出现；选择器是平台默认样式，没有应用内浏览；
 完成后的历史仍不存在。
 
+### 8.161 `One` 就是"一个值"：假内核不再把标量答成 `null`
+
+★ 从 §8.159 起，`devices_scan_start`、`transfer_send_text`、`transfer_send_file` 都被记成"契约缺口"：
+`command.rs` 写 `One`，08 的签名返回 `String`/`TransferId`，而 fake 回答 `null`，测试再用 `KNOWN_DIVERGENCE` 放行。
+可 `ReturnShape::One` 的定义本来就只是"**一个值**"，不是"一个对象"——真正的错在测试的假设，不在命令。
+
+- 假内核改成回答真实的 id（`scan-cached` / `scan-network` / transfer uuid），删掉 `KNOWN_DIVERGENCE`。
+- `One`/`Maybe` 的断言改为：不是数组、不是 `null`、`typeof` 是 object/string/number/boolean。
+  它仍然抓住"把单个值包进 `{ value: … }`"这类漂移，但不再把标量当成违约。
+- ★ 顺带把 `pairing_request` 补成设计写的样子：08 的签名是 `Result<RequestId, IpcError>`，实现却返回 `()`。
+  现在返回 `RequestId`（壳转成字符串），并把 `pairing_request` 加进 fake 的已答命令；`One`/标量从此有真值可测。
+  页面仍不读这个 id——它回答的是"这次请求",而 UI 等到的是 `PairingResolved`。
+
+**测试**：前端 280 通过、app Rust 278、`pnpm run build`（含 vue-tsc）、`pnpm run shapes`、`pnpm lint` 0 error、
+两套 clippy 全绿。
+
+**仍然缺**：`pairing_request` 的 id 没有用于取消**向外**发起的配对（`pairing_cancel` 只作用于等待中的入站请求）；
+`One` 的 TS 侧仍是 `T`，没有一个生成器能从 `ReturnShape` 推出"标量还是 DTO"。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
