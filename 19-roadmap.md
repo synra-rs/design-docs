@@ -2861,6 +2861,22 @@ staging 再走目录管线，两份临时空间在峰值上同时存在。
 **仍然缺**：**没有持久化队列** —— 三次都失败后答案仍然丢失，进程重启不会重投；重试延迟是常量；只对迟到答案重试，普通
 出站拨号仍是一次；`/` `exhausted` 的句子只进日志。
 
+### 8.133 日志写失败留下它自己的句子
+
+★ §8.113 给日志加了 `write_errors` 计数，§8.130 把它推进指标 —— 但一个数字说不出**该做什么**：“磁盘满”“目录被删”“没有
+权限”都需要不同的动作，而读数的人只看到 1。
+
+- **`LogStats::last_write_error`**：worker 在 `write_all`/`flush` 失败时把错误文本存进 `parking_lot::Mutex<Option<String>>`；
+  计数照旧，句子是新的。用 parking_lot 是因为写路径已经在用它，且一个中毒的 std 锁不该让日志计数停下来。
+- **daemon 的 `logs` 回答**新增 `lastWriteError`；CLI 在丢行/写失败的句子里追加 `; the last failure was: …`。
+- **测试**：拒绝写入的 sink 断言 `write_errors == 2` **且** `last_write_error` 含 “no space”；CLI 的回答带
+  `lastWriteError` 时句子包含它。
+
+★ 测试：observe **290**、daemon 231、core 678、store 237、registry 21、CLI 103、app shell 265/264、前端 259、workspace
+clippy、`api-guard`、guards 12。
+**仍然缺**：只有**最近一次**失败，早先的错误被覆盖；指纹量里没有这段文本（`status`/`diag_metrics` 只有计数）；写失败后仍
+不降级/换文件。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
