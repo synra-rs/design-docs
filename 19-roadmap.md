@@ -3754,6 +3754,24 @@ M4 的"分享入口"于是只剩半个——应用能显示别人送来的分享
 **仍然缺**：拖拽入口；文件分享仍需要 transfer-backed 的 `ShareItem.transfers` 管线（§8.182）；
 剪贴板读取失败（平台不支持）只有错误条，没有"换一种方式"的建议。
 
+### 8.184 断网时有一句全局的话
+
+★ M4 的诊断验收写着"拔网线 → App 显示网络不可用"。设备行会说某个 peer "not reachable"，但那是关于**一个设备**；
+断网是关于**这台机器**的，所有分享路径都会失败，而界面此前没有任何地方说这件事。
+
+- 新增 `useNetworkStatus`：读 `navigator.onLine`，监听 `online`/`offline`，组件卸载时**移除**监听
+  （一个会遗留监听的 composable 不能被使用两次）。
+- App 在页面之上（`CrashNotice` 之前）画一条 `role="alert"`：**Network unavailable.**
+  / *Sharing and pairing will fail until it comes back.*
+- 用平台自己的 flag 而不是内核探测：问题是"现在该不该指望分享能成"，不是"能不能连上某个特定 peer"；
+  为后者每页开 socket 会更贵，而且对一个只是关机的 peer 仍然会答错。
+- 测试用 jsdom：改 `navigator.onLine`、派发 `online`，断言文字跟着变，并断言卸载移除了两个监听。
+
+**测试**：前端 296（+1）；`pnpm run build`、`pnpm run shapes`、`pnpm lint` 0 error 通过。
+
+**仍然缺**：`navigator.onLine` 只说明"有链路"，不说明"能到 registry/peer"；没有把断网与
+`devices_snapshot` 的 `online` 字段合并成一句话；没有重连后的自动重试。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
