@@ -4138,6 +4138,20 @@ stderr 里失败，窗口照常打开——用户以为更新了。
 **仍然缺**：更新路径没有把 warnings 带出来；警告没有分级（未签名 vs 兼容性警告）；
 安装通知的 action 仍然只到插件页，未预选那个插件。
 
+### 8.206 更新也带警告：`update_directory` 现在给报告
+
+★ §8.205 让安装通知带 `warnings`，但更新分支做不到：`update_directory` 返回 `Result<(), IpcError>`，
+它拿到了 `Installed`（含 warnings）又把它丢掉。于是"这个更新新增了一个权限"这类警告在更新时消失。
+
+- `update_directory` 返回 `Result<InstallReport, IpcError>`，与 `install_directory` 共用 `report_of`：
+  两条路径的报告字段现在只有一个构造点。
+- 注册表 update 调用处 `.map(|_| ())` 保持它原来的签名；命令契约没有变。
+- 壳的更新通知带上 `report.warnings`；`NoticeHost` 的 detail 同时认 installed 与 updated。
+- 测试：更新通知带一条警告并断言它出现在横幅里；app Rust 283、前端 307。
+
+**仍然缺**：`report_of` 不检查安装报告里的 `publisher_id` 是否已被信任；更新通知的警告没有分级；
+`plugins_update` 的命令返回值仍是 Unit（报告只用于通知，不回到 UI 的同步调用处）。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
