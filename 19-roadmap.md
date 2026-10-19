@@ -4007,6 +4007,22 @@ Matching 期间取消后的卡片没有额外说明。
 **仍然缺**：`IpcError.params` 仍未按 key 收窄；候选的设备名只在 devices store 里有卡片时才有值，
 未扫描到的设备仍显示 id。
 
+### 8.198 撤掉一个从来没有读者的开关：`ui.autoSyncPlugins`
+
+★ 设置页的 **Update plugins automatically** 写的是 `ui.autoSyncPlugins`。全仓搜索：**没有任何代码读它**——
+Rust 侧、前端、插件都没有。设计文档要的是 `plugins.autoSync: NotifyOnly | AutoPush | Off`（默认
+NotifyOnly），不是这个布尔键；页面写的是一个既没有读者、也不是设计拼写的键。
+
+- 移除这个偏好：`KEYS` 只剩 `theme`，自动同步开关、`save`、`saving` 和 `preference.autoSyncPlugins` 一并删掉。
+- 测试里"写 `ui.autoSyncPlugins`"的用例删除；原 switch 索引整体前移（取消 / 通知 / 开机自启 = 0/1/2）。
+- 保留 `theme`：`ui.theme` 是内核真实记录、插件会读的值，虽然这一版只有一个调色板。
+- 这不是"功能被砍"：一个开关按下去只改一个没人读的键，和 §8.182 的文件分享按钮是同一种失效——**看起来做了，实际没有**。
+
+**测试**：前端 303（-1）；`pnpm run build`、`pnpm run shapes`、`pnpm lint` 0 error 通过。
+
+**仍然缺**：自动同步本身没有实现（设计是 NotifyOnly 默认 + 一键同步；手动 `plugins_sync_plan`/`sync_run`
+仍是唯一路径）；`plugins.autoSync` 这个配置键不存在，也就没有默认值可读。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
