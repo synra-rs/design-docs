@@ -3252,6 +3252,22 @@ IPC 契约 123、app 277、前端 267、`pnpm run build`（含 vue-tsc）全绿�
 
 **仍然缺**：没有"忘记后清理本地备份/同步记录"的动作；`devices_forget` 只删配对行，历史 `sync_records` 仍在。
 
+### 8.155 这台设备终于能改名：`identity_set_display_name` 有了界面
+
+★ 命令、校验、重启后仍在的测试（`commands/identity.rs` 九条）都在，界面只把名字**显示**在设置页和侧栏，
+没有任何地方能改它。一个生成的默认名（"mba-3f21"之类）于是永久留在设备列表里，对端看到的也是它。
+
+- 设置页的 Name 行加 **Rename**：点开变成输入框 + Save / Cancel；空名、控制字符、超长都由内核拒绝，
+  页面把 `maxChars` 与原因原样显示，不复制一份规则。
+- 改名后**重读** `identity_get`：命令返回 `Unit`，而页面行与侧栏是两个不同的副本（页面用本地 ref，侧栏用
+  devices store）。两处都写，才不会出现"设置页叫新名字、侧栏还是旧名字直到重启"。
+- 没有新增 `IdentityUpdated` 事件：这仍是单窗口，改名命令的调用者就是看到它的页面。跨窗口同步留给事件模型。
+
+**测试**：设置页 +1（Rename → 输入 → Save，断言 `identity_set_display_name` 的参数，并显示重读回来的新名字）；
+前端 273 通过，`pnpm run build`（含 vue-tsc）与 `pnpm lint`（0 error）通过。
+
+**仍然缺**：没有 `IdentityUpdated` 事件，第二个窗口不会跟着变；也没有"恢复默认名"的动作。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
