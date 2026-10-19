@@ -4056,6 +4056,25 @@ NotifyOnly），不是这个布尔键；页面写的是一个既没有读者、�
 **仍然缺**：通知说"已安装"，但插件仍然是 **未信任、未启用** 的——下一句"去确认权限"还没有；
 插件卡片不会因为安装通知自动出现，仍要 `plugins_list`；macOS 的打开事件仍不经过 argv。
 
+### 8.201 双击一个已装的包是更新，而不是"已经装过"
+
+★ §8.199 的文件关联直接调 `plugins_install`，而 `install` 对已存在的标识符会**拒绝**：
+`@acme/hello is already installed; remove it before installing another copy`。于是双击一个更新包只会在
+stderr 里失败，窗口照常打开——用户以为更新了。
+
+- 新增 `synra_core::install::package_manifest(archive)`：把包装到临时目录、读 `manifest.json`、删掉文件，
+  不写数据库、不动 `plugins/`。测试断言读完 `plugins/` 仍是空的。
+- `source_version` 现在也读包：`.synra` 更新终于能在替换旧目录**之前**跑 `migrate`。之前 `is_file` 直接
+  返回 `None`，迁移被静默跳过。
+- 文件关联的启动路径先读 manifest：已安装 → `update_directory`，未安装 → `plugins_install`；两者都发
+  `notice.installed`（更新也复用同一句，版本号会变）。
+- 这不是"多一个分支"：`update_from_package` 早就存在，缺的是**在替换前知道包的身份**。
+
+**测试**：core 701（+1：不安装也能读包、且不留目录）；daemon 233、app 283；core/app clippy 全绿。
+
+**仍然缺**：更新仍然只按"存在即更新"判断，不比较版本高低（旧版本包也能覆盖新版本）；
+`plugins_install` 自己的"已安装"拒绝没有改成自动更新；通知文案仍是 "Installed"，没有说 "Updated"。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
