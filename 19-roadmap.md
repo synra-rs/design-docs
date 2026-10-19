@@ -3921,6 +3921,20 @@ no-default 与默认两套 clippy 全绿。
 **仍然缺**：`IntentPrompt.options` 还没有 UI（那是一个单独的多选题）；没有"接受默认设备"的按钮
 （`acceptDefault` 变体仍无调用）；离线候选只禁用 Accept，没有解释为什么。
 
+### 8.193 没有候选的意图也能被拒绝
+
+★ §8.192 把 Decline 放在 `v-if="intent.candidates.length > 0"` 里。可一个找不到处理者的分享正是一个
+**需要用户处置**的意图：它停在 `no_handler`，没有 Accept，也没有 Decline，界面上没有任何动作。
+
+- Decline 改由 `canDecline(intent)` 决定：完成态（`done` / `failed` / `cancelled`）不再提供，其余一律提供。
+- 这不是"多一个按钮"：`intent_decide` 的 `decline` 分支走的是 `orchestrate::cancel`，拒绝与取消是同一个
+  记录动作；一个没有候选的意图如果拒绝不了，就只能等它自己消失。
+- 测试：无候选、`state: no_handler` 的意图点 Decline，断言精确的 `{ decision: 'decline', reason: null }`；
+  前端 303。
+
+**仍然缺**：`intent_cancel` 仍无前端调用（Decline 覆盖了同一条路径）；`Done`/`Failed` 的提示仍只有状态词；
+Matching 期间取消后的卡片没有额外说明。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
