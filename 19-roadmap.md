@@ -3393,6 +3393,25 @@ IPC 契约 123、app 277、前端 267、`pnpm run build`（含 vue-tsc）全绿�
 
 **仍然缺**：接收方向没有对应的一句话——传输结束后行从首页消失，收件人不知道落点；也没有发送历史。
 
+### 8.163 收件人知道自己收到了什么、落在哪
+
+★ §8.162 给发送补了回执，接收方向仍然什么都没有：传输结束时进度行从首页消失，文件进了 `inbox/`，
+而收件人只看到"行没了"。`KernelEvent::Notice` 从事件契约写下的那天起就没有生产者，也没有消费者——
+它正是为这种"不属于任何一页的消息"准备的。
+
+- 壳的 listener 在文件落地后发 `Notice { message: "notice.received", params: { name, path } }`；
+  **插件包不发**：它已经装上，插件页与 `PluginUpdated` 才是那条消息的家，两条句子说一件事只会让人以为有两件事。
+- 前端新增 `useNoticesStore`（只保留最新一条：这是横幅不是收件箱）与 `NoticeHost`
+  （根组件，紧挨 crash banner）。消息是 key + params，句子在 `messages.notices`；不认识的 key 显示通用句，
+  绝不把内核的 key 打到界面上。
+- `events.ts` 的 dispatcher 加一个 `notice` 订阅；此前没有 store 认领它，按"未知事件就重读"的规则会白读一次快照。
+
+**测试**：壳 +2（文件落地有 name/path 的 notice；bundle 静默）、前端 +3（收到文件的两句、最新替换旧的一条、
+未知 key 不泄露）。前端 283、`pnpm run build`（含 vue-tsc）、`pnpm run shapes`、`pnpm lint` 0 error 通过，
+listener 的两条在 `--features tauri-shell` 下跑。
+
+**仍然缺**：没有收件历史（通知关掉就找不到了，只能去 `inbox/`）；通知是内存里的最新一条，重启后不会重放。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
