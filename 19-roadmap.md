@@ -3640,6 +3640,23 @@ core clippy 全绿。
 unload + 重新 load，不走 `ClearFault`，所以“清除故障”不是一个显式动作；shell 的卡片仍用 `load_error`
 判 faulted，没有读 `lifecycle`。
 
+### 8.177 故障的插件不再显示成绿色
+
+★ §8.176 让 `call` 拒绝 `Faulted`，但卡片仍然只看"在不在 `PluginSet` 里"。一个已经到达 ladder 底部、
+每次调用都被拒绝的插件，在插件页上还是 `active`——状态词与真实行为相反，比没有状态更糟。
+
+- `snapshot` 读一次 `set.lifecycle(id)`，把 `State::Faulted` 的 reason 取出来；`life_state` 新增 `faulted`
+  参数，在 `loaded → active` **之前**返回 `faulted`。
+- 原因句复用已有的 `state_reason`：把 fault reason 作为 `refused` 的 fallback 传进去，所以卡片显示的是
+  ladder 自己的解释，不是页面另写的"它坏了"。
+- 测试是纯函数级：`life_state(row, loaded=true, faulted=true, ...)` 得到 `faulted`，同一行 `faulted=false`
+  仍然是 `active`——这正是修复前的两种答案。
+
+**测试**：app Rust 282（+1）；两套 clippy 全绿。
+
+**仍然缺**：故障发生时没有主动 `PluginUpdated` 事件，用户要刷新列表才看到红色；`plugins_reload` 仍然
+unload + 重新 load，不走 `ClearFault`；`Deactivate` / `Park` 仍没有生产路径。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
