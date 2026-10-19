@@ -2788,7 +2788,23 @@ guards 12。
 ★ 测试：registry **20**、daemon 231、core 675、store 237、CLI 103、app shell 264/263、前端 259、workspace clippy、
 `api-guard`、guards 12。
 **仍然缺**：预发布版本的顺序（`semver` 已处理，但 `latest` 仍由发布者决定、不会被范围覆盖）；两条管线的网络/镜像策略仍
-各自实现；范围只用于安装，不用于 `check_update` 的“有没有更新”。
+各自实现；范围只用于安装，`check_update` 的“有没有更新”由 §8.129 用 semver 比较而不是范围。
+
+### 8.129 “有更新”不等于“版本不同”
+
+★ 壳的 `plugins_check_update` 用 `latest.version == active.version` 判断有没有更新。设备上完全可能装着比 registry 的
+`latest` **更新**的版本（回滚、本地构建、镜像还没追上），而这条判断会把降级当成更新提示给用户。
+
+- **`synra_registry::is_newer(candidate, installed)`**：两边都能解析成 semver 时按语义版本比较（`1.10.0 > 1.9.0`，
+  `2.0.0-rc.1 < 2.0.0`）；解析不了时退回“不同即更新”—— 那是改动前的行为，保留给用日期式版本号发布的插件，而不是让
+  它们的更新检查失败。
+- **壳用它**：`if !is_newer(...) { return Ok(None) }`；相等与降级都不再是“有更新”。
+- **测试**：registry 新增一个用例覆盖升/降/相等/预发布/非 semver 五组；壳的 registry 测试仍全过。
+
+★ 测试：registry **21**、daemon 231、core 675、store 237、CLI 103、app shell 264/263、前端 259、workspace clippy、
+`api-guard`、guards 12。
+**仍然缺**：`check_update` 仍看 `latest` 而不是范围（设计如此：发布者的标签决定“最新”）；非 semver 的回落会给一个
+不同但更旧的字符串报“更新”。
 
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
