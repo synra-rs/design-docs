@@ -3320,6 +3320,28 @@ IPC 契约 123、app 277、前端 267、`pnpm run build`（含 vue-tsc）全绿�
 **仍然缺**：扫描进度是事件/快照驱动的，取消后的"已找到几个"不会保留一条最终报告；按钮没有区分
 "网络扫描"与"读取缓存"两种模式。
 
+### 8.159 应用第一次真的能"发"：Send text
+
+★ `transfer_send_file` / `transfer_send_text` 在契约里注册了很久，界面没有任何调用者：这个应用能配对、能收文件，
+**不能发**。M4 的端到端场景因此缺了起点。文件发送需要一个文件选择器（当前工具链没有 dialog 插件），
+文字发送不需要——内核把它写进 outbox 再从对端变成一个普通文件——所以先做后者。
+
+- 已配对且 **可到达** 的设备行加 **Send text**；模态框（antd 的，焦点陷阱与 Escape 不是页面的）里写文字，空文本不能提交。
+- 调用 `transfer_send_text { request: { to, text, fileName: 'message.txt' } }`；返回的 `TransferId` 页面不读，
+  传输本身从 `transferUpdated` 到达首页。
+- ★ `file_name` 原来被命令**忽略**：outbox 文件固定叫 `message-<ms>.txt`，接收端看到的名字与请求无关。
+  现在用请求里的 stem（`sanitise_component` 后再加时间戳）——`notes.txt` 变成 `notes-<ms>.txt`，
+  `../../evil.txt` 仍是 outbox 里的 `evil-<ms>.txt`，不成为路径。两条文本发送路径（同步与 `_start`）共用一个 `outbox_path`。
+- ★ 契约里 `transfer_send_text` 标成 `One`，而 08 的签名是 `Result<TransferId, IpcError>`（标量），
+  与 `devices_scan_start` 是同一处契约缺口。fake 因此回答 `null` 并列入 `KNOWN_DIVERGENCE`，测试记下原因，
+  而不是把壳改成设计没写过的对象。
+
+**测试**：壳 +1（名字取自请求、分隔符不逃出 outbox、无名时回退 `message`）；设备页 +1（Send text → 写文字 →
+断言命令参数）；前端 277、`pnpm run shapes`、`pnpm run build`、两套 clippy 全绿。
+
+**仍然缺**：**文件发送还没有界面**（需要文件选择器）；发送记录只存在于首页在飞列表，完成后没有历史；
+`transfer_send_text` 的 `One`/标量缺口仍未在契约里修。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
