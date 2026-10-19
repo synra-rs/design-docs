@@ -3015,14 +3015,32 @@ clippy、`api-guard`、guards 12。
 - `pub fn deactivate(set, id, now)`：调 `Work::Deactivate`，无论它成功还是 trap，随后 `unload`。
   壳的 `apply_unload` 与守护进程的 `plugin remove` / `disable` 都改用它——一个已经被删掉文件的插件
   不该还能回答一次分享。
-- 守护进程的 `enable` 仍只写标志：它手上没有吊销列表，装载一个不检查吊销的插件是这里不能走的捷径；
-  下一次启动会经过 `load_installed`，那里检查。
+- 守护进程的 `enable` 当时仍只写标志：它手上没有吊销列表，装载一个不检查吊销的插件是这里不能走的捷径。
+  §8.142 把吊销列表放上 `Runtime`，这条缺口补上了。
 
 **测试**：core +1（`script_for` 让 `activate` 返回 `Failed`，断言摘要里有插件自己的句子、集合里没有它），
 core loader 10 条、daemon 全量 232 条、app 272 条全部保持绿。
 
 **仍然缺**：`activate` 的配置只有 `{}`；没有 `migrate()` 的调用点（更新版本时数据迁移仍不做）；
 `PluginSlot` 状态机仍未驱动（§8.139 的"仍然缺"）。
+
+### 8.142 守护进程的 enable 也当场装载
+
+★ 8.139 让壳的 `enable` 真的装载，而守护进程的 `synra plugin enable` 仍只写一个标志：它回答"插件是开着的"，
+但下一次启动之前它答不了一次分享。原因不是不想接，而是**手边没有吊销列表**——那份文档在 `serve` 的启动代码里读，
+`Runtime` 不持有它，而装载一个不检查吊销的插件是这里不能走的捷径。
+
+- `revocations.json` 的读取从 `plugin_loads` 块里移出来，解析结果放上 `Runtime.revocations`；
+  启动装载与运行期 enable 因此查的是**同一份文档**。
+- `plugin_set_enabled(true)`：读行，`should_run` 为真才 `synra_core::plugin::load_plugin`（它自己会查吊销、同意、
+  manifest 摘要并调 `activate`）；失败把原因记进 `plugin_loads` 并返回 `PluginTrapped`，标志保持用户的选择。
+  未信任 / 未同意的插件不会因为一次 enable 就运行。
+- `plugin_set_enabled(false)`：`deactivate` + `record_unloaded`，与壳同形。
+
+**测试**：daemon +1（已同意且已信任的插件，enable 后 `PluginSet` 里真的有它；disable 之后没有），
+全量 daemon 233 条、core 695 条保持绿。
+
+**仍然缺**：`enable` 与 `disable` 仍然没有事件——CLI 拿回答复后不需要订阅，但两个宿主的事件模型仍只为窗口服务。
 
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 

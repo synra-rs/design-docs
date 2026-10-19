@@ -5,7 +5,8 @@
 > 今天这条链的两端都通了：`synra_core::install` 被两个宿主共用（守护进程的 `plugin install` 与壳的
 > `plugins_install` 都走它），per-capability 同意由 `synra_core::consent` 与 `plugin_grants` 落在库里，
 > `synra_core::plugin::load_installed` 在**两个宿主启动时**装载已启用且已同意的插件，壳还会在
-> `enable` / `consent` / `update` 之后就地把一个插件装进集合、在 `disable` / `uninstall` 时把它拿出去。
+> `enable` / `consent` / `update` 之后就地把一个插件装进集合、在 `disable` / `uninstall` 时把它拿出去；
+> 守护进程的 `enable` / `disable` / `remove` 也走同一条装载 / 停用路径（[19 §8.142](./19-roadmap.md)）。
 > 安全模式也因此第一次对窗口生效（[18 §10](./18-observability.md)）。
 > **装载现在也真的会 `activate`**（2026-10-19，见 [19 §8.141](./19-roadmap.md)）：`load_plugin` 在编译之后调用
 > 插件的 `lifecycle.activate("{}")`，失败就把它从集合里拿掉并记录原因；`deactivate` 在停用 / 卸载前调用。
