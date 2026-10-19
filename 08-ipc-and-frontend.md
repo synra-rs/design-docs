@@ -648,7 +648,10 @@ Content-Security-Policy:
 > **用户看得到原因**：`PluginSnapshot.stateReason` 是新增字段（Rust DTO → `@synra/protocol` 镜像 → 卡片上的告警），
 > 所以"崩溃 3 次所以这次没启动任何插件"与"这个构建没有引擎"不再都显示成 `unavailable`。
 > 启用 / 同意 / 更新之后**就地装载**，停用 / 卸载之后**就地卸载**——开关不再需要一次重启才生效。
-> 壳侧测试 +4（启动装载、安全模式卡片、失败原因、开关/同意/卸载），core 9 条 loader 测试，daemon 的同一批测试改到安装器的真实路径上。
+> 目录发现（`record_discovered_plugins`）也搬进了 `synra_core::plugin`，壳在建引擎之前扫自己的 `plugins/`：
+> 一个作者拷进窗口数据目录的插件不再是"窗口看不见、守护进程看得见"。发现写下的行仍是 `enabled = false,
+> trusted = false`——发现是可见性，不是批准。
+> 壳侧测试 +5（启动装载、安全模式卡片、失败原因、开关/同意/卸载、目录发现），core 9 条 loader 测试，daemon 的同一批测试改到安装器的真实路径上。
 >
 > ★ 这一节在实现之前写就，长期整节未勾选。逐条核对源码后：**这一节目前没有一条可以勾。**
 > 三样东西是真的（`IpcError` 三件套、`KernelEventEnvelope` 带 `seq`、`EventDispatcher` 的 gap/unknown 逻辑），
