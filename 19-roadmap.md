@@ -2223,7 +2223,7 @@ workspace clippy、guards 12 项。
 ★ 测试：core 673（+1 `dispatched_to` 的两个半键与结束后不再命中）、daemon 218（+2：`apply_result` 把 dispatching
 变成 succeeded 且重复回答被忽略；一条真实 TCP 连接上 `INTENT_INVOKE` 得到同一链接上的 `INTENT_RESULT`，`reply_to`
 等于请求 id）、ipc 123、workspace clippy、guards 12。
-**仍然缺**：`REMOTE_RESULT_WAIT` 之外的迟到结果（无重试、无离线队列）；远端取消没有回执（取消本身不需要答案）。
+**仍然缺**：`REMOTE_RESULT_WAIT` 之外的迟到结果（§8.132 给了有界重试，仍无离线队列）；远端取消没有回执（取消本身不需要答案）。
 （控制 socket 的排队已在 §8.98 消掉：现在每连接一线程。）
 
 ### 8.98 控制连接：接受与伺候分开，每个客户端一条线程
@@ -2383,7 +2383,7 @@ daemon 220、store 227、app shell 262/261、前端 259、workspace clippy、gua
 
 ★ 测试：core 674、daemon **221**（+1：`handle_event` 收到迟到的 `INTENT_RESULT` 后板上的意图变成 `succeeded`，第二份
 同样的答案仍是 `Handled`）、store 227、observe 286、app shell 262/261、前端 259、workspace clippy、guards 12。
-**仍然缺**：源端不可达时的持久化重投（没有队列）；迟到的 **cancel** 回执（取消本来不要答案）。
+**仍然缺**：源端不可达时的持久化重投（§8.132 加了三次重试，仍没有队列）；迟到的 **cancel** 回执（取消本来不要答案）。
 
 ### 8.106 插件卡片上的配额不再只是 JSON
 
@@ -2843,6 +2843,23 @@ uptime 与进程指标，`status` 的 metrics 里也没有日志。
 clippy、`api-guard`、guards 12。
 **仍然缺**：`.synra` 的 UI 解包目录（`ui/`）在安装包里被跳过、安装后由 `ui.zip` 重新展开（设计如此）；包安装仍先解包到
 staging 再走目录管线，两份临时空间在峰值上同时存在。
+
+### 8.132 迟到的答案先重试几次
+
+★ §8.122 的迟到投递只拨一次：源端恰好在此刻关掉上一条连接（它就是刚才回答这台设备的同一个进程），答案就丢了。设计里
+提到 `reconnect_attempts_total`，但内核并没有重连机制 —— 这里做的是**有界重试**，诚实地记成另一个名字。
+
+- **三次拨号**：`dial_with_retries(3, …)`，失败后停 100 ms、200 ms 再试；地址从未见过则不重试（重试一个未知地址只会让
+  失败更慢）。最坏多花约 300 ms，在一个连接线程里。
+- **一个诚实的计数器**：`late_delivery_attempts_total{outcome=delivered|retry|exhausted}`。不叫 `reconnect_attempts_total`：
+  内核不保持/重建链路，这个名字会让人以为有重连。
+- **测试**：重试的决定抽成 `dial_with_retries(attempts, dial, pause)`，两个用例 —— 失败两次后第三次成功（断言三次）、
+  永久失败在边界停止（断言三次）、第一次成功不暂停（暂停闭包里 `panic!`，它在成功时不会被调用）。
+
+★ 测试：core **678**（+2）、daemon 231、store 237、registry 21、CLI 103、app shell 265/264、前端 259、workspace clippy、
+`api-guard`、guards 12。
+**仍然缺**：**没有持久化队列** —— 三次都失败后答案仍然丢失，进程重启不会重投；重试延迟是常量；只对迟到答案重试，普通
+出站拨号仍是一次；`/` `exhausted` 的句子只进日志。
 
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
