@@ -3432,6 +3432,25 @@ listener 的两条在 `--features tauri-shell` 下跑。
 **仍然缺**：列表不随新到的文件自动刷新（通知是另一条路）；没有"打开所在文件夹"或"删除"动作；
 路径以明文展示，长路径只能截断。
 
+### 8.165 收到的文件可以打开，且只能打开收件箱里的
+
+★ §8.164 列出了收件箱，但那一行只有文件名与路径，用户能看见却打不开。`synra-platform` 的 `open_path` 早就有；
+缺的是"哪一个路径允许被打开"的检查。
+
+- 新命令 `transfer_open`（Transfer / Host / **Unit** / read）：先 `inbox_file` 把路径 **canonicalize**，
+  要求它 `starts_with` `<data>/inbox` 且 `is_file`，然后才交给 `state.platform.open_path`。
+- ★ 检查必须在壳里，不能在页面里：路径来自 bridge，而 `open_path` 会启动操作系统为该扩展名关联的程序。
+  一个被攻破的 WebView 若能把 `~/.ssh` 当参数传进来，"打开我收到的文件"就变成了"打开磁盘上的任何东西"。
+- Home 的每个 Received files 行加 **Open**；失败走页面已有的错误条（`Unsupported` + platform 的原因）。
+- 测试只测**包含性检查**，不真的启动程序：收件箱内的文件通过，`identity.toml` 这样的箱外文件与不存在的路径
+  都以 `InvalidArgument` 拒绝。
+
+**测试**：壳 +1（箱内通过、箱外与缺失拒绝），Home 的用例多一次点 Open 的断言。
+前端 286、app Rust 280、IPC 契约 123、`pnpm run build`（含 vue-tsc）、`pnpm run shapes`、`pnpm lint` 0 error、
+两套 clippy 全绿。
+
+**仍然缺**：没有"在文件管理器中显示"（reveal）或删除；Open 的平台错误只有错误条，没有逐个文件的 inline 原因。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
