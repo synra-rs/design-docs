@@ -3145,6 +3145,24 @@ core loader 10 条、daemon 全量 232 条、app 272 条全部保持绿。
 **仍然缺**：设置页没有语言/主题控件，配置目前只能由 `config_set` 写；`locale` 的缺省是空串而不是系统语言——
 "宿主不知道"和"没有语言"在契约里仍然只能用一个值表示。
 
+### 8.149 `faulted` 插件有了重试命令，而不是"关掉再开"
+
+★ §8.143 让装载失败显示成 `faulted`，也把"没有重试入口"写进了仍然缺。一个 faulted 插件是
+**已启用、已信任**的；失败的是启动，不是配置。用户唯一的办法是把开关关掉再打开——一个他没想做的改变，
+而且页面还得为它解释。
+
+- 契约新增 `plugins_reload`（Plugins / Host / **One** / mutating）：只对已启用的行再跑一次
+  `apply_lifecycle`，不改 `enabled` / `trusted`，答案就是重读后的卡片。
+- 失败**不是命令错误**：卡片带着 loader 的句子（`stateReason`）返回，同时 `PluginUpdated` 已经发出；
+  只有"没装过"才是 `PluginNotInstalled`。
+- 插件页在 `state === 'faulted'` 时显示 Retry；点击调 `plugins_reload`，store 由事件更新，不在页面里手拼卡片。
+- 契约测试、注册清单、fake kernel、argument guard 与 README 的命令计数都跟着从 47/45/32 变成 48/46/33。
+
+**测试**：壳 +2（缺 artifact → faulted → 放回 artifact → retry 后 `active` 且集合里有它；未安装是
+`PluginNotInstalled`），前端挂载 +1（faulted 卡片有 Retry，点击发出 `{ pluginId }`），IPC 契约 123 条、前端 263 条全绿。
+
+**仍然缺**：没有全局的"重试所有 faulted"；重试一次只对一个插件，且失败原因仍来自最近一次装载报告。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
