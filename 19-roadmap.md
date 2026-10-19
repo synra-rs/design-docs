@@ -3792,6 +3792,28 @@ M4 的"分享入口"于是只剩半个——应用能显示别人送来的分享
 **仍然缺**：没有"启动时最小化到托盘"选项；Linux 的注册方式（.desktop）未实测；移动端不应显示这个开关
 （尚未按平台隐藏）。
 
+### 8.186 `PluginHealthChanged` 第一次有发布者，也第一次有读者
+
+★ 这个事件在契约里、在 `events.ts` 的类型里都写了很久，Rust 里**没有任何 `emit`**，前端也**没有注册 handler**。
+于是 §8.177 修好的"faulted 卡片"只有在用户重新打开插件页时才会变红；插件正在坏掉的那一刻，界面什么也不知道。
+
+- `PluginSet` 新增 `HealthSink`（与 `AuditSink` 同一个形状：`Arc<dyn Fn(&PluginId, &str, &str)>`）。
+  它是回调而不是事件类型：`synra-core` 不拥有事件契约，构造 IPC 事件会让内核依赖界面的词汇。
+- 只在**健康阶梯真的移动**时调用：`before != after`。一个在 `good` 上 trap 十次的插件不会产生十条相同的通知；
+  每次移动带上 ladder 自己的 `explanation`。
+- 壳把 sink 接到 `state.events`，发布 `KernelEvent::PluginHealthChanged { pluginId, health, explanation }`。
+- 前端 `events.ts` 注册 `pluginHealthChanged` → `plugins.markHealth`：只有 `faulted` 改卡片的 `state` 与
+  `stateReason`（`degraded` / `overreaching` 仍是 active 的健康事实），其余卡片不动。
+- 测试：core 的 fault 测试加 sink，断言窗口收到 `faulted`；store +1，断言只有目标卡片变成 faulted；
+  事件类型本来就在 TS 镜像里，不需要重新生成。
+
+**测试**：core 700、daemon 233、app Rust 283、前端 298；core/app clippy 全绿；
+`pnpm run build`、`pnpm run shapes`、`pnpm lint` 0 error 通过。
+
+**仍然缺**：`PluginHealthChanged` 的 `degraded` / `overreaching` 在卡片上没有专门的位置；
+sink 在 `PluginSet` 的锁内调用，订阅者必须很快返回（目前的实现只是入队）；
+`pluginHealthChanged` 没有在事件分发测试里被断言（只测了 store 的处理）。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
