@@ -3991,6 +3991,22 @@ Matching 期间取消后的卡片没有额外说明。
 **仍然缺**：`IpcError.params` 是 `unknown`，没有人按 key 收窄；`ErrorCode` 在协议镜像里仍只是 `string`；
 `IpcError.details` 完全没有读者。
 
+### 8.197 `IpcError.code` 是 `ErrorCode`，候选也说出设备名字
+
+★ §8.196 把 `IpcError` 镜像出来了，但 `code` 还是 `string`——镜像里明明已有 `ErrorCode` 联合类型（在
+`wire.ts`），`ui.ts` 不引用它，于是"哪些 code 存在"在界面这一侧仍然不可知。
+
+- `ui.ts` 的 import 改为 `import type { ErrorCode, SuggestedAction } from './wire'`，
+  `IpcError.code: ErrorCode`。
+- 候选行不再只有插件标题和设备 id：`deviceName(candidate.deviceId)` 从 `devices.byId` 这个 Map 里取
+  `displayName`，取不到才退回 id。设备名本来就在 devices store 里，让 Home 再显示一次 id 是把 join 丢给用户。
+- 注意 `byId` 是 Pinia 解包后的 `Map`（`computed(() => new Map(...))`），不是函数；`vue-tsc` 把
+  "调用 Map" 直接报成不可调用，这一条在编译期就暴露了。
+- 测试不变（304）：候选的 id 没变，设备名是同一行的补充；`vue-tsc` 通过说明 `ErrorCode` 的收窄是真实的。
+
+**仍然缺**：`IpcError.params` 仍未按 key 收窄；候选的设备名只在 devices store 里有卡片时才有值，
+未扫描到的设备仍显示 id。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
