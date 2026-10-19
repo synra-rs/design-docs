@@ -137,6 +137,8 @@
 #[tauri::command] async fn diag_probes(state: State<'_, AppState>) -> Result<ProbeReportDto, IpcError>;
 #[tauri::command] async fn diag_metrics(state: State<'_, AppState>) -> Result<MetricsSnapshot, IpcError>;
 #[tauri::command] async fn diag_logs_tail(state: State<'_, AppState>, lines: Option<u32>) -> Result<Vec<String>, IpcError>;
+/// 删掉会让下次启动进入安全模式的崩溃报告；"忽略"必须是持久的，否则下次启动会再问一遍。
+#[tauri::command] async fn diag_crash_dismiss(state: State<'_, AppState>) -> Result<(), IpcError>;
 ```
 
 
