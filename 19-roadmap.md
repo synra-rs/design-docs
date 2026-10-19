@@ -3849,6 +3849,28 @@ sink 在 `PluginSet` 的锁内调用，订阅者必须很快返回（目前的�
 **仍然缺**：`Deactivate` / `Park` 仍没有生产路径；壳的这条分支没有独立单测（core 的 clear/activate 两半有）；
 清除故障后健康计数归零，历史不再可见。
 
+### 8.189 `synra://share?text=…` 能把一个分享送进窗口
+
+★ M4 的系统集成写着深链 `synra://`。它不只是"打开应用"：一个分享链接应该直接变成 board 上的一个意图，
+否则链接能做的只是把窗口叫到前面。
+
+- 新增 `deeplink.rs`，把**解析**与**副作用**分开：
+  - `share_text(url)` 只认 `synra://share?text=…` 或 `?url=…`，百分号解码交给 URL parser；
+  - 空值、别的 scheme、别的 host、非 URL 都是 `None`——**打开窗口然后什么都不做，比不打开更糟**。
+- 壳接入 `tauri-plugin-deep-link`，配置 `schemes: ["synra"]`；`on_open_url` 把 URL 交给 `receive`：
+  dispatch `IntentSourceDto::Share`，然后 `show_main`（先 dispatch，后叫窗口：用户看到的是这条分享的卡片）。
+- ★ 冷启动也处理：URL 可能在监听器存在之前就到了，`get_current()` 是插件对那段窗口的答案；
+  Windows/Linux 另外调 `register_all()`，失败只打印——没注册 scheme 是少了一个入口，不是打不开窗口。
+- ★ 顺手修了一个依赖问题：`tauri-plugin-dialog` / `global-shortcut` / `autostart` / `deep-link` 之前是
+  **非可选**依赖，于是 `cargo test --no-default-features` 仍会编译整个 Tauri。现在四个都 `optional = true` 并
+  挂到 `tauri-shell` feature 上；no-default 的测试重新只编译逻辑（clippy 从 ~41s 回到 ~5s 就是证据）。
+
+**测试**：`deeplink` +2（分享文本与 URL 解码；空值/错 scheme/错 host/非 URL 拒绝）；app Rust 283、
+no-default 与默认两套 clippy 全绿。
+
+**仍然缺**：Windows 安装包里的 scheme 注册没有在真机安装后验证；`get_current` 与事件在冷启动时可能各投递一次
+（没有去重）；不是 share 的 `synra://` 链接只会聚焦窗口，不会告诉用户"这个链接不认识"。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
