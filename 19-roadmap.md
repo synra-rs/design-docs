@@ -4040,6 +4040,22 @@ NotifyOnly），不是这个布尔键；页面写的是一个既没有读者、�
 **仍然缺**：macOS 的文件打开走 Apple Event 而不是 argv，这条路径没有覆盖；安装完成后没有"已安装 X"的
 即时提示（卡片要等 `plugins_list`）；`.synra` 关联只描述包，不描述"更新已有插件"的语义。
 
+### 8.200 双击安装之后，界面说了一句"装了什么"
+
+★ §8.199 的文件关联只负责把包装进去：装完窗口才出现，插件卡片却要等 `plugins_list` 才更新，用户看到的是
+一个没有变化的应用。安装成功本身是一条值得说的事实。
+
+- 壳在 `plugins_install` 成功后发布
+  `Notice { message: "notice.installed", params: { pluginId, version } }`，走已有的页面级通知，不新造事件。
+- `NoticeHost` 认这个键：`Installed @acme/hello 1.2.0.`；它不是 `received` 的"保存位置"，所以没有 description。
+- 安装失败仍然只 `eprintln!`：一个坏包不该占住窗口，但也不该假装成功。
+- 测试：notice host +1（键到句子），前端 304。
+
+**测试**：`cargo check` / clippy 全绿；`pnpm test`、`pnpm run build`、`pnpm lint` 0 error。
+
+**仍然缺**：通知说"已安装"，但插件仍然是 **未信任、未启用** 的——下一句"去确认权限"还没有；
+插件卡片不会因为安装通知自动出现，仍要 `plugins_list`；macOS 的打开事件仍不经过 argv。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
