@@ -587,6 +587,11 @@ pub fn install_panic_hook(paths: &Paths, version: &str) {
 >
 > ★ **"查看详情"也接上了**：`diag_crashes` 返回报告本身（最新在前），设置页的同一区按需显示时间、版本、消息与位置。
 > 它不随页面挂载读取——崩溃消息是这页最敏感的诊断内容，只有用户点"Show crash reports"时才读。
+>
+> ★ **启动提示也接上了（[19 §8.152](./19-roadmap.md)）**：`App.vue` 的根上挂 `CrashNotice`，挂载时读
+> `diag_crashes`，只保留**最近 5 分钟**内的报告（与 `StartupVerdict` 同一个窗口），显示
+> `[Show details] [Export diagnostics] [Ignore]`。它不是模态框：安全模式已经决定不装载插件，应用可以用，
+> 弹窗会强迫用户先回答再读插件页。**仍然缺**：提示里没有"哪些插件被停用了"的列表——那仍在插件页的卡片上。
 
 ---
 
