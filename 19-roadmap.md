@@ -4023,6 +4023,23 @@ NotifyOnly），不是这个布尔键；页面写的是一个既没有读者、�
 **仍然缺**：自动同步本身没有实现（设计是 NotifyOnly 默认 + 一键同步；手动 `plugins_sync_plan`/`sync_run`
 仍是唯一路径）；`plugins.autoSync` 这个配置键不存在，也就没有默认值可读。
 
+### 8.199 双击一个 `.synra` 包就能安装
+
+★ M4 的系统集成写着"文件关联"。安装器可以注册扩展名，但应用启动后还得把"操作系统把文件交给了我"变成
+安装——否则双击只会打开窗口，什么也不做。
+
+- `launch.rs`：从参数里找**第一个存在的、扩展名为 `.synra` 的文件**；跳过可执行文件本身，忽略旗标、目录和
+  不存在的路径。存在性检查放在这里，因为让安装器去打开一个不存在的文件，会把"壳没有收到它"报成 source 错误。
+- 壳在 state 建好之后调用 `plugins_install(InstallSourceDto::Path)`，然后 `show_main`。安装的检查
+  （签名、清单、同意）仍是安装管线的那一套，文件关联只是入口。
+- `tauri.conf.json` 的 `bundle.fileAssociations` 注册 `synra` 扩展名、`application/x-synra`。
+- 测试用临时目录：带 flag、缺失路径、真实包、同扩展名目录；断言只有真实文件被选中。
+
+**测试**：`launch` +1；app `cargo check` / clippy 全绿。
+
+**仍然缺**：macOS 的文件打开走 Apple Event 而不是 argv，这条路径没有覆盖；安装完成后没有"已安装 X"的
+即时提示（卡片要等 `plugins_list`）；`.synra` 关联只描述包，不描述"更新已有插件"的语义。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
