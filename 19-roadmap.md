@@ -3285,6 +3285,23 @@ IPC 契约 123、app 277、前端 267、`pnpm run build`（含 vue-tsc）全绿�
 **仍然缺**：HomePage 的传输行只显示对端与状态，不显示文件名/进度文字以外的内容；`transfer_list` 里的
 `direction` 还没有单独的视觉区分。
 
+### 8.157 首页的在飞行说清"哪个方向、哪个文件"
+
+★ §8.156 让首页读到了 `transfer_list`，但行里仍然只有对端与 `state`，而这一栏的标题是 **Sending now**、
+空态是"没有任何东西正在发往另一台设备"。收件传输也画在同一栏里——标题与空态对一半的行是假的，
+文件名则是用户唯一能确认"是不是那个文件"的东西。
+
+- 标题改成 **In flight**，空态改成"Nothing is moving to or from another device."。
+- 行里加 `Sending` / `Receiving` 标签：方向不是装饰，它决定 Cancel 命令打到哪一侧（发送方的 worker 还是
+  listener 的 identifier）。
+- `fileName` 非空时显示在设备名下面；文本传输没有文件名，留空而不是写 "text"。
+- 测试断言快照里的传输显示 `Study PC`、`notes.txt`、`Receiving` 与 `50%`；第一次只断言 `notes.txt` 失败，
+  因为当时行里根本没有这个字段——测试正好抓住要补的东西。
+
+**测试**：前端 274 通过，`pnpm run build`（含 vue-tsc）与 `pnpm lint`（0 error）通过。
+
+**仍然缺**：没有按方向分行/分组；`abortReason` 已到达前端但没有显示在行里。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
