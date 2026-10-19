@@ -2806,6 +2806,23 @@ guards 12。
 **仍然缺**：`check_update` 仍看 `latest` 而不是范围（设计如此：发布者的标签决定“最新”）；非 semver 的回落会给一个
 不同但更旧的字符串报“更新”。
 
+### 8.130 日志的压力进了两个宿主的指标
+
+★ §8.113/§8.121 让 CLI 与 daemon 的 `logs` 说出丢行与写失败，但**壳的诊断页**仍看不到：`diag_metrics` 只采样数据库大小、
+uptime 与进程指标，`status` 的 metrics 里也没有日志。
+
+- **壳**：`diag_metrics` 在快照前，从 `AppState.log` 的 `LogStats` 采三个仪表 —— `log_lines`、`log_dropped`、
+  `log_write_errors`。没有日志时**不写**（零是“运行且安静”，与“没在运行”是两件事）。
+- **daemon**：`status_value` 用同一个形状从 `Runtime.log_stats` 采样。两个宿主现在把同样的三个数放进 metrics，界面本来就
+  渲染 metrics，不需要新命令、新 DTO。
+- **测试**：壳的 `an_empty_shell_reports_no_metrics_rather_than_refusing` 增加一条断言 —— 没有日志时 `log_lines` 不得出现，
+  这条测试的“不凭空发明样本”规则因此也覆盖了新仪表。
+
+★ 测试：daemon 231、core 675、store 237、registry 21、CLI 103、app shell 264/263、前端 259、workspace clippy、
+`api-guard`、guards 12。
+**仍然缺**：仪表只在读的时候更新（没有日志写入时的推送）；`log_write_errors` 只有计数，没有“哪一次写失败”；CLI 的
+`--output json` 里 metrics 仍只在 `status` 下。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
