@@ -4105,6 +4105,23 @@ stderr 里失败，窗口照常打开——用户以为更新了。
 **仍然缺**：动作枚举只用于文件关联，`plugins_update` 的注册表路径没有复用；"已安装"与"更新"通知
 没有可点的动作（去插件页）；强制降级仍无入口。
 
+### 8.204 安装/更新通知有了下一步：去插件页
+
+★ §8.200–8.203 的通知都说"装了什么/更新了什么"，但下一步——确认权限、启用——在另一个页面。一条没有去处的
+句子，用户只能自己找。
+
+- `NoticeHost` 的 `AAlert` 使用 `#action` 槽：包相关的四种通知（installed / updated / alreadyInstalled /
+  newerInstalled）显示 **Open plugins**。
+- 点击先 `dismiss()` 再 `router.push('/plugins')`：通知的使命是"告诉你发生了什么"，去确认权限是下一屏的事。
+- `useRouter()` 让 host 成为路由的读者，测试 fixture 因此给每个 mount 一个 memory router（含 catch-all，
+  否则 `vue-router` 对空初始路径刷警告）。新增测试断言点击后 `currentRoute.path === '/plugins'`。
+- 其他通知（received / unknownLink）没有 action：文件不是"去插件页"能处理的事。
+
+**测试**：notice host +1（307）；`pnpm run build`、`pnpm lint` 0 error 通过。
+
+**仍然缺**：action 不区分"安装后要确认权限"与"更新后可能新增权限"——两者都去同一个页面；
+没有深链直接落到那个插件的卡片；`AAlert` 的 action 在窄屏与关闭按钮挤在一起。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
