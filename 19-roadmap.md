@@ -3972,6 +3972,25 @@ Matching 期间取消后的卡片没有额外说明。
 **仍然缺**：错误里的 `params` 不显示（例如 `reason` 对用户往往最有用）；没有重试按钮——一个失败的意图
 可能只需要再 `intent_dispatch` 一次，但页面不替用户决定；镜像应把 `error` 映成真正的 `IpcError`。
 
+### 8.196 `IpcError` 进入协议镜像，`IntentSnapshot.error` 不再是 `unknown`
+
+★ §8.195 在页面里把 `intent.error` 窄化成 `{ code?, message? }` 才能读它。这不是页面的懒惰：`ui.ts` 一直把
+`IntentSnapshot.error` 写成 `unknown`，而 `IpcError` 根本没有被镜像。一个"知道有错、但不知道错是什么形状"
+的类型，让每个读者自己重写一遍。
+
+- `ui.ts` 新增 `IpcError { code, message, params?, details?, retryable, actions? }`，并在文件顶部以
+  `import type { SuggestedAction } from './wire'` 复用已有的联合类型（`ui.ts` 与 `wire.ts` 是两份手写镜像，
+  但 `SuggestedAction` 只有一份定义）。
+- `IntentSnapshot.error` 改为 `IpcError`；`index.ts` 导出 `IpcError`。
+- Home 去掉局部 cast，直接读 `error.code` / `error.message`。
+- `@synra/protocol` 重新构建（`tsc -b`）；app 的 `vue-tsc` 通过，说明镜像与页面现在对同一个形状达成一致。
+
+**测试**：前端 304 不变；`pnpm --filter @synra/protocol build`、`pnpm run build`、`pnpm run shapes`、
+`pnpm lint` 全绿。
+
+**仍然缺**：`IpcError.params` 是 `unknown`，没有人按 key 收窄；`ErrorCode` 在协议镜像里仍只是 `string`；
+`IpcError.details` 完全没有读者。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
