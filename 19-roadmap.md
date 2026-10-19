@@ -3954,6 +3954,24 @@ Matching 期间取消后的卡片没有额外说明。
 **仍然缺**：`IntentPrompt` 的选项仍未显示；`IntentCandidate.title` 是插件标题，不是设备名（设备名在
 `DevicesPage`，这里没有 join）；终态没有单独的详情（失败原因只存在于 `intent.error`，页面没画）。
 
+### 8.195 失败的意图说出为什么，而不是只显示 `Failed`
+
+★ `IntentSnapshot.error` 一直带着 `IpcError`（code + message key），界面只画了状态标签。失败的原因于是只
+存在于 JSON 里，用户看到的是 "Failed" —— 一句正确但没有用的话。
+
+- Home 在意图行下显示一句 `intentError`：与 `ErrorNotice` 同一条链——先查 `kernelErrors[message]`，
+  再查 `errors[code]`，最后 `unknown`；**不打印 message key，也不打印 code**。
+- TS 镜像里 `IntentSnapshot.error` 是 `unknown`（生成器没把 `IpcError` 映出来），所以页面把它窄化成
+  `{ code?, message? }` 再查表；这是对镜像缺口的局部处理，不是新契约。
+- 样式是 `text-xs` 外层 + 内层 `text-error`：UnoCSS 的 `order` 规则不接受 `m-0 text-error text-xs` 的并列，
+  拆一层就没警告了。
+- 测试：`failed` + 未知 message key + `plugin_faulted` code，断言显示 code 的句子且不出现 key。
+
+**测试**：前端 304（+1）；`pnpm run build`、`pnpm run shapes`、`pnpm lint` 0 error 通过。
+
+**仍然缺**：错误里的 `params` 不显示（例如 `reason` 对用户往往最有用）；没有重试按钮——一个失败的意图
+可能只需要再 `intent_dispatch` 一次，但页面不替用户决定；镜像应把 `error` 映成真正的 `IpcError`。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
