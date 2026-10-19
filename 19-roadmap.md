@@ -3077,6 +3077,20 @@ core loader 10 条、daemon 全量 232 条、app 272 条全部保持绿。
 **仍然缺**：从 `.synra` 归档更新不迁移；迁移成功后安装失败会留下"新格式的数据 + 旧代码"（回滚文件容易，
 回滚插件自己写的数据不可能由宿主完成）；没有跨版本的多步迁移链，只有一次 `from → to`。
 
+### 8.145 运行中的状态词是 `active`，不是壳自己的 `running`
+
+★ 这是一处**三份词汇**的漂移：设计的状态机、`PluginSnapshot.state` 的文档（"snake_case，与内核自己的状态一致"）
+和插件页 `stateColour` 的 `active => success` 都用 `active`；而壳的 `life_state` 对已装载的插件返回 `running`。
+后果是页面那条绿色标签**从来不会出现**：一个正在运行的插件和一张没有任何状态的卡片显示同一种中性色。
+
+- `life_state` 的已装载分支改为 `active`；`faulted` / `disabled` / `awaiting_consent` / `unreadable` /
+  `unavailable` 仍是壳为边界情况起的词，写在它自己的函数上。
+- 前端挂载测试 +1：状态为 `active` 的卡片必须渲染出 `.ant-tag-success`。这条断言在改词之前会红。
+- 三处 Rust 断言从 `running` 改为 `active`。
+
+**仍然缺**：这些词仍由壳的 `life_state` 推导，而不是从 `PluginSlot` 查询；`active` 的含义是"已装载并激活"，
+不是"此刻有调用在跑"。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
