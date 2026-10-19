@@ -3739,6 +3739,21 @@ M4 的"分享入口"于是只剩半个——应用能显示别人送来的分享
 **仍然缺**：文件分享需要 `transfer_send_file` 之外的"本地暂存 + ShareItem.transfers"管线；拖拽与
 `Clipboard` 入口也仍未接。
 
+### 8.183 剪贴板分享：页面不读剪贴板，只发一个请求
+
+★ `IntentSourceDto` 的 `Clipboard` 变体早在契约里，`item_for` 也已实现"为这一次请求读一次剪贴板"，
+但桌面端没有按钮。文本分享要求用户先粘贴，而很多分享的起点就是"我刚复制了它"。
+
+- Home 加 **Share clipboard**：只发 `{ kind: 'clipboard' }`，**页面从不读剪贴板**——一个能读的页面就能在
+  任何时候读，而命令是这次授权的全部。
+- 空剪贴板由壳拒绝（`the clipboard is empty`），页面显示错误条；成功后重新读快照。
+- 测试断言页面仅发送 `{ source: { kind: 'clipboard' } }`，没有调用任何平台 API。
+
+**测试**：前端 295（+1）；`pnpm run build`、`pnpm run shapes`（54/52/46）、`pnpm lint` 0 error 通过。
+
+**仍然缺**：拖拽入口；文件分享仍需要 transfer-backed 的 `ShareItem.transfers` 管线（§8.182）；
+剪贴板读取失败（平台不支持）只有错误条，没有"换一种方式"的建议。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
