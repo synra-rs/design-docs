@@ -3871,6 +3871,22 @@ no-default 与默认两套 clippy 全绿。
 **仍然缺**：Windows 安装包里的 scheme 注册没有在真机安装后验证；`get_current` 与事件在冷启动时可能各投递一次
 （没有去重）；不是 share 的 `synra://` 链接只会聚焦窗口，不会告诉用户"这个链接不认识"。
 
+### 8.190 不认识的 `synra://` 链接会说出来，而不是只把窗口叫到前面
+
+★ §8.189 的 handler 对任何 `synra://` 链接都 `show_main`。一个 `synra://settings` 或拼错的 host 会
+聚焦窗口、什么都不发生——用户看到的是"它好像做了点什么"，而实际没有。
+
+- `receive` 把 URL 分三类：认识的 share → dispatch；`synra` scheme 但不认识 → 发布
+  `KernelEvent::Notice { message: "notice.unknownLink", params: { url } }`；其他 scheme → 忽略。
+- `NoticeHost` 认这个键：文案是 `This build does not understand this link: …`，而且告警类型是
+  `warning` 而不是 received 的 `success`——同一张横幅，不同的意思。
+- 页面仍然不拼 URL 的语义：它只把 kernel 给的 `url` 放进句子里。
+
+**测试**：前端 300（+1）；`deeplink` 的两个解析测试仍通过；app clippy、`pnpm run build`、`pnpm lint` 全绿。
+
+**仍然缺**：冷启动时 `get_current` 与事件可能各投递一次，同一个链接会 dispatch 两次（没有去重）；
+未知链接的 notice 没有日志行，只有横幅。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
