@@ -2965,6 +2965,10 @@ clippy、`api-guard`、guards 12。
 前端 1 条挂载测试（页面显示的是宿主给的句子而不是自己编的）。daemon 侧的
 `safe_mode_loads_nothing_and_says_why` 仍然守同一条规则。
 
+**仍然缺**：壳不跑目录发现（`record_discovered_plugins` 仍在 daemon）。从界面安装的插件有行，所以能装载；
+但手工拷进 `plugins/` 的目录窗口看不见，而 daemon 看得见——两个宿主对"什么算已安装"因此还有一个分歧。
+把那段扫描搬进 `synra_core::plugin` 是下一步。
+
 ### 8.139 开关、同意、更新、卸载都当场生效
 
 ★ 启动装载只解决"重启之后"。设计里的 `enable` 是 **Activating**，不是"记一个偏好、下次启动再说"。
@@ -2978,6 +2982,10 @@ clippy、`api-guard`、guards 12。
 - `plugins_uninstall` 先把编译产物从集合里拿掉，再删文件：一个文件已删、实例还在的插件仍能被一次 share 调到。
 
 **测试**：壳 +3（开关进出集合、同意后就地装载、卸载后集合为空），既有的同意/卸载测试保持绿。
+
+**仍然缺**：这仍是"编译并让插件可被调用"，不是激活状态机——`activate()` / `deactivate()` 没有调用者，
+`PluginSlot` 仍无生产驱动者（[14 §1](./14-plugin-lifecycle.md)）。所以 `state` 里的 `running` 意思是"可被路由到"，
+不是"已跑过 `activate`"；这个区分写在卡片的文档注释里，而不是让读者从状态词猜。
 
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
