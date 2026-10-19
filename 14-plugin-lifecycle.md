@@ -9,7 +9,8 @@
 > 守护进程的 `enable` / `disable` / `remove` 也走同一条装载 / 停用路径（[19 §8.142](./19-roadmap.md)）。
 > 安全模式也因此第一次对窗口生效（[18 §10](./18-observability.md)）。
 > **装载现在也真的会 `activate`**（2026-10-19，见 [19 §8.141](./19-roadmap.md)）：`load_plugin` 在编译之后调用
-> 插件的 `lifecycle.activate("{}")`，失败就把它从集合里拿掉并记录原因；`deactivate` 在停用 / 卸载前调用。
+> 插件的 `lifecycle.activate(config)`（配置里是宿主的语言与主题，见 [19 §8.147](./19-roadmap.md)），
+> 失败就把它从集合里拿掉并记录原因；`deactivate` 在停用 / 卸载前调用。
 > **仍然没有**的是 `PluginSlot` 那套类型状态机本身：生产路径直接调契约的两个函数，
 > 没有经过 `Installed → Activating → Active` 的槽位记录，所以"Faulted"仍只是卡片上的一个原因，不是一个可查询的状态。
 >

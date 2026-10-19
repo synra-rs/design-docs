@@ -3021,7 +3021,8 @@ clippy、`api-guard`、guards 12。
 **测试**：core +1（`script_for` 让 `activate` 返回 `Failed`，断言摘要里有插件自己的句子、集合里没有它），
 core loader 10 条、daemon 全量 232 条、app 272 条全部保持绿。
 
-**仍然缺**：`activate` 的配置只有 `{}`；`PluginSlot` 状态机仍未驱动（§8.139 的"仍然缺"）。
+**仍然缺**：`activate` 的配置现在有宿主的语言与主题（§8.147），但还没有插件自己的设置；`PluginSlot` 状态机仍未驱动
+（§8.139 的"仍然缺"）。
 `migrate()` 的调用点已经补上（§8.144），但只覆盖目录包；`.synra` 归档更新不迁移。
 
 ### 8.142 守护进程的 enable 也当场装载
@@ -3109,6 +3110,26 @@ core loader 10 条、daemon 全量 232 条、app 272 条全部保持绿。
 
 **仍然缺**：版本选择、镜像、缓存、static index 仍是各宿主自己的；这次统一的是**安全关键的那一半**，
 不是整条安装管线。
+
+### 8.147 `activate` 拿到宿主的语言和主题，而不是 `{}`
+
+★ 契约把 `activate` 的配置定成一个 JSON 字符串，SDK 的示例第一行就读 `config.locale`；而装载器一直传 `{}`。
+宿主明明知道这两个答案（`Host::locale` / `dark_mode`），插件却要再调一次 `env.locale()` 才能拿到同一件事。
+
+- `activation_config(host)` 生成 `{ "locale": ..., "darkMode": ... }`，两个字段来自**宿主自己**，不是常量。
+- ★ **第一版把它读在装载器里，结果是 daemon 的测试挂死。** `KernelHost::locale` 读 `ui.locale` 设置，也就锁库；
+  而调用方把 `&SynraDb` 借给装载器时**已经持有那把锁**——同线程自死锁，症状是测试进程一直跑。
+  修法是把它变成**调用方先读、再传进来**：`load_installed_with_config` / `load_plugin_with_config` 收一个 `&str`，
+  两个宿主都在拿 store 锁之前生成它。`load_installed` / `load_plugin` 保留为传 `{}` 的便捷包装，单元测试用它们。
+- 单独的测试解析生成的对象并断言两个字段；拒绝激活的测试改用 `load_installed_with_config` 和同一个函数生成的 key，
+  否则它脚本化的是一个再也不会发出的配置。
+- 没有每插件设置表，所以这里暂时只有环境。将来加设置时，它应当**加进这个对象**，而不是再开一个参数。
+
+**测试**：core +1（`activation_config` 的两个字段）；daemon 全量 233、app 272 在修掉死锁后通过。
+★ 这条死锁是**测试超时抓到的**，不是编译或断言——两个 daemon 测试跑了 60 秒以上，正是 AGENT.md 里
+"significant drop 在错误作用域里"那一类。
+
+**仍然缺**：插件自己的设置（用户写的那些）没有存处，也没有界面；`locale`/`darkMode` 是环境，不是配置。
 
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
