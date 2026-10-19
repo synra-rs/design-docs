@@ -3268,6 +3268,23 @@ IPC 契约 123、app 277、前端 267、`pnpm run build`（含 vue-tsc）全绿�
 
 **仍然缺**：没有 `IdentityUpdated` 事件，第二个窗口不会跟着变；也没有"恢复默认名"的动作。
 
+### 8.156 首页第一次绘制就读取在飞的传输，而不是等事件
+
+★ `transfer_list` 在契约、壳命令与 `Transfers` 表里都有，HomePage 却只调 `intent_list`，然后把
+`transfers = []` 写死。注释说"这个壳没有注册它，因为还没有传输"——那句话在 listener 与传输注册表接上之后就过期了。
+后果：窗口打开前已经开始的传输没有事件可到达，页面在一条正在跑的传输旁边显示"nothing on its way"。
+
+- `load()` 并行读 `intent_list` 与 `transfer_list`，两边都成功才 `intentsStore.applySnapshot({ intents, transfers })`；
+  任一失败按原来的形状报错，而不是用一个空列表冒充答案。
+- 仍然走 store：事件到达时 `intentUpdated`/`transferUpdated` 继续增量更新，快照只负责**第一次绘制**。
+- 测试的 fake 里把 `transfer_list` 默认成空表（与 `diag_metrics` 同一处理），否则每个首页测试都会多一条错误提示；
+  新增一条断言：`transfer_list` 里已有的传输在挂载后直接显示（`Study PC`、`50%`），不需要等事件。
+
+**测试**：首页 6 条、前端 274 全绿；`pnpm run build`（含 vue-tsc）与 `pnpm lint`（0 error）通过。
+
+**仍然缺**：HomePage 的传输行只显示对端与状态，不显示文件名/进度文字以外的内容；`transfer_list` 里的
+`direction` 还没有单独的视觉区分。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
