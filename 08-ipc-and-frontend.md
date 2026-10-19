@@ -139,6 +139,8 @@
 #[tauri::command] async fn diag_logs_tail(state: State<'_, AppState>, lines: Option<u32>) -> Result<Vec<String>, IpcError>;
 /// 删掉会让下次启动进入安全模式的崩溃报告；"忽略"必须是持久的，否则下次启动会再问一遍。
 #[tauri::command] async fn diag_crash_dismiss(state: State<'_, AppState>) -> Result<(), IpcError>;
+/// 崩溃报告本身，最新在前；设置页的“查看详情”按需读它。
+#[tauri::command] async fn diag_crashes(state: State<'_, AppState>) -> Result<Vec<CrashReport>, IpcError>;
 ```
 
 
