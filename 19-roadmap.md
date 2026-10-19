@@ -3482,6 +3482,21 @@ listener 的两条在 `--features tauri-shell` 下跑。
 
 **仍然缺**：`.synra` **单文件包**没有单独的选择器（同一个输入框可以收，但要手打路径）；注册表模式不需要选择器。
 
+### 8.168 `.synra` 包也能选，而不只是目录
+
+★ §8.167 加了 **Choose folder**，本地模式仍有一个手打路径的形状：单文件 `.synra` 包。安装管线本来就同时接受
+目录和包（`install_directory` 按 `is_file` 分支），缺的只是一个打开正确对话框的按钮。
+
+- 同一排加 **Choose package**：`{ directory: false, multiple: false, filters: [{ name: 'Synra package', extensions: ['synra'] }] }`。
+- 过滤器是提示，不是规则：真正的判断仍在安装管线里（它会重新检查文件是什么），所以一个被改名成 `.synra` 的
+  目录不会被这个对话框"担保"。
+- 两个按钮共用一个 `choosing` 状态；取消不清空输入，打不开走同一条错误条。
+
+**测试**：插件页 +1（mock 对话框返回 `.synra` 路径，断言 `filters` 与输入框的值）；前端 289、
+`pnpm run build`（含 vue-tsc）、`pnpm run shapes`、`pnpm lint` 0 error 通过。
+
+**仍然缺**：两个按钮并列在窄窗口会换行；注册表模式不需要选择器，这一排只对本地模式出现。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
