@@ -3903,6 +3903,24 @@ no-default 与默认两套 clippy 全绿。
 **仍然缺**：2 秒窗口内用户真的重复点同一个链接会被吞掉（产品选择，不是 bug）；去重表只活在这个进程里，
 重启后同一链接仍会重新 dispatch。
 
+### 8.192 意图的候选变成了可点的决定
+
+★ Home 收到意图后只画了 `state` 和插件名。`IntentSnapshot` 一直带着 `candidates`（插件、设备、是否在线），
+`intent_decide` 也一直在契约与命令清单里，但前端**从未调用**——一个分享能到达，却没人能让它开始。
+
+- 每个候选显示 `title`、设备 id、离线标记；**Accept** 只在候选在线时可点，点下去发
+  `{ decision: { decision: 'accept', deviceId } }`。
+- 有候选的意图另有 **Decline**，发 `{ decision: { decision: 'decline', reason: null } }`：reason 显式为
+  `null` 而不是省略，另一侧要被告知"被拒绝"。
+- 决策成功才重新读快照；失败走页面已有的错误条。按钮的 loading 按 `intentId`，不会让同一意图被点两次。
+- `intent_decide` 的 fake 与协议参数表补上；README 的"被调用"从 46 改为 47。
+
+**测试**：前端 302（+1：候选 Accept 的精确参数）；`pnpm run build`、`pnpm run shapes`（54/52/47）、
+`pnpm lint` 0 error 通过。
+
+**仍然缺**：`IntentPrompt.options` 还没有 UI（那是一个单独的多选题）；没有"接受默认设备"的按钮
+（`acceptDefault` 变体仍无调用）；离线候选只禁用 Accept，没有解释为什么。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
