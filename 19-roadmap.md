@@ -3342,6 +3342,24 @@ IPC 契约 123、app 277、前端 267、`pnpm run build`（含 vue-tsc）全绿�
 **仍然缺**：**文件发送还没有界面**（需要文件选择器）；发送记录只存在于首页在飞列表，完成后没有历史；
 `transfer_send_text` 的 `One`/标量缺口仍未在契约里修。
 
+### 8.160 文件发送：接上平台的文件选择器
+
+★ §8.159 只做了文字发送，因为文件需要选择器。现在 `tauri-plugin-dialog` 接上了：Cargo 依赖、前端
+`@tauri-apps/plugin-dialog`、`Builder::plugin(init())`，以及 `capabilities/default.json` 里的 `dialog:default`——
+权限写在它该在的地方，而不是给整个窗口 `core:all`。
+
+- 已配对且可到达的设备行加 **Send file**；按需动态 `import` 对话框，一个没有该插件的测试/构建不会在页面加载时失败。
+- 对话框回答的路径直接交给 `transfer_send_file { request: { to, path } }`；取消（`null`）不是错误，
+  选择器打不开才用页面已有的错误条。
+- `transfer_send_file` 与 `transfer_send_text` 一样是 `One`/标量契约缺口，加入 `KNOWN_DIVERGENCE`；
+  fake 回答 `null`，因为页面不读 transfer id。
+
+**测试**：设备页 +1（mock 插件 `open` 返回路径，断言 `transfer_send_file` 的参数）；前端 279、app Rust 278、
+`pnpm run build`（含 vue-tsc）、`pnpm run shapes`、`pnpm lint` 与两套 clippy 全绿。
+
+**仍然缺**：文件发送没有进度/确认对话框，传输只在首页在飞列表出现；选择器是平台默认样式，没有应用内浏览；
+完成后的历史仍不存在。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
