@@ -3935,6 +3935,25 @@ no-default 与默认两套 clippy 全绿。
 **仍然缺**：`intent_cancel` 仍无前端调用（Decline 覆盖了同一条路径）；`Done`/`Failed` 的提示仍只有状态词；
 Matching 期间取消后的卡片没有额外说明。
 
+### 8.194 意图状态说人话，而且终态清单之前写错了
+
+★ 状态标签直接打印 `intent.state`：`choosing`、`noHandler`、`timedOut` 是**引擎词**，不是界面词（R34/R23）。
+更糟的是 §8.193 的 `canDecline` 用 `done` / `no_handler` 当终态——而 `IntentState::name()` 给界面的是
+`succeeded` / `noHandler` / `timedOut` / `refused`，于是两个错误叠在一起：`noHandler` 被当成可拒绝，
+`cancelled` 又拼错。
+
+- `canDecline` 改用 `IntentState::final_kinds` 对应的界面拼写：`succeeded`、`failed`、`noHandler`、
+  `timedOut`、`refused`、`cancelled`。
+- 标签经 `intentStateLabel`：matching → "Finding a handler"、choosing → "Choose a device"、
+  dispatching → "Running"、noHandler → "No handler" 等；未知状态显示原词而不是空白。
+- 颜色只做扫描辅助：success / error / warning / processing，**文字仍然说同一件事**，颜色不是唯一信息源。
+- 测试改为 `matching` + 无候选：这才是"还在找、但用户已经可以拒绝"的状态；同时断言标签是人话。
+
+**测试**：前端 303（同一条测试改写）；`pnpm run build`、`pnpm run shapes`、`pnpm lint` 0 error 通过。
+
+**仍然缺**：`IntentPrompt` 的选项仍未显示；`IntentCandidate.title` 是插件标题，不是设备名（设备名在
+`DevicesPage`，这里没有 join）；终态没有单独的详情（失败原因只存在于 `intent.error`，页面没画）。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
