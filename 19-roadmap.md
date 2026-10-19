@@ -3598,6 +3598,29 @@ listener 的两条在 `--features tauri-shell` 下跑。
 
 **仍然缺**：快捷键仍不可配置；`show_main` 没有单测；移动端构建尚未验证这个插件。
 
+### 8.175 生命周期状态机第一次被真正的加载路径驱动
+
+★ `synra_plugin_host::lifecycle` 写了很久：installed → validated → granted → active，
+以及 fault/deactivate/park/uninstall 的拒绝规则。可生产路径从未持有过它——`PluginSet` 只存
+`version/compiled/authority`，界面上的 "active" 是从 flags 推出来的。**一个能拒绝非法移动的状态机，
+如果没人问它，就只是一组测试。**
+
+- `Loaded` 新增 `lifecycle`：`load` 在编译和 import 检查之后，依次 `Validate { manifest_digest }`、
+  `Grant { partially_denied }`，任何一步被拒绝都是 `PluginSetError::Lifecycle`（bug，不是用户状况）。
+- 新增 `load_with_lifecycle(spec, digest, partially_denied)`；`load` 以空 digest / 未部分拒绝委托，
+  所以旧调用方不需要新参数，也不会“绕过”状态机。
+- loader 用 `plugin.rs` 已经算好的 manifest digest 和 `decisions.iter().any(|d| !d.granted)` 调用新方法；
+  激活成功后 `mark_active` 把最后一格补上。激活失败仍然 `unload`，所以 **`Granted` 与 `Active` 的差别
+  正好对应“编译了但没跑起来”**。
+- `PluginSet::lifecycle(id)` 公开，测试能直接断言状态，而不是从版本/健康标志猜。
+
+**测试**：core +2（`Granted` 在 `mark_active` 前、unload 后没有状态；loader 加载成功后 `is_running` 且
+`granted_digest` 存在）；core 699、daemon 233、app Rust 281 通过，core clippy 全绿。
+
+**仍然缺**：`Fault`/`Deactivate`/`Park` 仍没有生产路径调用；shell 的卡片仍从 flags 推导 active，
+没有读 `lifecycle`；`PluginSlot` 本身（带 `Move`/`StopRecord` 的那一层）仍未接上，本轮接的是更底层的
+`Lifecycle`。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
