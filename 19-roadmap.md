@@ -4806,6 +4806,23 @@ CLI 最终 106 项测试通过，覆盖失败报告及 stderr JSON；严格 Clip
 
 **仍然缺**：撤销不删除已装的包（只停用/不信任）；v2 轮换后需要按指纹匹配；正在运行的意图/传输不受影响。
 
+### 8.240 版本行记住签名者：撤销与安全自动更新的共同基础
+
+★ §8.239 的撤销靠 manifest 的 publisher id 扫描，这是 v1 一发布者一 key 的假设；也没有任何地方能在不下载的情况下
+回答"这个已装版本是谁签的"。这一轮把签名者写进 `plugin_versions`。
+
+- 迁移 16 加 `publisher_id` / `fingerprint` 两列与 `(fingerprint, active)` 索引；`ActiveVersion` 带回它们；未签名包为
+  NULL。
+- 写入点：`record_plugin_version` 与 `replace_plugin_version` 都接收签名者；`install::writing` 在写版本行**之前**解析
+  签名，因此同一事务里的行与随包 `signature.json` 不会不一致。
+- `record_plugin_version` 的八个参数收成 `PluginVersionRecord`（签名者让位置参数到了容易写错的长度），所有调用点同步。
+- 测试：store 写入并读回签名者；安装链路（界面集成）断言已装版本的 publisher/fingerprint 与 publishers 行一致。
+
+**测试**：core 745、daemon 252、ipc 123、platform 80、app 316、前端 328 不变；clippy、guards 12/12。
+
+**仍然缺**：撤销仍按 publisher id 扫描 manifest（下一轮可切换到 fingerprint 查询）；轮换协议本身未实现；本版本之前
+写入的版本行没有签名者——项目未发布，不做回填。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
