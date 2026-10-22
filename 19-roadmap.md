@@ -4659,6 +4659,22 @@ daemon 没有界面可显示它。
 **仍然缺**：设置改动仍最多等 5 分钟；没有 "last checked" 显示；通知不会自动把页面里的更新按钮填上（仍要点每个插件的
 Check）。
 
+### 8.233 后台找到的更新，页面打开就能看见
+
+★ §8.231/§8.232 的通知只说"有 N 个更新"，用户打开插件页仍要一个个点 Check；后台 pass 的结果在函数返回后就被丢掉了。
+
+- `UpdateInfo` 带上 `plugin_id`；`check_update` 把结果写进 `AppState.available_updates`（没有更新时清掉该插件，升级成功
+  后删掉）；后台 pass 清空后重填。
+- 新命令 `plugins_updates`（`Many`，只读缓存）让页面在 mount 时直接拿到按钮；`PluginsPage` 不再需要网络就能显示
+  "Version X is published"。
+- 契约 55 条、注册 53 条、被调用 48 条；README 与 `command-inventory` 同步。
+- 测试：缓存可读且按插件 id 排序；页面 mount 即显示后台结果；契约/注册数量。
+
+**测试**：core 725、ipc 123、app Rust **308**（+2）、前端 **322**（+1）、daemon 235、platform 80；clippy、
+`--features tauri-shell`、build/shapes、`synra-js check`、guards 12/12。
+
+**仍然缺**：缓存不持久（重启后第一次 pass 前页面不知道）；daemon 不填它；自动安装仍未做。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
