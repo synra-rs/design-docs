@@ -4820,8 +4820,21 @@ CLI 最终 106 项测试通过，覆盖失败报告及 stderr JSON；严格 Clip
 
 **测试**：core 745、daemon 252、ipc 123、platform 80、app 316、前端 328 不变；clippy、guards 12/12。
 
-**仍然缺**：撤销仍按 publisher id 扫描 manifest（下一轮可切换到 fingerprint 查询）；轮换协议本身未实现；本版本之前
-写入的版本行没有签名者——项目未发布，不做回填。
+**仍然缺**：轮换协议本身未实现；本版本之前写入的版本行没有签名者——项目未发布，不做回填。
+
+### 8.241 撤销按指纹，而不是按发布者名字
+
+★ §8.239 还在扫 manifest 的 publisher id——那正是 §8.240 想淘汰的 v1 假设。现在版本行有签名者，撤销应该只停"这把 key
+签的、当前 active 的版本"。
+
+- store 新增 `active_plugins_by_fingerprint(fingerprint)`：`WHERE active = 1 AND fingerprint = ?` 的索引查询；旧版本
+  （留作回滚）不会被列出，同一发布者的另一把 key 也不会被误停。
+- 窗口与 daemon 的 revoke 路径删掉 manifest 扫描，改用该查询。
+- 测试：两个插件、其中之一的旧版本由另一把 key 签，查询只返回 active 版本；界面/daemon 的撤销测试继续通过。
+
+**测试**：store **253**（+1）、core 745、daemon 252、ipc 123、platform 80、app 316、前端 328；clippy、guards 12/12。
+
+**仍然缺**：轮换协议本身；撤销不删包；正在运行的意图/传输不受影响。
 
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
