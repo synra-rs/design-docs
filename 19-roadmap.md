@@ -4387,8 +4387,25 @@ macOS runner，这一条不能在这里补。插件作者文档也还没写"怎�
 **测试**：core **712**（+2：失败的视图带 code/message 且 `to_json` 有 error；成功的视图为 `None`）；app Rust
 **305**（+2：壳把 code 变成键并保留句子；成功的意图不带 error）；daemon 233；workspace clippy 全绿，guards 12/12。
 
-**仍然缺**：`TimedOut` 与 `Refused` 仍然只有状态词；`IntentSnapshot.startedAtMs` 仍是读取时刻而不是开始时刻；错误
-里的 `params` 仍然没有读者；界面不显示 `details` 里的内核句子（那是故意的，但一个"复制诊断信息"的入口还没有）。
+**仍然缺**：`TimedOut` 仍然只有状态词（`Refused` 的原因与 `startedAtMs` 在 §8.218 补上）；错误里的 `params` 仍然没有
+读者；界面不显示 `details` 里的内核句子（那是故意的，但一个"复制诊断信息"的入口还没有）。
+
+### 8.218 意图的开始时间是开始时间，拒绝也有了自己的原因
+
+★ §8.217 的"仍然缺"还剩两条，都是同一个形状：**事实在板里，视图没带出来**。
+
+- `IntentView.created_at_ms`：`IntentSnapshot.started_at_ms` 一直写的是**读取时刻**，所以"这个动作跑了多久"对任何意图都
+  回答"刚刚"。板从第一版就有 `created_at_ms`，现在视图带上它，控制协议的 `to_json` 也多了 `createdAtMs`。那条曾经
+  需要归一化 `started_at_ms` 才能通过的 list/single 测试，现在直接比较两次读取，并断言它等于 raise 的时刻。
+- `IntentState::Refused { refusal }` 有 `code` 与 `detail`，而视图只把 `Failed` 映射成 error。现在 `Refused` 也映射：
+  状态仍是 `refused`（颜色与词不变），`error` 给出 code 与那句 admission 的句子；页面本来就有 `intentError` 分支，
+  所以 "Refused" 下面第一次有了原因。`TimedOut` 仍然只有状态词——它没有一句内核写好的句子，编一句不如不编。
+
+**测试**：core **713**（+1：拒绝的视图带 code 与 detail；失败视图同时断言 `createdAtMs`）；app Rust **306**（+1：
+拒绝经壳变成 `error.plugin_not_installed` 且 details 保留句子；list/single 的 `startedAt` 直接相等且等于 raise 时刻）；
+daemon 233；workspace clippy 全绿。
+
+**仍然缺**：`TimedOut` 没有解释；界面不显示 `details.kernelMessage`；错误里的 `params` 仍无读者。
 
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
