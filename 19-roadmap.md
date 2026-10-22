@@ -4518,6 +4518,23 @@ code。于是对端的 `capability_denied`、`plugin_not_installed`、`plugin_tr
 **仍然缺**：daemon 仍没有退避循环，也不读 `intent_retries`（一次失败后同一进程里不会自己再问，只有下次启动）；
 `exchange` 仍只被 daemon 使用，窗口有自己的一份传输代码。
 
+### 8.225 排期表搬进内核：两个宿主迟早要共用一份
+
+★ §8.220 的 `RetryQueue` 只活在窗口的 `intent_resume.rs` 里；§8.224 给 daemon 加一次性重发时，最先想到的是复制那份
+队列——这正是设计文档反复说的"第二份规则"。这一轮把它移到 `synra_core::intent::retry`。
+
+- 搬过去的是策略、队列、状态与**七个测试**。`status` 返回内核的 `RetryStatus`（core 不依赖 `synra-ipc`），窗口在
+  `retry_status` 里转成 `IntentRetry`，字段一一对应——转换放在宿主，因为内核不该为了三个数字依赖界面。
+- 窗口的 `run` 只剩宿主的那半：拨号、发布、落盘、循环；shell 仍通过 `intent_resume::RetryPolicy` 拿默认策略，调用
+  点不变。
+- daemon 仍然是一次性重发——它现在**可以**用同一份队列，但这一轮不假装它已经会退避。
+
+**测试**：core **723**（+7）、app Rust **304**（-7，测试随类型搬家）；ipc 123、daemon 234、platform 80；clippy、
+`--features tauri-shell`、guards 12/12。
+
+**仍然缺**：daemon 还没接这份队列（仍是一次）；窗口的循环与 daemon 的一次性仍是两段控制流；`retry` 模块只有调度值，
+没有"跑一轮"的共享 runner。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
