@@ -4479,6 +4479,25 @@ warnings、publisher）在 `registry::update` 里被 `.map(|_| ())` 扔掉。文
 **仍然缺**：远端失败的原因仍以 `Internal` 到达（`InvokeResult.error` 只有字符串，没有 code）；`Cancelled` 的 reason
 仍不显示（用户自己的动作，优先级低）。
 
+### 8.223 远端失败终于带着 code 回来
+
+★ 05 §2.4 的回执形状写的是 `{ok, code?}`，而 `InvokeResult` 只有 `ok/result/error/elapsedMs`：`error` 是句子，没有
+code。于是对端的 `capability_denied`、`plugin_not_installed`、`plugin_trapped` 到本侧都变成 `Internal`，页面把
+"该授权 / 该安装 / 该报告 bug" 三种不同的下一步说成同一句。
+
+- `InvokeResult.error_code: Option<ErrorCode>`（`serde(default)`，旧对端不带它也能读）。`accept_remote` 从
+  `PluginSetError::code()` 填；`decide` 的本地执行失败用同一个映射；`apply_result` 用它 `conclude`，不再一律
+  `Internal`。同一设备上失败和另一台设备上失败，现在给出同一个 code。
+- `PluginSetError::code`：`NotLoaded` → `PluginNotInstalled`、`AtInstanceLimit` → `RateLimited`、
+  `UndeclaredImport` → `CapabilityDenied`、`Faulted` → `PluginTrapped`，编译/生命周期/实例丢失仍是 `Internal`。
+  两处调用方共用它，不会各写一份。
+- 测试：远端 `capability_denied` 经 `apply_result` 进 board 后，snapshot 里仍是这个 code；五个变体的映射各断言。
+
+**测试**：core **716**（+2）、app Rust 311、ipc 123、daemon 233、platform 80；clippy、guards 12/12。
+
+**仍然缺**：旧对端仍答 `Internal`（兼容的代价）；`Cancel` 没有 code（撤销本来不需要回答）；`InvokeResult` 的形状仍
+只在 05 里写着 `{ok, code?}`，04 没有它。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
