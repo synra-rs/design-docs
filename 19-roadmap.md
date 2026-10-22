@@ -4590,6 +4590,24 @@ daemon 没有界面可显示它。
 **仍然缺**：`exchange` 仍是两份（窗口/daemon）；`RetryHost` 的三个方法仍是每个宿主一份薄实现；daemon 没有界面显示
 重试。
 
+### 8.229 传输的最后一份重复也搬走了：宿主只负责拨号
+
+★ §8.228 之后两个宿主共享循环，但"发送、读同一条连接上的回执、bye"仍是两份：窗口的 `exchange_on` 与 daemon 的
+`exchange` 各自判断什么算回答、超时算什么、别的 event 怎么处理。这一轮把这段搬进 `synra_core::intent::remote`。
+
+- `send(link, outbound)` 与 `receive(link, wait)` 分开，是因为 daemon 的 `count_sent` 必须在**写成功之后、读之前**，
+  而窗口不需要计数；`exchange` 是两者的组合，窗口直接用它。
+- `receive` 保留三个判断：`INTENT_RESULT` 是回答；其它 event 是 `invalid_argument`（不是"还在跑"）；超时是 `None`
+  （不是失败）。错误用 `SynraError`，窗口转 `IpcError`，daemon 转 `Refusal`。
+- 行为的一处变化：daemon 碰到非 `INTENT_RESULT` 现在按失败重试（之前只记录、留在 dispatching）；这是把窗口的判断
+  拿过来——协议错误不该被当成沉默。
+- 测试：窗口的 7 条 exchange/deliver 测试现在走内核的实现；core 725、daemon 235 不变。
+
+**测试**：core 725、app 304、daemon 235、ipc 123、platform 80；clippy、guards 12/12。
+
+**仍然缺**：`exchange_on` 仍是窗口的薄包装（测试缝）；`send`/`receive` 的调用顺序仍由宿主保证（daemon 要在中间
+计数）；窗口与 daemon 的拨号仍走不同的 identity/metrics 路径（有意）。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
