@@ -4498,6 +4498,26 @@ code。于是对端的 `capability_denied`、`plugin_not_installed`、`plugin_tr
 **仍然缺**：旧对端仍答 `Internal`（兼容的代价）；`Cancel` 没有 code（撤销本来不需要回答）；`InvokeResult` 的形状仍
 只在 05 里写着 `{ok, code?}`，04 没有它。
 
+### 8.224 守护进程也会重发：重启后先问一次
+
+★ 自 §8.214 起窗口会把 `Dispatching` 的意图重发一遍；守护进程不会——它 `restore_intents` 之后就把它们留在原地，
+对端还在等，板子说"运行中"，唯一能再问的进程什么也不做，直到 24 小时过期。§8.220 的排期表也只被窗口读。
+
+- `Runtime::send_outbound` 的传输半边拆成自由函数 `exchange(host, outbound, wait)`：拨号、握手、发送、从同一条连接
+  读回执、`bye`。命令路径和重发路径共用它，避免第二份传输代码。
+- 新 `runtime/retry.rs`：启动后跑一遍 `orchestrate::resume` 选出的 outstanding，逐个 `exchange`；拿到回执就
+  `apply_result` 并落盘；报告 `attempted / answered / unanswered / failed`。**一次**，不是窗口的退避循环——排期属于有
+  页面显示它的宿主，daemon 的职责是别忘掉请求。
+- `serve` 用 `TaskSpec::service("intent.retry")` 起一个受监督的一次性任务；`Finished` 是正常结束，不是需要重启的
+  故障。
+- 测试：没有已知地址的 dispatch 记为 `failed`，且板子仍是 `Dispatching`——"到不了"不是"失败了"，24 小时过期或迟到
+  回答仍拥有结局。
+
+**测试**：daemon **234**（+1）；core 716、ipc 123、platform 80；clippy、guards 12/12。
+
+**仍然缺**：daemon 仍没有退避循环，也不读 `intent_retries`（一次失败后同一进程里不会自己再问，只有下次启动）；
+`exchange` 仍只被 daemon 使用，窗口有自己的一份传输代码。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
