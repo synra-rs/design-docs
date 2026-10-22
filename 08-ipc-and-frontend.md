@@ -1202,8 +1202,12 @@ Content-Security-Policy:
       只有 `src/stores/devices.ts`，其余七个没有文件。
       ★ 现存这一个确实是忠实的只读镜像：`:70` 整体替换快照、`:82/:94/:99` 只记录、
       `:133` 的 `switch` 只认三个事件且 `default` 返回 `false`，不含业务规则。
-- [ ] WebView 引擎兼容矩阵（WebView2 / WKWebView / WebKitGTK / Android / iOS）+ 探测 —— **未做**。
-      `WebviewKind` 只存在于设计文档（[09](./09-plugin-system.md)、本文 §384），代码 0 处。
+- [ ] WebView 引擎兼容矩阵（WebView2 / WKWebView / WebKitGTK / Android / iOS）+ 探测 —— **探测做了，矩阵没做**。
+      2026-10-22：`env.webview()` 落地（`@synra/client` 的 `WebviewKind`/`WebviewInfo` + 注入门面的 `detectWebview`）。
+      引擎由**平台**决定（Windows→WebView2、macOS/iOS→WKWebView、Linux→WebKitGTK、Android→系统 WebView），版本从 UA
+      读，读不到就是 `null`——WebKitGTK 的 `AppleWebKit/…` 是 WebKit 的版本而不是 GTK 引擎的，拿它冒充引擎版本会让
+      最低版本判断悄悄错掉。测试覆盖六种 UA 与一个未知平台。
+      **仍然缺的是矩阵本身**：CI 还没有在 WebView2 + WebKitGTK（Docker）+ WKWebView（macOS runner）上跑视觉/功能回归。
       ★ 比"没有"更糟的是：`src/ipc/injection.ts` 原先把 `platform`/`hostKind`/`appVersion`
       当成**硬编码常量**暴露（`platform: () => 'windows'`），在 Linux/macOS/Android 上就是撒谎。
       一个按 `platform()` 分支的插件在所有平台都会走 Windows 那条路，而且**不会报错** ——

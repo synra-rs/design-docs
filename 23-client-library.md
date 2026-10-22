@@ -350,10 +350,26 @@ export interface EnvNamespace {
   darkMode(): boolean
   appVersion(): string
   sdkVersion(): string
+  /**
+   * 渲染这个页面的 WebView 引擎，以及它报告的版本。
+   *
+   * ★ **只用于渐进增强**：一个页面必须在它所支持的最弱引擎上可用，不能把 `kind === 'webview2'` 当作功能是否存在
+   * 的条件。`version` 为 `null` 表示引擎没有在 UA 里报版本（例如 WebKitGTK），不是"版本未知但可以当新版"。
+   */
+  webview(): WebviewInfo
   /** 宿主**平台**是否支持该能力（例：iOS 无 simulate_keys）——与 `can()` 不是一回事 */
   platformSupports(capability: PlatformCapability): boolean
+  /** 宿主**版本**是否实现了某个客户端方法 */
+  hostSupports(feature: ClientFeature): boolean
   /** 本插件是否**被授予**该能力 */
   can(capability: string): boolean
+}
+
+export type WebviewKind = 'webview2' | 'wkwebview' | 'webkitgtk' | 'android-webview' | 'unknown'
+export interface WebviewInfo {
+  kind: WebviewKind
+  /** 引擎没有报版本时为 `null`，不是猜一个 */
+  version: string | null
 }
 
 export interface LogNamespace {
