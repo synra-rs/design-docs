@@ -4332,6 +4332,23 @@ dispatch 都不重发）；app Rust **297**（+4：回答结束意图并落盘�
 **仍然缺**：只有一次机会（下次启动才再试）；daemon 仍然只 `expire` 不重发；目标设备没有地址时这一遍直接失败；
 重发之后仍没回答的，还是等到 24 h 过期；界面上没有"正在重试"的中间态。
 
+### 8.215 插件终于知道自己在哪个 WebView 里，但矩阵仍然没跑
+
+★ 08 §6.1 写着"运行时探测（`WebviewKind`）用于渐进增强"，而 `WebviewKind` 只存在于设计文档：代码 0 处。更早的一版把
+`platform()` 硬编码成 `'windows'`，已经改掉了；引擎这一项一直空着。现在补上**探测**这一半：
+
+- `@synra/client` 新增 `WebviewKind` / `WebviewInfo` 与 `EnvNamespace.webview()`；`@synra/testkit` 的默认值是
+  `unknown`——一个不知道自己在哪的 mock 不该自称现代引擎。客户端包的 `check`（tsc + consumer + shapes + doc-snippets）
+  全绿。
+- 注入门面 `detectWebview(userAgent, platform)`：**引擎由平台决定**，不是由 UA 决定（UA 可以撒谎，而宿主选择引擎是按
+  平台的）；UA 只用来读版本。iOS 的 `OS 17_0` 转成 `17.0`；WebKitGTK 报 `null`，因为它的 `AppleWebKit/605.1.15`
+  是 WebKit 的版本而不是 GTK 引擎的版本，拿它冒充会让最低版本判断悄悄错掉。
+- 前端测试 317（+7：六种 UA + 一个未知平台），`pnpm run build` 重新生成 façade（13.0 KB），`pnpm run shapes` 8 项、
+  `pnpm lint` 0 error。
+
+**仍然缺**：真正的**矩阵**——CI 在 WebView2 / WebKitGTK（Docker）/ WKWebView（macOS）上跑视觉与功能回归；本机没有
+macOS runner，这一条不能在这里补。插件作者文档也还没写"怎么用它做渐进增强"。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
