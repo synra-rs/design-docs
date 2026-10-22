@@ -606,6 +606,12 @@ Content-Security-Policy:
 
 ## 9. 实现清单
 
+> **2026-10-22：更新检查结果与时间已持久化。** `plugin_update_checks` 绑定已安装版本，正负结果都记录；
+> 失败保留上次答案并在下一轮重试，重启不重置 24 小时间隔。`PluginSnapshot.update` 与 `updateCheckedAtMs`
+> 通过 `pluginUpdated` 事件一起更新，插件页直接读共享 store，移除了页面自己的更新表与额外的 mount 读取。
+> `plugins_updates` 仍提供只读列表，但页面首屏已由 `plugins_list` 一次带齐。
+> `Cancellation.wait` 使用条件变量，可立即结束后台的五分钟等待。实现、测试与剩余边界见 `19 §8.234`。
+
 > ★ **2026-10-18：传输的四条命令已经全部注册**（`transfer_list`、`transfer_cancel`、`transfer_send_file`、
 > `transfer_send_text`，壳侧注册总数 29），发送路径端到端可调。明细在 `19 §8.6`：注册表 `Transfers`、
 > `announce_transfer`、`snapshot_from`、`address_of`、`send_over`；测试 5 条（未配对拒绝 ×2、死地址不留行、
