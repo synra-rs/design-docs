@@ -4553,6 +4553,25 @@ code。于是对端的 `capability_denied`、`plugin_not_installed`、`plugin_tr
 **仍然缺**：两个宿主仍各自写循环（共享的是调度值，不是 runner）；daemon 没有界面，重试次数只在日志里；`exchange`
 的两份实现（窗口/daemon）仍未合并。
 
+### 8.227 卡片说得出下一次尝试的时间
+
+★ §8.219 的卡片说"第几次"，但不说"下次什么时候"；`IntentRetry` 没有时间，用户只能盯着 "Retrying (3/8)" 等下一行
+变化。排期里本来就有 `next_at_ms`，只是没进快照。
+
+- `RetryStatus.next_at_ms` / `IntentRetry.nextAtMs`（serde 可选，gave-up 行是 `None`）。页面在 `retryLabel` 里把它
+  格式化成**绝对时间**，显示 "Retrying (3/8), next try at 18:42"。
+- ★ 选绝对时间而不是倒计时：卡片只在事件到来时重渲染，渲染时算出的 "in 30s" 一秒后就是错的；一个时刻在下次重试前
+  一直是真的，也不需要页面自己跑 timer。
+- gave-up 行没有 `nextAtMs`，仍显示 "No answer yet..."；没有该字段时退回原来的 "Retrying (n/m)"——旧壳/旧协议不会
+  因为多一个字段而变差。
+- 测试：core 的状态带 due；DTO 往返；页面用固定的 `nextAtMs` 断言格式化后的时刻；`dto-coverage` 36/36。
+
+**测试**：core 723、ipc 123、daemon 235、platform 80；app Rust 304、前端 **318**；`pnpm run build` / `shapes`、
+`synra-js check`、clippy、guards 12/12。
+
+**仍然缺**：没有倒计时或自动刷新（有意）；时刻的时区由 `toLocaleTimeString` 决定，测试只断言同一个函数的输出；
+daemon 没有界面可显示它。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
