@@ -4623,6 +4623,27 @@ daemon 没有界面可显示它。
 
 **仍然缺**：警告仍是英文（内核的句子）；没有 "view changelog"；自动更新策略仍未做。
 
+### 8.231 更新检查自己跑：每天一次，只通知
+
+★ 16 §6 的"每 24 小时检查，可在设置里关闭"一直没有实现；用户必须自己点 Check。这一轮做的是**通知**那一档，不是自动
+安装：设计的自动条件（信任等级、capability diff、发布者变更）需要的数据这一层还没读，静默安装等于替用户做了一个没被
+问过的决定。
+
+- 新 `commands/plugin_updates.rs`：`plugins.auto_update`（缺省 on）→ 每 24 小时对每个已装插件
+  `registry::check_update`，把结果合成**一条** `notice.updates {count, plugins}`；单个插件失败静默（没配置 registry /
+  网络 / 已下架都一样：这次没有可报的）。
+- 启动时先查一次，之后 5 分钟切片睡眠（不是 250 ms：等一天不该一天醒 34 万次），取消即退；token 进
+  `Background.cancels`。
+- 设置页加 "Check automatically" 开关（缺省 on，写同一个 config key）；`NoticeHost` 收到 `notice.updates` 显示
+  "N plugin updates are available" 并跳到插件页。
+- 测试：默认 on / 写 false 后 off；一次 pass 只发一条 notice；设置开关按自己的 key 写；notice 文案与动作。
+
+**测试**：app Rust **306**（+2）、前端 **321**（+2）；core 725、daemon 235、ipc 123、platform 80；clippy、
+`--features tauri-shell`、build/shapes、guards。
+
+**仍然缺**：不自动安装；设置改了要等下一个周期才生效（当前 sleep 不会被打断）；没有 "last checked" 时间；daemon
+不跑这个检查（无界面）。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
