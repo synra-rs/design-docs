@@ -4308,6 +4308,30 @@ finished。`late_queue::MAX_AGE_MS`（24 h）是迟到回答还能到达的上�
 **仍然缺**：这是"最终会结束"，不是"立刻知道"——对端真的执行了的话，本侧在 24 h 内仍会先显示 running；没有对
 dispatch 的主动重发（离线队列），也没有把"正在等另一台设备"与"已经没人会回答"区分开的界面提示。
 
+### 8.214 重启后把还在等的 dispatch 再发一次
+
+★ §8.213 把"永远等不到"变成了 24 h 后结束，但那只是收尾，不是补救。一个在关机前刚决定、对端还没回答的动作，重启后
+仍然只有两条路：等着（如果对端在 24 h 内回信）或者等它过期。这一轮补上第三条：**用同一个 request id 再发一次**。
+接收端的幂等键就是它——第一次没到，动作跑一次；第一次到了但回信丢了，它把已记录的结果再交一遍。两种答案都比
+"显示 running 一整天"好。
+
+- `orchestrate::resume(intent, local, now)` 从 `Dispatching { candidate, target, request_id }` 重建信封；它与 `decide`
+  共用同一个 `invocation(...)`，所以动作名、参数、插件版本与 request id **不可能各写一份**。`resume` 只认三种情况以外
+  的：`origin` 有值（对端让我做的事，再发等于让对方再跑一次）、target 是本机（从没离开过）、超过迟到回答窗口
+  （`expire_unanswered` 负责结束）。
+- 窗口的 `commands/intent_resume.rs`：`outstanding` 先在 board 锁内取快照并释放，再逐个 `deliver_decided`（最多等
+  `REMOTE_RESULT_WAIT`）；收到回答就 `apply_result` + `announce` + `checkpoint`，没收到就保持 dispatching，发送失败只
+  计数。`resume_with` 把发送做成闭包，测试用一条构造好的回答就能覆盖"应用并落盘"与"失败不动状态"两条路，不需要 peer。
+- 一次启动**一遍**，在 listener 起来之后用一个命名线程跑，窗口不等它。没有定时器、没有退避：一个仍然不可达的设备
+  要等到下次启动或 24 h 过期——把它叫作"离线队列"之前，它得先有调度与退避。
+
+**测试**：core **710**（+2：重建的信封带着原 request id / 同一个 trace、来源对、payload 对；对端请求、本机目标、过期
+dispatch 都不重发）；app Rust **297**（+4：回答结束意图并落盘、失败不动状态、无人回答计为 unanswered、从对端来的
+意图不在重发集合里）；workspace clippy 全绿。
+
+**仍然缺**：只有一次机会（下次启动才再试）；daemon 仍然只 `expire` 不重发；目标设备没有地址时这一遍直接失败；
+重发之后仍没回答的，还是等到 24 h 过期；界面上没有"正在重试"的中间态。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
