@@ -4572,6 +4572,24 @@ code。于是对端的 `capability_denied`、`plugin_not_installed`、`plugin_tr
 **仍然缺**：没有倒计时或自动刷新（有意）；时刻的时区由 `toLocaleTimeString` 决定，测试只断言同一个函数的输出；
 daemon 没有界面可显示它。
 
+### 8.228 重试循环收成一处：宿主只提供"怎么发"和"怎么显示"
+
+★ §8.225/§8.226 之后两个宿主共享的是调度**值**，循环仍是两份；"等 30 秒、最多 8 次、放弃后保留条目"这些话在两处各写
+一遍。这一轮把循环也收进内核。
+
+- `RetryHost` trait 三件事：`pending()`、`attempt(id) -> Attempt`、`changed(id, row, status)`；`run_loop` 负责
+  `take_due / forget / record_failure / observe / next_wait` 与睡眠。`Attempt` 有
+  `Answered / Ended / Unanswered / Failed`——`Ended` 是"意图已经不在飞了，删排期、不重试"。
+- 窗口的实现只剩拨号与发布/落盘；daemon 的实现只剩 `exchange` 与落盘。两边不再各自决定上限、等待、放弃语义。
+- 时钟与 sleep 是参数，内核的单测用假时钟和假睡眠驱动：答完即忘、失败退避到上限并报告 `gave_up`。
+- 日志（gave up）移到 `changed`，因为那是宿主第一次看到 `status.gave_up` 的地方。
+
+**测试**：core **725**（+2）、app 304、daemon 235；ipc 123、platform 80；clippy、`--features tauri-shell`、guards
+12/12。
+
+**仍然缺**：`exchange` 仍是两份（窗口/daemon）；`RetryHost` 的三个方法仍是每个宿主一份薄实现；daemon 没有界面显示
+重试。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
