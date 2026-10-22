@@ -4285,6 +4285,29 @@ workspace clippy 全绿。
 **仍然缺**：tag 只跑检查、不发布（业主的下一步）；app 的 `shell` 作业仍是 `--no-default-features`（与本地一致），
 没有 macOS runner，所以 UI 插件隔离那类只能在窗口里跑的东西依旧不在 CI 里。
 
+### 8.213 没人回答的 dispatch 不再永远显示"运行中"
+
+★ §8.211 让 board 落盘之后，一个 `Dispatching` 的意图重启后仍然是 `Dispatching`——包括对端永远不会回答的那些。
+它既是首页上的一句假话，也是一条**永远不会被回收**的行：保留期只收 finished 的意图，而 `Dispatching` 永远不会
+finished。`late_queue::MAX_AGE_MS`（24 h）是迟到回答还能到达的上限：过了它，对端队列里的答案已经被丢掉，没有任何
+东西还能回答。所以这是把"运行中"结束掉的**可证明**时点，不是拍脑袋的超时数字。
+
+- `Board::expire_dispatch(id, after)`：只动 `Dispatching`；已经结束的意图原样返回——把真实结果回滚成"没人回答"是
+  迟到回答绝不能做的事。它与 `time_out`（matching 窗口的结束）分开，因为两个超时问的不是同一个问题。
+- `persist::expire_unanswered(board, now_ms)` 在恢复之后跑：超过 `MAX_AGE_MS` 的 dispatch 变成
+  `TimedOut { after }`，返回 id 由宿主写盘（壳与 daemon 各循环一次 `checkpoint`）。`after` 是真正等过的时长，
+  不是 matching 窗口。
+- `IntentState::TimedOut` 的文档现在写明它有两个入口：候选列表来晚了，或另一台设备没有回答。用户的下一步都是
+  "再试一次"，所以它们是同一个状态而不是一个 `Failed` 加一句话。界面本来就有 `timedOut` 的标签与颜色，不需要新词。
+
+**测试**：core **708**（+2：窗口内不动、窗口外结束且二次扫描不回滚；已经成功的意图不会被改成没人回答）；app Rust
+**293**（+1：重启后过期的 dispatch 是 `timedOut`）；daemon 233；workspace clippy 全绿。
+另：`plugin_ui` 的一条传输测试等 worker 清行时只给了 2 秒，全量并行跑会偶发 "the failed send left no row"（单独跑
+3/3 通过，空闲时全量也通过）；上限改成 10 秒，条件断言不变——那条断言本来就是"等到行消失"，不是"两秒内消失"。
+
+**仍然缺**：这是"最终会结束"，不是"立刻知道"——对端真的执行了的话，本侧在 24 h 内仍会先显示 running；没有对
+dispatch 的主动重发（离线队列），也没有把"正在等另一台设备"与"已经没人会回答"区分开的界面提示。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
