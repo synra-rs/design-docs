@@ -4608,6 +4608,21 @@ daemon 没有界面可显示它。
 **仍然缺**：`exchange_on` 仍是窗口的薄包装（测试缝）；`send`/`receive` 的调用顺序仍由宿主保证（daemon 要在中间
 计数）；窗口与 daemon 的拨号仍走不同的 identity/metrics 路径（有意）。
 
+### 8.230 更新报告留在页面上，而不是只闪一下
+
+★ §8.221 起 `plugins_update` 返回 `InstallReport`，页面仍把它当 `null` 丢掉；用户能看到的是 shell 发的 toast，几秒
+后消失。警告里最该被重读的一句——"the package is not signed"——恰好只在 toast 里。
+
+- `PluginsPage` 保留最后一次成功更新的 `{pluginId, version, warnings}`，在页头显示可关闭的 success alert，warnings
+  逐条列出。再次更新会替换它，关闭即清空。
+- 这不是第二条通知通道：toast 仍是 shell 从同一份 report 发的；页面只是把同一份数据留得久一点，内容就是内核的句子。
+- 测试：点 Check → Update，断言版本与警告都留在页面上；mock 的 `plugins_update` 返回带 warnings 的 report。
+
+**测试**：前端 **319**（+1）；Rust 未动（core 725、app 304、daemon 235、ipc 123、platform 80）；`pnpm run build` /
+`shapes`、clippy、guards 12/12。
+
+**仍然缺**：警告仍是英文（内核的句子）；没有 "view changelog"；自动更新策略仍未做。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
