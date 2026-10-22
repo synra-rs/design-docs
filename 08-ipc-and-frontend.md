@@ -606,6 +606,10 @@ Content-Security-Policy:
 
 ## 9. 实现清单
 
+> **2026-10-22：CLI 发布者密钥决定已补齐（19 §8.238）。** `plugin publisher list` 查询已验证签名的发布者，
+> `publisher decide ID seen|trusted|revoked --fingerprint FP` 只决定显示的密钥。界面列表与安装后的指纹提示同步传入
+> fingerprint；共享内核验证输入，数据库更新原子比较指纹，未知发布者或错误指纹不写入。信任不代替插件权限授权。
+
 > **2026-10-22：CLI 更新入口已补齐。** `plugin registry`、`policy`、`check`、`update` 通过控制 socket 写配置或执行操作，
 > 手动检查不自动安装，手动更新也不继承新增权限的旧授权。命令和校验细节见 `19 §8.237`。
 

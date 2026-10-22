@@ -702,7 +702,7 @@ pub struct UpdateInfo {
       撤销的 key 现在真的会在 `publisher-trust` 阶段被拒（daemon 测试 `a_revoked_publisher_is_refused_even_with_a_valid_signature`）。
       **仍然缺**：没有命令/界面把 `seen` 变成 `trusted`/`revoked`，也没有指纹确认 UI —— 表只能被安装写入，用户还不能做决定。
       ★ **命令与列表有了**：`plugins_publishers`（Many，返回 `PublisherDto{ publisherId, fingerprint, trust, firstSeenMs,
-      decidedMs }`）与 `plugins_publisher_decide`（`publisherId` + `trust` ∈ `seen|trusted|revoked`）。插件页新增
+      decidedMs }`）与 `plugins_publisher_decide`（`publisherId` + `fingerprint` + `trust` ∈ `seen|trusted|revoked`）。插件页新增
       **Publishers** 区：每个 key 显示 id、指纹、状态，带 “Trust key” / “Revoke key”；命令只改已经存在的行 —— 一个
       没被任何签名见过的 key 不能被“信任”，否则界面能信任一个从未出现过的公钥。
       **仍然缺**：安装签名包后没有即时的指纹确认步骤（用户要自己去列表里点）。
@@ -712,6 +712,10 @@ pub struct UpdateInfo {
       在跑，指纹可以按自己的节奏比对。**仍然缺**：没有“永远不要这个发布者”的一键拒绝（要去列表里 Revoke）。
       ★ **一键拒绝也有了**：提示里三个答案 —— Trust this key / Never trust this publisher / Not now；后两个都关闭提示，
       但只有前者写 `trusted`，中间那个写 `revoked`（之后这个 key 的包会在 `publisher-trust` 阶段被拒）。
+      ★ **CLI 也能决定了（2026-10-22，19 §8.238）**：`synra plugin publisher list` 显示 id、指纹与状态，
+      `publisher decide ID seen|trusted|revoked --fingerprint FP` 明确确认显示的密钥；CLI 与界面调用同一个 core 决策函数，
+      数据库写入匹配指纹，输入错误或旧提示不能决定另一把 key。该操作不授予插件权限、不启用插件、不替换绑定的公钥；
+      §3.3 的密钥轮换协议仍按首版设计留待 v2。
       ★ **决定：只有暗色一套 token**（28 §6 R22）。设置页把 `ui.theme` 印出来并说明“只有一套调色板”，不再画一个永远只有
 一个选项的控件；`ui.theme` 仍是内核记录，插件通过 `env-dark-mode` 读到它。
 - [x] 撤销清单的内置分发与生效（停用已装的被撤销版本）—— **已实现**（第 78 轮）：
