@@ -4745,6 +4745,37 @@ ESLint、构建与 8 项 shapes 检查通过；新增 Rust 模块格式检查及
 **仍然缺**：daemon 的独立 CLI 配置和手动更新命令尚未提供（当前读取共享数据库配置）；自动安装失败后的重试仍沿用
 每日节奏；激活失败保留新版本及拒绝原因，不回退已提交的字节；变更日志入口仍未实现。
 
+### 8.237 CLI 可以配置更新并明确检查与替换
+
+- 新增四类 plugin 子命令，均通过控制 socket 交给持有数据库的 daemon 执行；CLI 不另开数据库写配置。
+  `registry` 无参数读取，URL 参数替换有序列表，`--clear` 删除设置；支持 npm、`static:` 和显式 loopback HTTP。
+  `policy` 无参数读取默认 `notify-only`，参数只接受 `never`、`notify-only`、`auto-minor`、`auto-all`。
+- `plugin check [PLUGIN]` 每次重新取元数据，即使后台策略为 never 或刚完成检查也执行；明确检查不会触发自动安装。
+  单插件目标必须已安装；失败逐项报告并保留旧缓存，CLI 对含失败的报告以非零状态退出，JSON 保留旧答案及失败详情。
+  失败 JSON 在 stderr 直接输出，去掉原先 `synra:` 文本前缀，保证脚本可以直接解析；散文错误仍保留命令名前缀。
+- `plugin update PLUGIN [--version VERSION]` 复用已配置源和同一份下载、完整性校验、解包实现；支持精确版本、范围和 latest。
+  core 新增 `PreparedReplacement`：校验字节保留到提交，绑定被替换版本，提交重新检查当前版本和签名密钥撤销状态。
+  明确更新也必须前进，允许预发布版本；篡改、同版本或降级、未批准公钥变化均在停止旧实例前拒绝。
+- 手动和自动替换共用迁移、停止、提交、恢复加载路径；提交前核对源没有改变。新增权限不继承旧决定，版本已安装但停用，
+  等待单独 consent/enable。新版本不应运行时清掉旧激活失败记录，避免旧错误冒充新版本的失败。
+  已提交但激活失败仍报告新安装版本与激活原因，不把已落盘的更新伪装成失败回退。
+- daemon 集成测试通过真实本地控制 socket 和 HTTP，覆盖两类源、四类请求、手动绕过 never/每日缓存、
+  新权限、预发布版本、换公钥、篡改字节、离线保留缓存和无效配置；CLI 测试覆盖参数、请求映射及失败退出状态。
+
+```text
+synra plugin registry https://registry.example static:https://cdn.example/plugins
+synra plugin policy auto-minor
+synra plugin check
+synra plugin update @acme/hello --version ^1.1
+synra plugin registry --clear
+```
+
+**验证**：core 全工作区 3386 项测试通过；最后两项 daemon 用例加入后，其 251 项单元测试与 9 项配对集成测试再次全过。
+CLI 最终 106 项测试通过，覆盖失败报告及 stderr JSON；严格 Clippy、增改模块格式检查、MSRV 1.88 和 12 项 guards 通过。
+`api-guard` 集成测试通过；直接运行该工具仍报告其测试中已登记的 5 处既有私有 IO 错误类型误报，无新增偏差。
+
+**仍然缺**：CLI 尚无发布者密钥信任和公钥轮换批准入口；自动安装失败重试仍沿用每日节奏；变更日志入口尚未实现。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |

@@ -611,6 +611,12 @@ pub struct UpdateInfo {
 > 提交前再次核对源设置、策略与取消状态。已知撤销的候选版本、安全模式都不自动替换旧版本。
 > daemon 的真实 HTTP 下载改用原始字节，避免 tarball 被 UTF-8 解码损坏；loopback 访问仅由显式本地源授权。
 
+> **2026-10-22：CLI 可以配置源和策略、手动检查与更新（19 §8.237）。**
+> `synra plugin registry [URL...]` 读取或替换有序源列表，`--clear` 清除；`plugin policy [POLICY]` 读取或设置四档策略。
+> `plugin check [PLUGIN]` 忽略后台开关和每日缓存，只检查而不安装；`plugin update PLUGIN [--version VERSION]`
+> 明确更新到更高版本，支持版本范围和预发布版本。检查失败保留上次答案，CLI 同时输出失败详情并以非零状态退出。
+> 手动更新复用完整校验与生命周期切换；新增权限清除旧授权并停用，未批准的公钥变化在停止旧实例前拒绝。
+
 ---
 
 > ★ **而第 79 轮把第一行做成了**：`synra_plugin_host::catalog`：
