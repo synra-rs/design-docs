@@ -4407,6 +4407,27 @@ daemon 233；workspace clippy 全绿。
 
 **仍然缺**：`TimedOut` 没有解释；界面不显示 `details.kernelMessage`；错误里的 `params` 仍无读者。
 
+### 8.219 重试不再只是后台的事：卡片会说 "Retrying (3/8)"
+
+★ §8.216 有了退避循环，但界面仍只看到 `dispatching`：一台设备睡着时，卡片和第一次尝试时一模一样。这一轮让后端把
+重试进度放进 `IntentSnapshot`，页面据此说人话。
+
+- 契约：`IntentRetry { attempts, maxAttempts, gaveUp }`，`IntentSnapshot.retry: Option<...>`。`None` 表示**还没失败
+  过**——一个第一次尝试仍在等的意图只是 dispatching，而 "retrying 0/8" 是在描述没有发生的事。
+- 壳：`AppState.intent_retries` 是循环写的共享表；`RetryQueue.status` 从第一次失败之后才有值。每次失败/放弃/回答后
+  `publish` 只在状态真的变化时发 `IntentUpdated`，所以卡片会从 "Running" 变成 "Retrying (1/8)"，第 8 次后变成
+  "No answer yet..."，回答后那行消失。`gaveUp` 的意图**仍是** `dispatching`——放弃的是这个进程的努力，状态词与颜色
+  都不变，只多一句补充。
+- 前端：`HomePage` 在 trace 行下显示这一句；两条文案分开（还在重试 / 已经放弃），不把 "gave up" 说成失败。
+  `@synra/protocol` 镜像加 `IntentRetry`，`dto-coverage` 36/36。
+
+**测试**：core 713、ipc 123 不变；app Rust **308**（+2：第一次失败前状态为空、发布后进入快照并可清除）；前端
+**318**（+1：两张卡分别显示 Retrying (3/8) 与 No answer yet）；`pnpm run build` / `shapes`、`synra-js check`
+（36 个 DTO）、clippy、`--features tauri-shell` 编译、guards 12/12。
+
+**仍然缺**：没有倒计时（要显示"30 秒后"得再有一个 timer）；次数不持久，重启清零；daemon 的意图没有这个字段；界面
+只说"下次启动会再试"，没有说重试策略本身。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
