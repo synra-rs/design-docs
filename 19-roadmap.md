@@ -4464,6 +4464,21 @@ warnings、publisher）在 `registry::update` 里被 `.map(|_| ())` 扔掉。文
 **仍然缺**：`plugins_update` 的返回报告页面还没渲染（现在靠 notice）；publisher/trust 变化仍不在 report 里；UI 仍只把
 `plugins_install` 的报告画出来。
 
+### 8.222 "Timed out" 也有了原因：等了多久
+
+★ §8.217 把 `Refused` 的原因接上，§8.218 修了开始时间；`TimedOut` 是最后一个只有状态词、没有事实的终态。它的
+`after` 一直在板里，视图没带出来。
+
+- `IntentView.error` 对 `TimedOut { after }` 映射为 `SynraError::new(Timeout, "nothing answered within {after} ms")`；
+  页面照常翻成 `error.timeout`，`details.kernelMessage` 里保留等待时长。
+- 两个入口共用这一句：matching 窗口关闭，以及 §8.213 的 dispatch 过了迟到回答窗口——用户看到的都是 "Timed out"，
+  但至少知道等了多久。
+
+**测试**：core **714**（+1）、app Rust **311**（+1）；ipc 123、daemon 233、platform 80；clippy、guards 12/12。
+
+**仍然缺**：远端失败的原因仍以 `Internal` 到达（`InvokeResult.error` 只有字符串，没有 code）；`Cancelled` 的 reason
+仍不显示（用户自己的动作，优先级低）。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
