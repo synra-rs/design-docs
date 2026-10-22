@@ -4370,6 +4370,26 @@ macOS runner，这一条不能在这里补。插件作者文档也还没写"怎�
 **仍然缺**：尝试次数只在内存里，重启清零；daemon 仍然只 `expire` 不重发；放弃之后要到下次启动再试（约 28 分钟的
 窗口）；界面仍只有 `dispatching`，没有"正在重试 / 已放弃"的区分。
 
+### 8.217 失败的意图终于说出了原因
+
+★ `IntentSnapshot.error` 从 §8.195 / §8.196 起就在契约与 TypeScript 镜像里，页面也有 `intentError` 的整条分支；
+但壳的 `snapshot_of` 一直写着 `error: None`。于是每一个**真实失败**的意图都渲染成 "Failed" 加一句泛化的话——
+字段、类型、翻译、测试替身全齐了，唯一缺的是**填它的人**。设计文档把这条列在 §8.195 的"仍然缺"里，但它比"缺一条
+提示"更糟：一个存在而永远为空的字段，让下一个人以为失败原因已经接通了。
+
+- 内核 `IntentView` 增加 `error: Option<SynraError>`，`snapshot` 从 `IntentState::Failed` 取；控制协议的
+  `to_json` 也带上它（`null` 表示没有）。`TimedOut` / `Refused` **不造**错误：它们各自有状态词与颜色，硬塞一句话
+  只会变成第二份更差的描述。
+- 壳经 `IpcError::from_synra_error` 映射：code 变成 `error.*` 消息键，内核的句子进 `details.kernelMessage` 给 bug
+  report，而不是当成给用户读的文案。
+- 页面一行都不用改：`HomePage` 的 `intentError` 本来就走这条链，镜像里 `error?: IpcError` 也早就在。
+
+**测试**：core **712**（+2：失败的视图带 code/message 且 `to_json` 有 error；成功的视图为 `None`）；app Rust
+**305**（+2：壳把 code 变成键并保留句子；成功的意图不带 error）；daemon 233；workspace clippy 全绿，guards 12/12。
+
+**仍然缺**：`TimedOut` 与 `Refused` 仍然只有状态词；`IntentSnapshot.startedAtMs` 仍是读取时刻而不是开始时刻；错误
+里的 `params` 仍然没有读者；界面不显示 `details` 里的内核句子（那是故意的，但一个"复制诊断信息"的入口还没有）。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
