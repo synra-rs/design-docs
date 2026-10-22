@@ -141,6 +141,7 @@ pub fn open(path: &Utf8Path) -> Result<Connection, StoreError> {
 | `sync_records`           | 跨设备同步历史                                | 可清理       |
 | `transfer_sessions`      | 传输会话（用于续传）                          | TTL 清理     |
 | `intents`                | 意图（可选持久化，用于离线排队）               | TTL 清理     |
+| `intent_retries`         | 一个 dispatch 的重试排期（次数、下次时间、是否放弃） | 随意图级联删除 |
 | `config`                 | 配置 KV                                     | 永久         |
 | `schema_migrations`      | 迁移版本（由 rusqlite_migration 管理）         | 永久         |
 
@@ -688,9 +689,9 @@ plugins-manifest.json   # 已装插件清单（id + version + source），用于
 - [x] `rusqlite` + `bundled` + WAL —— **C**：`rusqlite 0.40` + `bundled` 在
       `crates/synra-store/Cargo.toml`；WAL 在 `db/migrations.rs:228`。
       ★ `rusqlite_migration` **不是依赖**，用手写 `MIGRATIONS` 常量 + `db::apply` 取代。
-- [ ] 5 个初始迁移脚本 + CI 对"空库/旧库"各跑一次 —— **实际是 9 个**迁移（第 106 轮核对：写这一行时是 7 个，后来又加了两个）
-      （`db/migrations.rs:18-209`），不是 5 个。空库有真实 SQLite 测试（`sqlite/tests.rs:18`）；
-      "旧库"只在纯模型层覆盖（`db/tests.rs:173` 用闭包而非真库）；
+- [ ] 5 个初始迁移脚本 + CI 对"空库/旧库"各跑一次 —— **实际是 14 个**迁移（第 106 轮核对为 9 个；之后加了
+      `publisher-trust`、`audit-trace`，2026-10-22 又加了 `intent-retries`），不是 5 个。空库有真实 SQLite 测试
+      （`sqlite/tests.rs:18`）；"旧库"只在纯模型层覆盖（`db/tests.rs:173` 用闭包而非真库）；
       ★ **CI 从 2026-10-18 起存在**（`synra-core` 与 `synra-app` 各一个 `checks` workflow），所以"没有 CI"不再是
       这半缺失的原因 —— 原因变成"CI 里没有这一项"：两个 workflow 跑的都是 `cargo test`，没有一个 job 会**两次**
       启动内核（空库一次、旧库一次）并把两边的报告收起来。
