@@ -396,7 +396,7 @@ pub struct PluginConfig {
     pub allow_local_install: bool,                 // false（生产）
     pub default_quota: QuotaTier,                 // standard | relaxed
     pub max_installed: u32,                       // 默认 100
-    pub auto_update: UpdatePolicy,                // notify_only (默认) | auto_minor | auto_all | never
+    pub auto_update: UpdatePolicy,                // notify-only (默认) | auto-minor | auto-all | never
     pub keep_old_versions: u32,                   // 默认 2
 }
 
