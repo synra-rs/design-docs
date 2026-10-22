@@ -4535,6 +4535,24 @@ code。于是对端的 `capability_denied`、`plugin_not_installed`、`plugin_tr
 **仍然缺**：daemon 还没接这份队列（仍是一次）；窗口的循环与 daemon 的一次性仍是两段控制流；`retry` 模块只有调度值，
 没有"跑一轮"的共享 runner。
 
+### 8.226 守护进程接上同一份排期：从"启动问一次"到"按退避问"
+
+★ §8.224 的 daemon 只重发一次；§8.225 把队列搬进内核后，没有理由再让两个宿主跑两套节奏。这一轮 daemon 的
+`intent.retry` 从一次性任务变成循环。
+
+- 启动先立即发一遍（保留 §8.224 的语义），然后 `load_intent_retries` + `RetryQueue::restore`，与窗口同一条规则：
+  恢复次数与下次时间，gave-up 行重置并删除，已结束的行清掉。
+- 每轮 `take_due` → `exchange` → `apply_result`；成功/结束就 `forget` 并删行，失败/无回答就 `record_failure` 并写行，
+  `observe` 新 dispatch，`next_wait` 切片睡眠（取消即退）。
+- 同一份 `RetryPolicy::default`（30 秒起、5 分钟封顶、8 次），同一张 `intent_retries` 表：两个宿主第一次在"重试"
+  上完全一致。
+- 测试：循环在 30 ms 内响应取消；没有已知地址的 dispatch 仍记为 `failed`、状态不变。
+
+**测试**：daemon **235**（+1）；core 723、app 304、ipc 123、platform 80；clippy、guards 12/12。
+
+**仍然缺**：两个宿主仍各自写循环（共享的是调度值，不是 runner）；daemon 没有界面，重试次数只在日志里；`exchange`
+的两份实现（窗口/daemon）仍未合并。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
