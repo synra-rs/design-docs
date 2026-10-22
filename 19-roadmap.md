@@ -4200,6 +4200,43 @@ query 里未知 id 时页面显示空列表，没有"不认识的插件"说明�
 **仍然缺**：拖放**非包文件**没有反馈（静默忽略）；macOS 的 `Opened` 分支未编译验证；
 没有拖放视觉反馈（窗口不显示"松开以安装"）；文件分享到设备仍没有入口。
 
+### 8.210 窗口宿主第一次把动作发到另一台设备，并且等它的回答
+
+★ `intent_decide` 对"在另一台设备上运行"的候选一直是**拒绝**的：`refuse_if_remote` 写着
+"this shell has no transport"。那句话在写下的那天是真的；壳为了传输长出 listener 与 dial 之后，它就不再是真的。
+于是界面上一个明确显示为 online 的设备，选中它得到的是一句"I cannot send it"——这正是"看起来做了、实际没有"的形状，
+只不过这次包在一个错误码里。daemon 从 §8.97 起就会发这些信封，缺的只是**窗口宿主**这一半。
+
+- `commands/intent_remote.rs`：解析地址（`address_of`，配对表里没有地址就是 `Unsupported` 而不是网络错误）→ 按
+  `synra_core::retry` 重试拨号（3 次、100/200 ms，理由与 §8.134 相同）→ `send` → **只在信封是
+  `_synra.intent.invoke` 时**读同一条连接上那一个回答 → `bye`。取消不等待：协议没有"I stopped"的回信，等它只会花掉
+  整个超时去确认一件协议没承诺的事。
+- `intent_decide` / `intent_cancel` 在决定产生 `Outbound` 时真的发出去。**先 announce 再交付**：一个远程动作可能要花
+  掉整个等待，卡片必须在那之前就说 dispatching，否则用户面对的是一个不动也不说的界面；收到回答后 `apply_result`，
+  再 announce 一次。超时**不伪造结果**——意图保持 dispatching，迟到的回答仍由 listener 应用（§8.102 那条路径）。
+  发送失败也不撤销已经发生的决定：本地状态照旧，错误只说对方没有被告知。
+- 等待时长从 daemon 搬进内核：`synra_core::dispatch::REMOTE_RESULT_WAIT`（`EXECUTE_BUDGET_MS + 3 s`）。两个宿主各写
+  一份同样的算术，是执行预算一改就漂移的形状——一边报 succeeded，另一边还在说 in flight。
+- 两条命令标 `#[tauri::command(async)]`：八秒的等待不能占着收 invoke 的那个线程（窗口线程），与 `devices_scan_start`
+  同一个理由、同一个手法（同步函数上的 `(async)` 交给 sync threadpool）。
+
+**测试**：app Rust **290**（+7：回答在**同一条链路**上回来且 `reply_to` 等于请求 id；超时不伪造结果；取消**不等待**
+（断言整个交换 < 2 s）；不是 `INTENT_RESULT` 的答复被当作协议错误拒绝；没有地址的设备在打开 socket 之前就被拒；
+invoke 等、cancel 不等由同一张表推导；信封进了链路的帧计数器）；core 701、daemon 233、platform 80、plugin-host
+（`wasm-runtime`）352，workspace clippy 全绿；`pnpm test` 310、`pnpm run shapes` 8 项、`pnpm run build`、`pnpm lint`
+0 error。
+
+★ **这一轮开始时 HEAD 是红的，两处都先修了再开工**：
+1. `synra-core::install::package_manifest`（§8.201 引入）直接调了 `std::fs::remove_dir_all`，而 11 §D2 的守卫只允许
+   `sandbox.rs` / `plugin_files.rs` 删目录树——`cargo run -p guards` 在上一轮提交上就是 FAIL。改成
+   `synra_store::remove_tree(&staging_root, &unpacked)`，把递归删除留给那个唯一的所有者，连同它的包含检查。
+2. `synra-platform` 的一条旧测试有一个单元素 `for` 和一行没人用的 `shares`，当前 stable 的 clippy 拒绝它。core CI 用
+   的是 stable 而不是 pin 住的旧版本，所以这条迟早会红——去掉循环，断言不变。
+
+**仍然缺**：远端决定仍然不持久（壳的 board 是内存的，重启后 dispatching 的意图消失）；发送本身不写 trace 行，只有
+收到结果时的 `apply_result` 会写；`REMOTE_RESULT_WAIT` 之外的迟到结果仍没有队列；测试用的是内存链路，**真实拨号**只有
+"没有地址"这条拒绝路径被覆盖。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
