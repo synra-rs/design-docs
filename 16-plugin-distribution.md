@@ -598,6 +598,13 @@ pub struct UpdateInfo {
 | 当前版本在撤销列表中                      | ✅ 强制更新（或停用） |
 | 其余情况                                 | ✅ 自动（若策略为 AutoMinor/AutoAll） |
 
+> **2026-10-22：app 已接通自动安装（19 §8.235）。** `plugins.auto_update` 使用 `never`、`notify-only`（默认）、
+> `auto-minor`、`auto-all`；策略作用于下一次到期检查。真实 tarball 通过摘要、签名和安装校验后，
+> `prepare_automatic_update` 用已安装 manifest、签名和当前发布者信任判断门槛，而非相信 registry 的权限摘要。
+> 准备对象保留校验过的字节；宿主迁移并停止旧实例后，提交再次核对版本、信任和配置策略。
+> 版本与继承的权限决定在同一事务提交；新增权限或发布者变化不继承旧授权。自动安装失败保留更新提示，
+> 供用户手动处理；撤销版本继续由现有撤销流程停用。后台调度目前只在 app 运行。
+
 ---
 
 > ★ **而第 79 轮把第一行做成了**：`synra_plugin_host::catalog`：

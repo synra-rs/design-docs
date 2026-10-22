@@ -606,6 +606,10 @@ Content-Security-Policy:
 
 ## 9. 实现清单
 
+> **2026-10-22：更新策略已连接真实安装。** 设置页四档策略写入 `plugins.auto_update`，默认 `notify-only`；
+> `auto-minor`/`auto-all` 只安装相同可信签名者且无新增权限的稳定新版本。旧实例迁移、停止与新实例加载复用手动更新流程，
+> 版本与权限决定原子提交，拒绝时保留旧版本及提示。实现与验证见 `19 §8.235`。
+
 > **2026-10-22：更新检查结果与时间已持久化。** `plugin_update_checks` 绑定已安装版本，正负结果都记录；
 > 失败保留上次答案并在下一轮重试，重启不重置 24 小时间隔。`PluginSnapshot.update` 与 `updateCheckedAtMs`
 > 通过 `pluginUpdated` 事件一起更新，插件页直接读共享 store，移除了页面自己的更新表与额外的 mount 读取。
