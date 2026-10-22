@@ -4237,6 +4237,54 @@ invoke 等、cancel 不等由同一张表推导；信封进了链路的帧计数
 收到结果时的 `apply_result` 会写；`REMOTE_RESULT_WAIT` 之外的迟到结果仍没有队列；测试用的是内存链路，**真实拨号**只有
 "没有地址"这条拒绝路径被覆盖。
 
+### 8.211 窗口的 board 也落盘了，远程动作也终于会出现在界面上
+
+★ §8.210 修好了"窗口把动作发出去"，并把这个缺口写进了"仍然缺"：窗口的 board 仍然只在内存里。关掉重开，所有意图
+消失——包括**对端正在等回答的那一个**。对端重试时 `accept_remote` 在空 board 上找不到请求，于是动作执行第二次。
+daemon 从 `runtime/intents.rs` 起就有 checkpoint/restore，窗口两样都没有；而两份行映射就是两份会漂移的状态名。所以
+映射搬进了内核。
+
+- `synra_core::intent::persist`：`record_of` / `row_of` / `restore_rows` / `restore` / `collect` 与
+  `INTENT_RETENTION_MS`。`state` 仍取 `IntentState::kind()`（保留期按它过滤），保留期仍是 `17 §6` 的
+  "完成之后 24 小时"。daemon 的 `checkpoint_intent` / `restore_intents` / `collect` 只剩"读、写、记日志"，窗口用同一份。
+- 窗口在 `AppState::new` 里先 `load_intents`（数据库锁）再取 board 锁 `restore_rows`——**先读后锁**，因为反过来会让
+  每个意图命令等的锁横跨一次磁盘读。读不出来的行被点名跳过而不是让窗口起不来；同一次构造里 `collect` 掉过期的已完成
+  意图。写入点是 `intent_dispatch`、`intent_decide`（决定之后、远端回答之后各一次）、`intent_cancel`，以及 listener
+  的三个远程分支（invoke / cancel / late result）。写失败只 `eprintln!`：每一次都发生在动作之后，拒绝会说"什么都没
+  发生"，而实际上发生了。
+- ★ 顺带补上 §8.97 留下的那一半**可见性**：listener 处理完远程动作只改了 board，从未发布 `IntentUpdated`，所以首页
+  永远看不到"另一台设备让我做的事"。现在 `record_and_announce` 把事件与行写在一起，不会一个有、一个没有。
+
+**测试**：core **706**（+5：store 往返、未知 id 不是行、坏文档被点名跳过、重复恢复不倒退、只收过期的已完成意图）；
+daemon 233；app Rust **292**（+2：窗口自己 raise 的意图重启后还在；对端 invoke 的意图被写下来并在重启后回来）；
+workspace clippy 全绿。
+
+**仍然缺**：远端决定在发送失败时仍留在 `dispatching`（不伪造结果，代价是重启后可能永远停在那）；`Ok(None)` 的重复
+远程请求不发事件（它本来也没变）；窗口没有后台保留期线程，只在启动时收一次；恢复出来的 `Dispatching` 意图没有"对端
+还会不会回答"的超时，只能等保留期（而它永远不会是 finished）。
+
+### 8.212 CI 的入口只剩发布标签，检查由发布工作流调用
+
+★ 三个仓库的检查此前各自在 `push: main` 与 `pull_request` 上跑，而 app 的 interface 作业**没有 checkout 内核**：
+`src/ipc/registration.test.ts` 与 `src/ipc/commands.test.ts` 直接抛 "the IPC contract is unreadable"；同一作业里的
+`scripts/check-shapes.ts` 则**跳过**对照后依旧绿——一次从未对照过的运行和一次对照通过的运行，在摘要里长得一样。
+业主的规则是：门禁只有 `v*` 标签那一刻，其余检查由发布工作流主动调用。
+
+- app / core 的 `ci.yml` 改成 `on: workflow_call`，检查的定义仍然只有这一份；顶层的 `concurrency` 去掉（reusable
+  workflow 不继承它），移到调用方。新增 `release.yaml`：只在 `v*` 标签触发，`checks` 作业
+  `uses: ./.github/workflows/ci.yml`。发布步骤（打包、签名、`cargo harbor`、npm）留给业主；这一版的标签只做门禁，
+  不做"假装发布"的空作业。
+- app 的 interface 作业补上 `synra-rs/synra-core` → `synra-rust-core` 的 checkout。测试的路径是
+  `<app>/../synra-rust-core`，而作业把 app 放在 `synra-rust-app` 下，缺的正是这个兄弟目录。
+- 与 `synra-js` 相同的取舍写进了文件头：合进 main 的坏提交要到发布时才发现。这是"只有一个入口"的代价，不是遗漏；
+  要恢复 PR 侧门禁应另加一个文件，而不是把 `pull_request` 加回发布工作流。
+
+**测试**：四个 YAML 经 `yaml.safe_load` 解析；本地 `pnpm test` 310、`pnpm run shapes`、`pnpm run build`、`pnpm lint`
+0 error、`cargo test`（app 292 / core 706 / daemon 233）、clippy、guards、matrix 全绿。GitHub 上的 tag 运行本机无法验证。
+
+**仍然缺**：tag 只跑检查、不发布（业主的下一步）；app 的 `shell` 作业仍是 `--no-default-features`（与本地一致），
+没有 macOS runner，所以 UI 插件隔离那类只能在窗口里跑的东西依旧不在 CI 里。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
