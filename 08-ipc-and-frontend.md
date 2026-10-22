@@ -108,7 +108,7 @@
 #[tauri::command] async fn plugins_disable(state: State<'_, AppState>, plugin_id: PluginId) -> Result<(), IpcError>;
 #[tauri::command] async fn plugins_consent_respond(state: State<'_, AppState>, plugin_id: PluginId, granted: Vec<String>, denied: Vec<String>) -> Result<(), IpcError>;
 #[tauri::command] async fn plugins_check_update(state: State<'_, AppState>, plugin_id: PluginId) -> Result<Option<UpdateInfo>, IpcError>;
-#[tauri::command] async fn plugins_update(state: State<'_, AppState>, plugin_id: PluginId, to: String) -> Result<(), IpcError>;
+#[tauri::command] async fn plugins_update(state: State<'_, AppState>, plugin_id: PluginId) -> Result<InstallReport, IpcError>;
 /// 重试一个 faulted 插件的装载，**不改任何开关**：它已经 enabled + trusted，失败的是启动。
 #[tauri::command] async fn plugins_reload(state: State<'_, AppState>, plugin_id: PluginId) -> Result<PluginSnapshot, IpcError>;
 #[tauri::command] async fn plugins_sync_plan(state: State<'_, AppState>, plugin_id: PluginId) -> Result<SyncPlanDto, IpcError>;

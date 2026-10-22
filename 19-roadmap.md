@@ -4447,6 +4447,23 @@ daemon 233；workspace clippy 全绿。
 **仍然缺**：daemon 仍不读这张表；排期与意图不在同一事务（意图那行不在时外键会拒绝并记日志，而不是静默成功）；
 没有倒计时。
 
+### 8.221 更新之后说清楚装了什么，以及有什么警告
+
+★ §8.206 把这条写进"仍然缺"：`plugins_update` 的命令返回值仍是 `Unit`，而注册表更新产生的 `InstallReport`（版本、
+warnings、publisher）在 `registry::update` 里被 `.map(|_| ())` 扔掉。文件关联那条更新路径会发 `notice.updated`，
+注册表这条不会——同一个动作、两种说法，取决于用户从哪个按钮按的。
+
+- `registry::update` 返回 `InstallReport`；`plugins_update` 返回它，并发布与文件关联路径相同的 `notice.updated`
+  （`pluginId` / `version` / `warnings`）。两条路径现在都会告诉用户装了什么、哪项检查只是警告。
+- 契约里 `plugins_update` 从 `Unit` 改为 `One`；壳的 wrapper、fake kernel、`PluginsPage` 的 `call<InstallReport>`
+  跟着改。`commands.test.ts` 的 arity 检查会抓住"fake 仍答 `null`"这种漂移。
+- 测试：壳的一条测试断言 notice 的版本与警告；`pnpm run build` / `test` / `shapes`（8 项）全绿。
+
+**测试**：core 713、ipc 123、daemon 233、platform 80；app Rust **310**（+1）、前端 318；clippy、guards 12/12。
+
+**仍然缺**：`plugins_update` 的返回报告页面还没渲染（现在靠 notice）；publisher/trust 变化仍不在 report 里；UI 仍只把
+`plugins_install` 的报告画出来。
+
 ## 9. 每阶段的"退出条件"（不允许跳过的）
 
 | 阶段 | 退出条件（缺一不可）                                                                   |
