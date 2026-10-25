@@ -4,15 +4,14 @@
 
 ---
 
-## 1. 插件作者的三种选择
+## 1. 插件作者的两种选择
 
 | 路径            | 语言           | 产物                    | 适用场景                          |
 | --------------- | -------------- | ----------------------- | --------------------------------- |
 | **Rust headless** | Rust           | `plugin.wasm`           | 逻辑、动作、协议解析（**推荐**）    |
 | **Rust hybrid**  | Rust + HTML/JS | `plugin.wasm` + `ui.zip` | 需要自定义界面                     |
-| **TS UI-only**   | TypeScript/Vue | `ui.zip`                | 只需要一个界面，逻辑很轻（如设置面板） |
 
-**不推荐**：纯 JS 的 headless 插件。
+**不支持**：纯 UI 插件或纯 JS 的 headless 插件。TypeScript/Vue 可用于 hybrid 的 UI 部分，安装包仍必须包含 headless 组件。
 理由：headless 的价值在于"跑在内核里、可被内核调度、有强隔离"。纯 JS 做不到（要么同 realm 无隔离，要么 WebView 里被挂起）。
 
 > **对旧插件作者的迁移路径**：旧插件（Vue SPA + `defin` 逻辑混在一起）迁移到 Rust 版时：
@@ -194,7 +193,7 @@ pub fn to_wire_slug(id: &PluginId) -> PluginSlug;
 | 声明的 artifact 存在                       | 两者        | 拒绝                       |
 | capability 语法合法                        | 两者        | 拒绝                       |
 | headless 插件不得声明 `ui:*`               | 两者        | 拒绝                       |
-| UI-only 插件不得声明 headless 专属能力       | 两者        | 拒绝                       |
+| 缺少 headless 组件或只有 UI artifact        | 两者        | 拒绝                       |
 | `network.outbound` 与 `network:*` 能力一致  | 两者        | 拒绝                       |
 | `actions[].name` 无重复                    | 两者        | 拒绝                       |
 | `events[].name` 在该插件内唯一              | 两者        | 拒绝                       |
@@ -756,6 +755,9 @@ synra-plugin keygen --out ~/.synra/keys/dev.key
 
 ## 8. 实现清单
 
+> 以下清单及第 180 轮记录是早期评估，保留用于追溯；其中模板、命令和测试数量不能作为当前状态。
+> 当前契约以正文为准，本轮设计修订的待开发项见 [19 §0.2](./19-roadmap.md)。
+
 > ★ 这一节在实现之前写就，长期整节未勾选。逐条核对源码后：**合同、生成器、类型库是真货**；
 > 薄封装、属性宏、打包、发布、模板都没有。**"verify 通过"与"部署会被拒"之间目前有一道缝**（见 755）。
 
@@ -813,7 +815,7 @@ synra-plugin keygen --out ~/.synra/keys/dev.key
       只有宿主侧 `plugin-host/src/verify/mod.rs:64` 的 `Stage::ImportsWithinCapabilities` 有。
       后果是作者本地 `verify` 得到的"通过"，并不包含部署时会被拒的那一条 ——
       一个本地全绿的插件可能在装载期被拒，而 CLI 没有告诉他为什么。
-- [ ] Rust headless 模板 + Rust hybrid 模板 + TS UI-only 模板 —— **C/半个**：
+- [ ] Rust headless 模板 + Rust hybrid 模板；纯 UI 模板不属于目标支持范围。以下为早期模板观察，并非当前实现状态：
       `template.rs:36-43` 的 `TemplateKind{Headless,Ui,Hybrid}` 三套确实存在并被测试（`validate_manifest`）。
       ★ **headless 模板不是组件**：`template.rs:386-403` 产出的是 `cdylib` +
       `#[no_mangle] extern "C" fn synra_plugin_activate()`，与 WIT 要求的

@@ -1,8 +1,8 @@
 # Synra · 设计文档
 
-> 版本：`v1.0-draft`
-> 日期：2026-07-22
-> 文档目录：`D:/Projects/synra-rust/design-docs/`（**未来会独立成一个仓库**）
+> 版本：`v1.1-draft`
+> 日期：2026-10-25
+> 文档目录：`D:/Projects/synra-rust/design-docs/`（独立仓库 `synra-rs/design-docs`）
 > 性质：**设计文档（Design-First）**。本目录不含实现代码，只定义契约、边界、取舍与路线。
 
 ---
@@ -27,13 +27,15 @@
 
 ---
 
-## 1. 当前目录形态（设计期）
+## 1. 当前目录形态
 
 ```
-D:/Projects/synra-rust/          # ← 设计期的临时容器（各仓库最终各自独立）
+D:/Projects/synra-rust/          # 各仓库并排检出
 ├─ design-docs/                   # ★ 本仓库（synra-rs/design-docs，已推送）
-├─ synra-rust-core/               # 内核骨架（只有 README.md）
-└─ synra-rust-app/                # 应用骨架（只有 README.md）
+├─ synra-rust-core/               # Rust workspace、daemon、CLI 与工具
+├─ synra-rust-app/                # Tauri 应用
+├─ synra-js/                      # 插件 UI 类型、客户端与主题
+└─ docs/                          # 官网、用户文档与 schema
 ```
 
 > 目录名带 `synra-rust-` 前缀是**设计期遗留**，与仓库名（`synra-core` / `synra-app`）不同。
@@ -93,6 +95,17 @@ D:/Projects/
 | 8  | **官网 = 用户文档 = schema 托管**，同一个仓库（`docs`），VitePress + Netlify | [27](./27-website.md) |
 | 9  | **域名 `synra-app.dev`**；包标识符 **`dev.synra-app.app`**        | [22 Q-11](./22-risks.md) |
 | 10 | **App UI 只有一份样式真相源**：`@synra/theme`（在 `synra-js/packages/theme`）——包根是零依赖的 token，外部 UI 走子路径（`./unocss` / `./vitepress` / `./css`），三个消费者都从它取 | [28](./28-app-ui.md) |
+| 11 | **设备连接需要持久身份与认证加密**；局域网不作为信任边界 | [04 §7.2、§8.2](./04-wire-protocol.md)、ADR-017 |
+| 12 | **共享运行时持有完整业务流程**；daemon 与应用只做宿主适配 | [03 §4](./03-architecture-baseline.md)、[07 §9.1](./07-core-kernel.md)、ADR-018 |
+| 13 | **安装记录、安装更新任务、运行实例分别建模** | [14 §1](./14-plugin-lifecycle.md)、ADR-019 |
+| 14 | **资源清理、安装提交、数据迁移与恢复分别定义保证** | [14 §3.1](./14-plugin-lifecycle.md)、ADR-020 |
+| 15 | **未发布阶段允许直接重构，不承担旧格式兼容或内部 API 冻结承诺** | [26 §2](./26-core-stability-and-perf.md)、ADR-021 |
+| 16 | **固定开发工具链，MSRV 独立验证；按改动范围选择验证层级** | [06 §7.0](./06-workspace-layout.md)、[21 §1.2](./21-testing-strategy.md)、ADR-022 |
+| 17 | **规范、决策、当前计划与历史记录分开维护** | [24 §2.4](./24-migration-map.md)、ADR-023 |
+
+第 11–17 项于 2026-10-25 修订，决策理由见 [20 ADR](./20-adr.md)。
+**它们是目标契约，不是已实现声明**；当前差距和验收统一列于 [19 §0.2](./19-roadmap.md)。
+历史记录保留原编号于 [history](./history/README.md)，不作为当前待办或测试结果。
 
 ---
 
@@ -129,7 +142,7 @@ synra-core/
 └─ spike/                          #   M0 的技术验证，不进 workspace，结论见 RESULTS.md
 ```
 
-**本仓库不含设计文档** —— 设计文档在 [`docs` 仓库](https://github.com/synra-rs/docs)。
+**core 仓库不含本套设计文档** —— 设计文档在 [`design-docs` 仓库](https://github.com/synra-rs/design-docs)。
 
 ### 3.2 `synra-app` — Tauri 应用
 
@@ -171,6 +184,7 @@ synra-js/packages/
 ```
 design-docs/
 ├─ README.md · 01-charter.md · … · 28-app-ui.md   # 28 篇（见 §4 分流表）
+├─ history/                                  # 开发与调查记录归档，不是当前规范
 └─ 无构建：纯 Markdown，不上站点（理由见 §1.1）
 ```
 
@@ -381,7 +395,8 @@ docs/
 | rusqlite | **`0.40`**（`bundled`） | 本地持久化。`bundled` 是**移动端的前提**，不是可选项（见 spike 4） |
 | quinn    | `0.11.x`           | 可选传输（[ADR-004](./20-adr.md)）                      |
 
-> ⚠️ **不写 `rust-toolchain.toml`**（会让 CI 的 MSRV job 失效，[ADR-014](./20-adr.md)）。
+> 开发与 CI 主检查的目标工具链在 `rust-toolchain.toml` 固定；MSRV 单独显式选择编译器验证。
+> 此约定取代 ADR-014，尚待实现，见 [06 §7.0](./06-workspace-layout.md)、[ADR-022](./20-adr.md)。
 >
 > ⚠️ **Wasmtime 早先在此处写的是 `48.x`，workspace 实际锁的是 `38`。**
 > 本文改为记录实际值：一份比现实更响亮的版本锚点，正是它本该防住的那种漂移。

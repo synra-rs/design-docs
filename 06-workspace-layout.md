@@ -15,7 +15,7 @@ synra-core/                   # ← Cargo workspace 根 = git 仓库根
 ├─ Cargo.toml                      # workspace 根
 ├─ Cargo.lock
 ├─ README.md / LICENSE (MIT)
-├─ STABILITY.md                    # ★ 稳定性分级（哪些 crate 遵守 SemVer）
+├─ STABILITY.md                    # 真实发布状态与接口边界，未发布阶段可直接重构
 ├─ rustfmt.toml / deny.toml
 ├─ .cargo/config.toml              # 目标平台别名、链接参数
 ├─ crates/
@@ -458,26 +458,18 @@ synra db dump                       # 导出 SQLite（调试用，[17 §2.3](./1
 
 ## 7. 工作流与工具链
 
-### 7.0 工具链：不写 `rust-toolchain.toml`
+### 7.0 工具链：开发版本固定，MSRV 独立验证
 
-> ⚠️ **刻意的决定：不写 `rust-toolchain.toml`**（[ADR-014](./20-adr.md)）。
->
-> `D:/Projects` 下的 `peon-burrow` / `bmux-cli` / `harbor` / `bigseek` / `crate-plugin-kit` / `w3wright` **全都不写**它；
-> 唯一写的是 `clash-verge-rev`（`channel = "1.98.1"`）。
->
-> `peon-burrow` 的理由（`implementation-order.md § 2`、`testing.md § 7`）：
-> > **钉死 channel 会让 CI 的 MSRV job 失效。**
->
-> MSRV 只写在 `Cargo.toml` 的 `rust-version`，由 CI 里一个**专门的 MSRV job** 装上那个版本真编一遍。
-> 这与"Cargo.lock 锁定"并不冲突——锁的是依赖版本，不是编译器 channel。
->
-> **代价（如实记录）**：不钉 channel 意味着"我本地能编、CI 不能编"这类问题要靠 MSRV job 提前发现；
-> 且 rustfmt/clippy 的行为会随工具链升级而变 → **CI 里必须固定 `dtolnay/rust-toolchain` 的版本**，不能用 `@stable`。
->
-> 我们另外需要的是 **targets**（移动端交叉编译），那放在 `.cargo/config.toml` 与 CI 里，不需要 toolchain 文件。
-> **已知的坑**（来自 `peon-burrow § 8` 第 9 条）：依赖的 `rust-version` 可能高于 workspace 的 MSRV
-> （实例：`sysinfo` 0.39 要求 1.95，而项目声明 1.88）→ **MSRV-aware resolver 只在"版本要求允许"时才挑低版本**。
-> 应对：加依赖前先 `cargo info <crate>@<ver>` 看 `rust-version`；CI 里 MSRV job **跑在 checks job 之前**。
+目标要求在 `rust-toolchain.toml` 指定经验证的完整 Rust 版本，包含 rustfmt 和 clippy，
+本地与 CI 主检查使用同一版本。具体版本在落地时根据当前依赖和平台验证选择，不在本文另抄一份数字。
+工具链升级应作为独立改动验证，避免格式和 lint 随执行环境漂移。
+
+MSRV 的声明源仍为 `Cargo.toml` 的 `rust-version`。MSRV job 显式安装并运行该版本，
+例如 `cargo +1.88.0 check --workspace --all-targets`；显式工具链选择不受默认开发版本影响。
+固定 action 的引用不能代替固定 Rust 编译器版本；锁定依赖也不能代替锁定工具链。
+交叉编译 target 按宿主需要安装，不要求每次检查都构建全部平台。
+
+此决定取代 ADR-014，理由见 [ADR-022](./20-adr.md)。当前尚未修改工具链文件或 CI，任务见 [19 §0.2](./19-roadmap.md)。
 
 **关于 `[workspace.package] rust-version`**：定为 **`1.88`**，与 `peon-burrow` / `bmux-cli` / `crate-plugin-kit` 一致
 （它能满足 `wasmtime` 48.x、edition 2024、`libloading` 0.9 等要求；**加依赖时要复核**）。
@@ -653,26 +645,12 @@ CI 里：
 
 #### 7.1.2 分类决策：几个 crate 发、几个不发
 
-沿用 `peon-burrow` 的 `STABILITY.md` 做法，把 crate 分三层并在**文档里明确承诺等级**
-（完整义务与检查见 [26 §2](./26-core-stability-and-perf.md)）：
+**当前从未发布**。所有 crate 的接口和数据结构可直接重构，不沿用此前的“稳定层需 major + 迁移说明”约定。
+`STABILITY.md` 应记录真实发布状态与边界，具体规则见 [26 §2](./26-core-stability-and-perf.md)。
+API 守卫保留防止越过安全边界与无意暴露内部状态的价值，但不能按 `pub`、DTO 字段或容器名一刀切冻结形状。
 
-| 层          | crate                                                                              | 承诺                          | 发布 | 公开 API 快照 |
-| ----------- | ---------------------------------------------------------------------------------- | ----------------------------- | ---- | ------------- |
-| **稳定层**   | `synra-protocol`、`synra-capability`、`synra-plugin-api`                              | 遵守 SemVer；破坏性变更需 major + ADR + 迁移说明 | ✅ | ★ **必须**（[26 §6.1](./26-core-stability-and-perf.md)） |
-| **半稳定层** | `synra-net`、`synra-store`、`synra-core`、`synra-plugin-host`                          | 遵守 SemVer；允许 minor 里**扩展 trait**（带默认方法） | ✅ | ✅ 建议 |
-| **内部层**   | `synra-observe`、`synra-platform`、`synra-plugin-ui`、`synra-testkit`                  | 无承诺                        | 部分 | ❌ |
-
-**"半稳定"这个等级的由来**：`synra-core` 是编排层，业务规则一定会长。
-但它要区分两件事 —— **接口**（`Kernel` 的公开方法）要稳，**内部结构**（聚合根怎么组合）可以动。
-不写清这个区分，要么过度冻结（无法演进），要么随意改动（下游被反复打断）。
-
-**稳定层的额外义务**（`STABILITY.md` 里要写明，[26 §2.2](./26-core-stability-and-perf.md)）：
-
-- 公开签名里**不出现具体容器类型**（`HashMap`/`Vec`/`HashSet`）—— 否则换实现就是破坏性变更；
-- 公开 struct 字段**全私有** + 构造函数 + 只读访问器；
-- 面向第三方的 enum **必须** `#[non_exhaustive]`，内核内部的 enum **必须不要**（§[26 §2.3](./26-core-stability-and-perf.md)）；
-- 错误类型对外只暴露**稳定错误码**，不暴露 `std::io::Error` / `serde_json::Error` 等第三方类型。
-
+将来对外发布前，按协议、SDK 及真实 Rust 消费者分别声明承诺；下面仅保留发布方案，不表示已经执行发布，
+也不要求为这次设计修订开展发版工作。
 
 **为什么要发布**：`synra-protocol` 与 `synra-capability` 有独立价值（别人想写一个兼容的客户端/服务端，或复用 capability 匹配），
 `synra-plugin-api` 是插件作者要依赖的契约 crate。其余发布是为了 `cargo install` 与依赖解析方便。
@@ -872,7 +850,7 @@ publish:     ; cargo harbor publish
 
 | # | 约定                                              | 来源                                | 落点                          |
 | - | ------------------------------------------------- | ----------------------------------- | ----------------------------- |
-| 1 | **不写 `rust-toolchain.toml`**，MSRV 在 `Cargo.toml` | `peon-burrow`（6/7 项目如此）        | [ADR-014](./20-adr.md)         |
+| 1 | **固定开发工具链**，MSRV 单独显式验证 | 按本项目可复现性要求修订 | [ADR-022](./20-adr.md) |
 | 2 | **`panic = "unwind"`** 在 release（插件 panic 要可捕获） | `peon-burrow` + `clash-verge-rev`（两家都写了同样理由） | [ADR-013](./20-adr.md)、[12 §7.2](./12-wasm-host.md) |
 | 3 | **`[workspace.lints.clippy]` 严格集**               | `clash-verge-rev`（生产验证过）       | §7 上方                       |
 | 4 | **`unsafe` 收在一个岛**，其余 `forbid(unsafe_code)`  | `bmux/pmpx-plugin-abi`               | §7.1.2、[ADR-013](./20-adr.md) |
