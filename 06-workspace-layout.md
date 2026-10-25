@@ -460,16 +460,18 @@ synra db dump                       # 导出 SQLite（调试用，[17 §2.3](./1
 
 ### 7.0 工具链：开发版本固定，MSRV 独立验证
 
-目标要求在 `rust-toolchain.toml` 指定经验证的完整 Rust 版本，包含 rustfmt 和 clippy，
-本地与 CI 主检查使用同一版本。具体版本在落地时根据当前依赖和平台验证选择，不在本文另抄一份数字。
+core 与 app 已在各自根目录的 `rust-toolchain.toml` 指定经验证的完整 Rust 版本，包含 rustfmt 和 clippy，
+本地与 CI 主检查使用同一版本；CI 在相应仓库目录执行 Rustup 安装命令，避免使用 runner 的全局 stable。
+具体版本以工具链文件为准，不在本文另抄一份数字。
 工具链升级应作为独立改动验证，避免格式和 lint 随执行环境漂移。
 
 MSRV 的声明源仍为 `Cargo.toml` 的 `rust-version`。MSRV job 显式安装并运行该版本，
-例如 `cargo +1.88.0 check --workspace --all-targets`；显式工具链选择不受默认开发版本影响。
+core 与 app 的 CI 均通过 TOML 解析读取各自声明，并用 `cargo +<msrv>` 显式检查；声明使用等价的完整三段版本。
+core 检查 workspace 全部目标，app 检查无默认特性的全部目标；显式工具链选择不受默认开发版本影响。
 固定 action 的引用不能代替固定 Rust 编译器版本；锁定依赖也不能代替锁定工具链。
 交叉编译 target 按宿主需要安装，不要求每次检查都构建全部平台。
 
-此决定取代 ADR-014，理由见 [ADR-022](./20-adr.md)。当前尚未修改工具链文件或 CI，任务见 [19 §0.2](./19-roadmap.md)。
+此决定取代 ADR-014，理由见 [ADR-022](./20-adr.md)。实现与本地验证见[固定工具链记录](./history/2026-10-26-toolchains.md)，状态见 [19 §0.2](./19-roadmap.md)；未调整触发方式或发布编排。
 
 **关于 `[workspace.package] rust-version`**：定为 **`1.88`**，与 `peon-burrow` / `bmux-cli` / `crate-plugin-kit` 一致
 （它能满足 `wasmtime` 48.x、edition 2024、`libloading` 0.9 等要求；**加依赖时要复核**）。
