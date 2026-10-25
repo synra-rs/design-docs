@@ -63,7 +63,8 @@
 ### 2.2 完整 Command 表
 
 本机身份维护返回协议层的共享类型，不复制宿主私有 JSON 形状：
-`CredentialSnapshot` 区分持久登记、当前进程加载的身份、待清理数量及重启要求；登记 ready 不表示原生密钥后端当前健康。
+`CredentialSnapshot` 区分持久登记、独立的 `CredentialRecovery` 恢复元数据、当前进程加载的身份、待清理数量及重启要求；登记 ready 不表示原生密钥后端当前健康。
+登记丢失时 enrollment 为 null，recovery 只提供最后登记的公开指纹与后端，设置页明确提示并要求确认后换钥；它不表示凭据可用或权限恢复。
 `CredentialRepairReport` 表示新钥已提交，cleanup 是独立的 `CredentialCleanupReport`，清理失败不能抹掉换钥成功。
 设置页确认框捕获当时展示的指纹，刷新不能悄悄更换待确认目标，后端拒绝失效指纹。
 成功或失败后都重新读取身份与设备列表，因为失败前也可能已撤销旧授权；读取失败明确显示且可独立重试，
