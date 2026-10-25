@@ -62,6 +62,17 @@
 
 ### 2.2 完整 Command 表
 
+本机身份维护返回协议层的共享类型，不复制宿主私有 JSON 形状：
+`CredentialSnapshot` 区分持久登记、当前进程加载的身份、待清理数量及重启要求；登记 ready 不表示原生密钥后端当前健康。
+`CredentialRepairReport` 表示新钥已提交，cleanup 是独立的 `CredentialCleanupReport`，清理失败不能抹掉换钥成功。
+设置页确认框捕获当时展示的指纹，刷新不能悄悄更换待确认目标，后端拒绝失效指纹。
+成功或失败后都重新读取身份与设备列表，因为失败前也可能已撤销旧授权；读取失败明确显示且可独立重试，
+不能因重试刷新而再次换钥。操作结果保留在 store 中跨导航展示，应用重启后以新进程的实际身份重新读取。
+状态不是私钥健康探测，不从界面快照产生授权；具体修复契约见 [17 §5](./17-storage-and-config.md)。
+应用 Tauri 分发器在调用任何本应用命令之前，以真实 WebView label 选择 Host 或 Plugin 接口并查询共享命令注册表；
+仅 main 可进入 Host 命令，其他 WebView 仅能进入已声明的插件桥接命令，之后仍须校验 token、权限及资源归属。
+未知本应用命令默认拒绝；判断不使用调用参数中声称的窗口标签，不能仅依赖 main 窗口的插件权限配置或前端隐藏按钮。
+
 配对命令共用 core 的 `PairingService`，任务返回 `synra-protocol::pairing::PairingSnapshot`。
 显式导入表示用户批准经可信带外路径获得的目标证书，所选 device id 必须匹配证书；
 应用从发现写入的设备表取得路由地址，路由和名称都不能产生授权。
@@ -76,6 +87,9 @@
 // ─────────── identity ───────────
 #[tauri::command] async fn identity_get(state: State<'_, AppState>) -> Result<IdentitySnapshot, IpcError>;
 #[tauri::command] async fn identity_set_display_name(state: State<'_, AppState>, name: String) -> Result<(), IpcError>;
+#[tauri::command] fn identity_credentials(state: State<'_, AppState>) -> Result<CredentialSnapshot, IpcError>;
+#[tauri::command] async fn identity_repair(state: State<'_, AppState>, expected_fingerprint: String) -> Result<CredentialRepairReport, IpcError>;
+#[tauri::command] async fn identity_cleanup(state: State<'_, AppState>) -> Result<CredentialCleanupReport, IpcError>;
 
 // ─────────── devices ───────────
 /// 全量快照：设备卡片列表 + 本机身份 + 扫描状态
