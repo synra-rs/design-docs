@@ -907,6 +907,14 @@ pub mod limits {
 具体流程、测试范围及剩余限制见[初次核验](./history/2026-10-26-pairing-consent.md)与[持久绑定验证](./history/2026-10-26-peer-trust.md)。
 旧宿主的六位显示码可由公开设备 id 重算，不能证明身份、私钥持有或本次会话；生产接入时应整体替换该流程。
 
+共享的 `synra_core::peer::authenticated::AuthenticatedPeer` 现将认证通道、Hello 协商和业务链路组成一个入口：
+本机 profile 必须匹配本机证书，Hello 与 HelloAck 声明的 id 必须匹配实际 TLS 身份及当前授权代次，
+接收方复核后才能发 HelloAck，发起方拒绝非 `Current` 的配对状态；token 不参与身份认证。
+TLS 与 Hello 共用不超过 `HELLO_TIMEOUT` 的总预算，业务每帧也有总 IO 预算，TLS 内部的部分记录读取不能重置预算。
+Hello 读取预取到的后续帧保留在同一个 decoder 中，交付每个帧前复核授权，包含缓存中的信封和文件块；
+IO 返回后也要复核，避免等待期间撤销后交付数据，数据库检查失败使本链路持续拒绝，恢复必须建立新连接。
+实现与边界见[认证业务入口验证](./history/2026-10-26-authenticated-peer.md)；两个宿主生产调用仍待切换到该入口。
+
 ```
 发起方                                    接收方
   │                                          │
