@@ -62,6 +62,14 @@
 
 ### 2.2 完整 Command 表
 
+配对命令共用 core 的 `PairingService`，任务返回 `synra-protocol::pairing::PairingSnapshot`。
+显式导入表示用户批准经可信带外路径获得的目标证书，所选 device id 必须匹配证书；
+应用从发现写入的设备表取得路由地址，路由和名称都不能产生授权。
+`pairing_status` 返回运行时快照或 null（`Maybe`），快照中的 reply、errorCode、detail 为必有键的可空值。
+前端只保存选择和表单输入，任务由共享 store 读取；`pairingUpdated` 触发权威重读，
+读取串行合并并丢弃被新事件或命令失效的旧响应，避免旧快照覆盖新任务。
+六位码提示、token 应答命令及旧配对事件已删除，无兼容入口。
+
 ```rust
 // src-tauri/src/commands/mod.rs
 
@@ -79,8 +87,10 @@
 #[tauri::command] async fn devices_forget(state: State<'_, AppState>, device_id: DeviceId) -> Result<(), IpcError>;
 
 // ─────────── pairing ───────────
-#[tauri::command] async fn pairing_request(state: State<'_, AppState>, device_id: DeviceId) -> Result<RequestId, IpcError>;
-#[tauri::command] async fn pairing_respond(state: State<'_, AppState>, request_id: RequestId, accept: bool, reason: Option<String>) -> Result<(), IpcError>;
+#[tauri::command] fn pairing_invite(state: State<'_, AppState>) -> Result<String, IpcError>;
+#[tauri::command] async fn pairing_listen(state: State<'_, AppState>, device_id: String, invitation: String) -> Result<PairingSnapshot, IpcError>;
+#[tauri::command] async fn pairing_connect(state: State<'_, AppState>, device_id: String, reply: String) -> Result<PairingSnapshot, IpcError>;
+#[tauri::command] fn pairing_status(state: State<'_, AppState>) -> Result<Option<PairingSnapshot>, IpcError>;
 #[tauri::command] async fn pairing_cancel(state: State<'_, AppState>, request_id: RequestId) -> Result<(), IpcError>;
 
 // ─────────── intent ───────────
@@ -269,7 +279,7 @@ export function installKernelEventBridge(kernel: KernelClient, store: RootStore)
   const unlisten = events.kernelEvent.listen(({ payload }) => {
     switch (payload.type) {
       case 'device_card_updated':   store.devices.upsert(payload.payload); break
-      case 'pairing_requested':     store.pairing.pushRequest(payload.payload); break
+      case 'pairingUpdated':        void store.pairing.refresh(kernel); break
       case 'intent_candidates_ready': store.intent.showCandidates(payload.payload); break
       case 'plugin_install_progress': store.plugins.setProgress(payload.payload); break
       case 'plugin_faulted':        store.plugins.markFaulted(payload.payload); break
@@ -605,6 +615,10 @@ Content-Security-Policy:
 ---
 
 ## 9. 实现清单
+
+> **2026-10-26：应用首次配对交互已接入共享受限服务。** 邀请导出、邀请导入与应答展示、应答导入、
+> 任务重读和取消经过应用命令与真实 TLS 验证；全局事件流和 store 保留导航期间的任务，
+> 设计、门禁证据与平台限制见[本轮记录](./history/2026-10-26-app-first-pairing.md)。
 
 > **2026-10-22：CLI 发布者密钥决定已补齐（19 §8.238）。** `plugin publisher list` 查询已验证签名的发布者，
 > `publisher decide ID seen|trusted|revoked --fingerprint FP` 只决定显示的密钥。界面列表与安装后的指纹提示同步传入
