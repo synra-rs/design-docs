@@ -77,7 +77,7 @@ synra-core/spike/            # 不进 workspace，用完可删（或归档）
 
 | 编号 | 状态 | 开发内容与完成判据 |
 | --- | --- | --- |
-| D1 | 开发中 | 已加入共享凭据及认证通道（[认证证据](./history/2026-10-26-device-authentication.md)）、Windows 原生密钥后端与登记恢复（[本机持久化](./history/2026-10-26-device-credentials.md)）、带外邀请与受限同意（[首次核验](./history/2026-10-26-pairing-consent.md)）、凭据持久绑定与授权代次（[持久绑定](./history/2026-10-26-peer-trust.md)）、Hello 身份复核与逐帧授权（[入口验证](./history/2026-10-26-authenticated-peer.md)），以及两个宿主的原生启动与业务入口接入（[宿主验证](./history/2026-10-26-host-authentication.md)）；生产首次配对交互、显式身份修复、Android 等平台后端及运行验证仍待完成，真实取消、平台恢复和完整业务链路还需回归 |
+| D1 | 开发中 | 已加入共享凭据及认证通道（[认证证据](./history/2026-10-26-device-authentication.md)）、Windows 原生密钥后端与登记恢复（[本机持久化](./history/2026-10-26-device-credentials.md)）、带外邀请与受限同意（[首次核验](./history/2026-10-26-pairing-consent.md)）、凭据持久绑定与授权代次（[持久绑定](./history/2026-10-26-peer-trust.md)）、Hello 身份复核与逐帧授权（[入口验证](./history/2026-10-26-authenticated-peer.md)），以及两个宿主的原生启动与业务入口接入（[宿主验证](./history/2026-10-26-host-authentication.md)）；CLI/daemon 首次配对已接入共享任务，含握手前持久预留、真实取消及撤销后晚到连接拒绝（[首次配对入口](./history/2026-10-26-first-pairing.md)）；应用配对交互、显式身份修复、Android 等平台后端及运行、平台恢复与完整业务链路仍待完成 |
 | D2 | 开发中 | 自动更新到期筛选及失败重试规则已收敛到 core，两个宿主的真实下载失败与重启测试通过（[证据](./history/2026-10-25-update-retries.md)）；应用与 daemon 文件发送已共用提议、窗口、完成和摘要确认流程，并覆盖生产接收端、拒绝、取消及缺少确认（[发送流程](./history/2026-10-26-transfer-workflow.md)）；完整更新、授权、撤销和启停服务尚待收敛，仍需验证同一结果、同一事件及竞态下的提交重检 |
 | D3 | 待开发 | 分离安装记录、任务与运行实例；真实更新场景能同时显示旧版运行、新版下载或失败，重启不从持久标志推断实例仍活着 |
 | D4 | 待开发 | 数据迁移工作副本与提交恢复：隔离迁移写入，记录提交阶段；注入各切换点故障及重启，拒绝混合版本或混合数据代次加载；分开报告安装成功与激活失败 |
@@ -178,7 +178,10 @@ just check
 synra --data-dir /tmp/a --port 32100 dev &
 synra --data-dir /tmp/b --port 32110 dev &
 synra --data-dir /tmp/a devices        # → 发现 b（TrustLevel ≥ Handshaked）
-synra --data-dir /tmp/a pair <b-id>    # → b 接受（CLI 交互）
+synra --data-dir /tmp/a pair invite  # → 经可信带外路径交给 B
+synra --data-dir /tmp/b pair listen <a-id> --invitation '<a-invitation>' # → 将应答带外交回 A
+synra --data-dir /tmp/a pair connect <b-id> --reply '<b-reply>'
+synra --data-dir /tmp/a pair status  # → 本机持久授权提交后为 Paired
 synra --data-dir /tmp/a send --to <b-id> --text "hello"   # → b 收到
 
 just interop-test

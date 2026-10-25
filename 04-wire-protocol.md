@@ -892,7 +892,8 @@ pub mod limits {
 下面的图和 payload 是**安全通道内的应用层协商示意**，不描述密码学握手。
 共享网络层已实现已批准身份间的 mTLS 通道、设备 id 与证书校验、完整证书固定校验及握手上限
 （[实现与验证](./history/2026-10-26-device-authentication.md)）。两个宿主的业务拨号和共享 listener 已接入认证入口，
-本机凭据初始化失败时拒绝联网，旧 token 不会被转成凭据授权；生产首次配对、身份修复及 Android 后端仍待完成，
+本机凭据初始化失败时拒绝联网，旧 token 不会被转成凭据授权；CLI 首次配对已接入受限任务服务，
+应用配对交互、身份修复及 Android 后端仍待完成，
 因此尚不满足完整契约，实施与验收见 [19 §0.2](./19-roadmap.md)。
 
 共享层现另有受限配对通道的实现验证：双方通过可信带外路径交换含完整证书的邀请，
@@ -986,19 +987,15 @@ pub struct HelloAck {
 }
 ```
 
-### 7.3 陈旧配对自愈
+### 7.3 配对授权不一致
 
-**问题**：A 把 B 从配对列表里删了，B 还以为和 A 配对着。下次 B 主动连 A，B 会带 `intent: Paired`。
+本机已撤销或不存在对端授权时，业务连接必须在受保护入口拒绝，不能为了发送 `Fresh` 提示而放行未批准身份。
+重连只接受已绑定的确切证书及当前授权代次；对端声明、旧 token 和 `HelloAck` 字段不能恢复授权。
 
-**规则**（双向对称，任一侧看到不一致就降级为 Fresh）：
-
-| 观测点                          | 条件                                        | 动作                                     |
-| ------------------------------- | ------------------------------------------- | ---------------------------------------- |
-| 接收方（收 `Hello`）             | 本地无 A 的配对记录，但 A 声明 `Paired`        | **正常完成握手**，在 `HelloAck` 里回 `intent: Fresh` + `peer_is_paired_locally: false` |
-| 发起方（收 `HelloAck`）          | `peer_is_paired_locally == false` 或 `intent == Fresh` | 删掉本地的 B 配对记录，通知 UI（"对方已解除配对"） |
-
-> **关键决定：接收方不断链。** 让握手走完、在 `HelloAck` 里如实告知，
-> 比"发现不一致就 socket.end()"对用户友好得多——用户看到的是"配对已解除"，而不是"连不上"。
+发起方无法认证对端时报告认证失败，保留本机已有绑定，等待用户明确撤销或重新配对；
+不能从未认证的断链、替换证书或超时推断“对方已解除配对”，更不能因此自动删除可信绑定。
+本机主动解除配对会原子删除授权与列表记录、取消该身份的未完成任务，并使旧业务连接的后续请求被拒绝。
+同证书重新配对也产生新代次，旧连接不能复活；首次或重新配对必须走 [§8.2](#82-配对) 的受限流程。
 
 ### 7.4 心跳与 ACK
 
@@ -1159,48 +1156,34 @@ pub struct SessionTimeouts {
 
 ### 8.2 配对
 
-```rust
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct PairRequest {
-    /// 发起方的 profile（接收方用于展示"谁在请求配对"）
-    pub profile: PeerProfile,
-    /// 发起方希望接收方如何回应（用于 UI 提示，不改变协议语义）
-    pub user_hint: Option<String>,
-}
+首次配对通过独立 `synra/pairing/1` mTLS 通道完成，不依赖已有业务连接。
+双方先通过可信带外路径交换完整公开证书，导入邀请的动作就是明确批准该身份，解析文本本身不构成批准。
+CLI 与 daemon 的入口现为 `pair invite`、`pair listen DEVICE --invitation ...`、
+`pair connect DEVICE --reply ...`、`pair status` 和 `pair cancel REQUEST_ID`；应用界面尚待接入此流程。
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct PairResponse {
-    pub accepted: bool,
-    pub reason: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct PeerProfile {
-    pub device_id: DeviceId,
-    pub display_name: String,
-    pub platform: PlatformKind,
-    pub app_version: String,
-}
-```
+发起方先导出 `synra-pair:1:...`；接收方明确导入后生成有时限的 `synra-pair-reply:1:PORT:...`，
+再经可信带外路径交还发起方导入。应答中的端口及发现地址只用于路由，TLS 仍须证明持有邀请中确切证书的私钥。
+两次导入均须核对所选设备 id 与证书身份，禁止把另一设备的邀请应用到当前选中的设备。
+双方同意、TLS exporter 绑定与持久回执均由同一受限通道机制处理，不另外设计认证算法。
 
 **规则**：
 
 | # | 规则                                                                       |
 | - | -------------------------------------------------------------------------- |
-| 1 | 配对请求的 `target` 必须等于本机 id，否则拒绝（不静默忽略）                     |
-| 2 | 同时只允许一个待处理的入站配对请求；已有待处理时新请求返回 `busy` 原因           |
-| 3 | 待处理请求有超时（`pairing`），超时后自动清除并通知 UI                          |
-| 4 | 发起方在 `pairing` 超时后必须清除本地"等待中"状态（**不允许永久挂起**）           |
-| 5 | 身份核验与用户确认通过后，**先持久化绑定身份的配对记录**，再回 `accepted: true`；双方均完成后才允许业务请求 |
-| 6 | 配对完成、拒绝或失败后关闭本次专用连接；再次尝试建立新的受限会话，业务连接另行认证 |
-| 7 | 配对记录绑定 `device_id` 与对端身份公钥或其可验证指纹；本机私钥不入配对记录；challenge 只用于应用层关联 |
+| 1 | 所选设备 id、可信带外邀请和实际 TLS 证书身份必须一致，拒绝自配对及替换已有绑定 |
+| 2 | 每个共享网络身份只保留一个活动任务，取消中的任务退出前不得复用运行时槽位 |
+| 3 | 握手前先持久预留任务代次、双方公开证书与到期时间，此时 binding 为 NULL，不产生业务授权 |
+| 4 | TLS 成功后仅能绑定原预留任务，取消、撤销、过期或更换本机登记后，晚到连接均不得重新领取任务 |
+| 5 | 双方持久回执完成后，原子提交本机授权代次及列表记录，失败回滚两者，旧 token 不参与授权 |
+| 6 | 时限覆盖等待连接、TLS、同意和持久回执；数据库锁等待后及提交前也复核单调时钟预算 |
+| 7 | 完成或失败后关闭专用连接，业务另行认证；重启不得从预留或未完成日志推断授权或恢复旧 socket |
 
 > 身份密钥变化、丢失或被撤销后，旧绑定不得继续授权；需要明确重新配对。
-> 取消配对立即撤销该身份的业务授权，已有连接上的后续请求同样必须被拒绝。
+> 取消任务阻止尚未提交的授权；已经提交时须如实拒绝取消，解除已生效配对是单独的撤销动作。
 > 发现广播只是候选地址提示，不是认证凭据。私钥保存和轮换见 [17 §5](./17-storage-and-config.md)。
+
+任务快照区分 Listening、Connecting、Confirming、Cancelling 及终态，快照本身不能授权。
+应答、任务代次、取消与边界测试见[生产首次配对入口](./history/2026-10-26-first-pairing.md)。
 
 ### 8.3 意图
 

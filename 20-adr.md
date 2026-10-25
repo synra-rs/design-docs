@@ -830,7 +830,9 @@ D:/Projects/
 写连接采用 SQLite WAL + FULL，避免将断电后可能丢失的提交报告为持久成功；这会增加同步成本。
 Windows 真实 TCP、文件数据库和故障注入验证见[持久绑定记录](./history/2026-10-26-peer-trust.md)，
 两个宿主的原生初始化、业务拨号与共享 listener 现已接入，Host 锁不覆盖 TLS 和 Hello，缺少凭据时拒绝联网，
-见[宿主接入验证](./history/2026-10-26-host-authentication.md)。Android 原生后端及运行、生产首次配对和修复仍待完成，
+见[宿主接入验证](./history/2026-10-26-host-authentication.md)。CLI/daemon 的首次配对已接入受限共享任务，
+握手前持久预留，取消和撤销覆盖晚到连接，见[生产首次配对入口](./history/2026-10-26-first-pairing.md)。
+应用配对交互、Android 原生后端及运行、身份修复仍待完成，
 不能据业务链路接入推断完整 D1 契约已经满足。
 
 ### 后果与复审
