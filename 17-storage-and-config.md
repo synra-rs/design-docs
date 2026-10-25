@@ -449,17 +449,26 @@ impl Config {
 配对记录保存对端设备 id、身份公钥或可验证指纹及确认信息，不保存对端私钥。
 同一 id 的密钥变化必须使旧绑定失效，不能静默覆盖；本机身份凭据不可用时拒绝认证，
 不得静默生成新身份继续沿用旧授权。重新生成密钥需要明确操作并重新配对。
-共享层已有凭据生成、恢复与认证通道，但安全密钥后端、配对记录及两个宿主的接入尚待实现，
-见 [04 §7.2、§8.2](./04-wire-protocol.md)、[19 §0.2](./19-roadmap.md)。
+共享层已有凭据生成、恢复与认证通道，并实现 Windows Credential Manager 后端及本机登记恢复服务；
+Android 等平台后端、对端凭据绑定、首次核验及两个宿主的生产接入仍待实现，
+见 [实现证据](./history/2026-10-26-device-credentials.md)、[04 §7.2、§8.2](./04-wire-protocol.md)、[19 §0.2](./19-roadmap.md)。
+
+**本机登记契约**：SQLite 的 `device_credentials` 单行记录只保存设备 id、公开证书、后端种类及就绪状态，
+不保存私钥；私钥账号使用 `device-identity/<完整证书的 SHA-256 十六进制指纹>`，与插件命名空间隔离。
+先以原子语句登记未就绪的公开记录，再在数据库锁外写入密钥后端、读回并校验证书与私钥，
+最后重新检查本机 id 和公开记录后提交就绪状态；初次身份创建也只允许一个赢家，不能覆盖已有身份。
+同一数据库上的并发登记只允许赢家写入私钥，其他调用只可恢复其同一凭据；
+赢家尚未写入可读密钥时，竞争者返回错误，不能写入替代私钥；存在旧配对时拒绝初次登记。
+若密钥已写入但登记未提交，重启可校验同一密钥后完成提交；缺失、损坏、过期或后端改变时返回错误，
+不得删除登记来隐藏失败或自动换钥，显式身份修复与重新配对流程仍需实现。
 
 ### 5.2 后端选择
 
 ```rust
-#[async_trait]
 pub trait SecretBackend: Send + Sync {
-    async fn get(&self, key: &SecretKey) -> Result<Option<SecretBytes>, SecretError>;
-    async fn set(&self, key: &SecretKey, value: &[u8]) -> Result<(), SecretError>;
-    async fn delete(&self, key: &SecretKey) -> Result<(), SecretError>;
+    fn get(&self, key: &SecretKey) -> Result<Option<SecretBytes>, SecretError>;
+    fn set(&self, key: &SecretKey, value: &SecretBytes) -> Result<(), SecretError>;
+    fn delete(&self, key: &SecretKey) -> Result<(), SecretError>;
     fn kind(&self) -> SecretBackendKind;
 }
 
@@ -481,6 +490,11 @@ pub enum SecretBackendKind {
 ```
 
 **降级链**：OS keychain → 加密文件（`EncryptedFile`）。
+
+当前 Windows 实现直接构造原生凭据对象，不依赖可被全局替换为 mock 的默认构造器；
+同一进程内的原生访问串行化，单项数据上限为 2560 字节，错误文本不包含库错误携带的敏感数据。
+后端 API 是同步调用，异步宿主应在阻塞执行边界调用；不能持有数据库锁调用它，也不将 TLS 握手时限当成原生后端时限。
+内存后端不能用于持久设备身份，加密文件及其他平台后端尚未实现，不能把测试替身当成可用降级实现。
 
 **必须告知用户**：当使用 `EncryptedFile` 时，UI 上提示"当前系统没有可用的密钥链，敏感数据以本地加密文件保存"。
 
