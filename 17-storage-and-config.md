@@ -108,7 +108,7 @@ pub fn open(path: &Utf8Path) -> Result<Connection, StoreError> {
 
     // ── 性能与可靠性设置 ──
     conn.pragma_update(None, "journal_mode", "WAL")?;      // 并发读写
-    conn.pragma_update(None, "synchronous", "NORMAL")?;    // WAL 下安全且快
+    conn.pragma_update(None, "synchronous", "FULL")?;      // 每次提交同步 WAL，支撑持久化回执与撤销
     conn.pragma_update(None, "foreign_keys", "ON")?;
     conn.pragma_update(None, "busy_timeout", 5000)?;
     conn.pragma_update(None, "temp_store", "MEMORY")?;
@@ -130,6 +130,9 @@ pub fn open(path: &Utf8Path) -> Result<Connection, StoreError> {
 | 表                       | 内容                                       | 生命周期     |
 | ------------------------ | ------------------------------------------ | ------------ |
 | `identity`               | 本机 device_id / display_name / profile     | 永久         |
+| `device_credentials`     | 本机公开证书、密钥后端种类与登记状态，不含私钥 | 永久         |
+| `pairing_attempt`        | 单槽配对任务日志，含会话绑定与阶段，不代表授权 | 终态或过期可替换 |
+| `peer_trust`             | 绑定双方完整公开证书及独立代次的业务授权     | 显式撤销     |
 | `paired_devices`         | 已配对设备记录（含 peer features）           | 永久         |
 | `devices_seen`           | 见过的设备（用于显示名缓存、排序）             | 可清理       |
 | `plugins`                | 插件主记录（信任、启用、健康度）              | 永久         |
@@ -450,8 +453,9 @@ impl Config {
 同一 id 的密钥变化必须使旧绑定失效，不能静默覆盖；本机身份凭据不可用时拒绝认证，
 不得静默生成新身份继续沿用旧授权。重新生成密钥需要明确操作并重新配对。
 共享层已有凭据生成、恢复与认证通道，并实现 Windows Credential Manager 后端及本机登记恢复服务；
-Android 等平台后端、对端凭据绑定、首次核验及两个宿主的生产接入仍待实现，
-见 [实现证据](./history/2026-10-26-device-credentials.md)、[04 §7.2、§8.2](./04-wire-protocol.md)、[19 §0.2](./19-roadmap.md)。
+另有可信带外邀请、受限 TLS 同意与持久化回执，以及共享对端凭据绑定服务；Android 等平台后端及运行验证、显式身份修复、
+两个宿主的生产接入仍待实现，见[本机登记证据](./history/2026-10-26-device-credentials.md)、
+[对端持久绑定证据](./history/2026-10-26-peer-trust.md)、[04 §7.2、§8.2](./04-wire-protocol.md)、[19 §0.2](./19-roadmap.md)。
 
 **本机登记契约**：SQLite 的 `device_credentials` 单行记录只保存设备 id、公开证书、后端种类及就绪状态，
 不保存私钥；私钥账号使用 `device-identity/<完整证书的 SHA-256 十六进制指纹>`，与插件命名空间隔离。
@@ -461,6 +465,21 @@ Android 等平台后端、对端凭据绑定、首次核验及两个宿主的生
 赢家尚未写入可读密钥时，竞争者返回错误，不能写入替代私钥；存在旧配对时拒绝初次登记。
 若密钥已写入但登记未提交，重启可校验同一密钥后完成提交；缺失、损坏、过期或后端改变时返回错误，
 不得删除登记来隐藏失败或自动换钥，显式身份修复与重新配对流程仍需实现。
+
+**对端绑定契约**：`pairing_attempt` 单槽保存任务 id、双方 id 与完整公开证书、TLS 会话绑定、截止时间及阶段，
+运行中的连接由任务持有；日志存在或阶段已准备均不能推出仍有运行实例或业务授权。
+双方同意后先提交准备阶段，再在数据库锁外交换持久化回执，最后短事务重新比较任务代次、双方证书、会话绑定、
+过期时间和本机就绪登记，原子提交完成标记与 `peer_trust` 授权；任一步失败不产生本机授权。
+全局只允许一个活动配对任务，授权最多 256 个，容量和已有绑定在原子认领语句中检查，已授权的同 id 不能静默换证。
+每次配对使用新的授权代次；业务连接捕获该代次，每次请求按 peer id 索引复核代次、实际 TLS 双方证书及消息来源，
+不在热路径加载整个授权列表，也不能将旧连接的代次刷新为新授权。
+解除配对在同一事务删除设备元数据、token 和凭据授权，并取消对应活动任务；旧任务失败清理只能取消自己的代次。
+未完成日志在重启后不能自动提升为授权；两端最终提交并非分布式原子事务，一侧失败时本机继续拒绝业务。
+
+写连接统一使用 WAL + `synchronous=FULL`：`NORMAL` 保证恢复后的一致性，但已提交事务仍可能在断电后丢失，
+不能支撑持久化成功回执或撤销的承诺，依据 [SQLite 同步说明](https://www.sqlite.org/pragma.html#pragma_synchronous)。
+对端信任的认领、准备与授权写入还会检查真实文件数据库及其同步设置，内存库或被弱化的配置不能报告持久成功。
+`FULL` 增加每次提交的同步成本，不据此声称吞吐改善；未来优化应在保持持久契约的前提下度量和合并适当事务。
 
 ### 5.2 后端选择
 
