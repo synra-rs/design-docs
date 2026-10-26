@@ -211,7 +211,9 @@ cargo tree -p synra-net -p synra-core | grep -E 'tauri|wry'   # 空
 真实组件已覆盖返回、清理、授权拒绝、纯匹配及有界初始化，见 [验证记录](./history/2026-10-26-wasm-abi.md)。
 Rust SDK 的真实导出、CLI headless 构建、组件编码、PluginSet 装载与缺少授权拒绝也已接通，
 并验证自定义库名、target 目录及编译或编码失败后旧产物保留，见 [作者链路记录](./history/2026-10-26-rust-authoring.md)。
-本地安装、完整用户授权与真实平台动作、SDK 独立资源验证、完整 CLI verify、UI 构建及性能验收仍待完成，本轮不等于 M2 完成。
+SDK 已携带从主契约生成的 WIT，完整生成检查与隔离源码依赖的实际 CLI 构建、装载和调用已验证，
+见 [资源记录](./history/2026-10-26-sdk-resources.md)；这不代表注册表分发验证。
+本地安装、完整用户授权与真实平台动作、完整 CLI verify、UI 构建及性能验收仍待完成，本轮不等于 M2 完成。
 
 ### 目标
 一个 **Rust headless Wasm 插件**能：

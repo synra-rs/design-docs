@@ -1159,6 +1159,8 @@ ABI 元数据由固定版本的 SDK wit-bindgen 生成；不需要外部 wasm-to
 构建从 Cargo JSON 元数据读取实际产物，不猜库名、路径或组件形态；
 开发者可使用自己的 Cargo target 目录，最终位置仍以 manifest 为准。
 SDK 和编码器版本由对应 Cargo.toml 与锁文件维护，不在规范中再复制版本号。
+SDK 从包内 WIT 资源生成绑定，根契约变化后用 wit-codegen 同步，
+再以只读检查验证全部派生文件；外部作者构建不依赖源仓库的目录布局。
 装载、实际调用、权限拒绝和失败重建由真实 Rust guest 门禁验证，见 [21](./21-testing-strategy.md)。
 
 ---

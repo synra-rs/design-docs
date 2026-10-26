@@ -5,6 +5,8 @@
 
 | 记录 | 范围 |
 | --- | --- |
+| [SDK 独立资源](./2026-10-26-sdk-resources.md) | 包内 WIT、全部生成物只读门禁与隔离源码依赖的真实构建及装载 |
+| [SDK 旧观察](./sdk-observations.md) | 原实现清单与第 180 轮调查，仅作历史快照 |
 | [Rust 作者链路](./2026-10-26-rust-authoring.md) | SDK 真实导出、无 WASI 构建、CLI 组件输出、实际导入检查与失败重建 |
 | [Rust 构建旧观察](./rust-authoring-observations.md) | 原构建方案与纯度调查，仅作历史快照 |
 | [Wasm 双向 ABI](./2026-10-26-wasm-abi.md) | 真实 Guest 返回、WIT Host 绑定、初始化预算与闸门边界验证 |

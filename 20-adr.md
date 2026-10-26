@@ -971,6 +971,8 @@ MSRV 仍由 `Cargo.toml` 声明，并由专门检查显式选择该版本。
 以 wasm32-unknown-unknown 构建 core module，由 CLI 的固定编码器读取嵌入元数据并生成组件，
 不开放 WASI、不依赖外部 wasm-tools，也不按库名猜产物路径。
 Cargo JSON 元数据决定当前项目的 cdylib 源文件，manifest 决定最终路径，成功编码后才原子替换输出。
+SDK 携带由根 WIT 契约生成的包内资源，消费者不读取仓库外部路径；
+生成检查覆盖所有派生文件并且只读，资源隔离证据见 [记录](./history/2026-10-26-sdk-resources.md)。
 
 Host 的授权依据是组件接口中的真实函数，类型接口本身不作为能力请求；
 未知导入和资源不能被忽略。
