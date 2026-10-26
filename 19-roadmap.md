@@ -556,10 +556,10 @@ M0 ──▶ M1 ──▶ M2 ──▶ M3
 
 新增需求见 [29 · Starter 与触摸板](./29-official-plugins.md)，两个插件分别由独立仓库承载，远端由用户创建。
 
-| 插件 | 仓库建议 | 当前状态 | 验收重点 |
+| 插件 | 独立仓库 | 当前状态 | 验收重点 |
 | --- | --- | --- | --- |
-| Starter | synra-plugin-starter | 需求已记录，待仓库地址与宿主能力接入 | 目标电脑选择、电脑选中文本到手机剪贴板、电脑打开链接与 debug；参考旧 Electron starter |
-| 触摸板 | synra-plugin-touchpad | 需求已记录，待仓库地址与鼠标输入服务 | 手机单指移动、双指滚动、左键点击、右键点击及双击保持左键拖拽，断连与撤销后释放按钮 |
+| Starter | [synra-plugin-starter](https://github.com/synra-rs/synra-plugin-starter) | 已接入，建立 headless 工程及基础 debug action，待 UI 和宿主能力 | 目标电脑选择、电脑选中文本到手机剪贴板、电脑打开链接与 debug；参考旧 Electron starter |
+| 触摸板 | [synra-plugin-touchpad](https://github.com/synra-rs/synra-plugin-touchpad) | 已接入，建立 headless 工程及纯手势识别库，待接入 Wasm、UI 和鼠标输入服务 | 手机单指移动、双指滚动、左键点击、右键点击及双击保持左键拖拽，断连与撤销后释放按钮 |
 
 这些需求加入整体目标，不替代既有 M0–M6 验收。
 M2 先完善 Rust 作者链路及共享宿主能力，Starter 随后验证 UI 和跨设备流程；触摸板在 M5 补真实手机到电脑的输入验收。

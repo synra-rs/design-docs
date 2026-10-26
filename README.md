@@ -35,7 +35,9 @@ D:/Projects/synra-rust/          # 各仓库并排检出
 ├─ synra-rust-core/               # Rust workspace、daemon、CLI 与工具
 ├─ synra-rust-app/                # Tauri 应用
 ├─ synra-js/                      # 插件 UI 类型、客户端与主题
-└─ docs/                          # 官网、用户文档与 schema
+├─ docs/                          # 官网、用户文档与 schema
+├─ synra-plugin-starter/           # 独立 Starter 插件
+└─ synra-plugin-touchpad/          # 独立触摸板插件
 ```
 
 > 目录名带 `synra-rust-` 前缀是**设计期遗留**，与仓库名（`synra-core` / `synra-app`）不同。
@@ -58,7 +60,7 @@ D:/Projects/
 > 记在这里是因为"六个"这个念头很自然：**它被否决的理由不是麻烦，是消费者拿到的东西不同**
 > （`./unocss`、`./vitepress`、`./css` 是三个入口，而不是三个包）。
 
-官方插件在基座之外另建独立仓库：`synra-plugin-starter` 与 `synra-plugin-touchpad`，需求见 [29](./29-official-plugins.md)。
+官方插件在基座之外另建独立仓库：[synra-plugin-starter](https://github.com/synra-rs/synra-plugin-starter) 与 [synra-plugin-touchpad](https://github.com/synra-rs/synra-plugin-touchpad)，均已接入本机工作区；需求与当前状态见 [29](./29-official-plugins.md)。
 
 ### 1.1 `design-docs` 与 `docs` 是**两个不同的仓库**
 

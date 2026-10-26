@@ -4,17 +4,20 @@
 
 ## 1. 仓库与组成
 
-| 插件 | 建议仓库名 | 插件 id | 作用 |
+| 插件 | 独立仓库 | 插件 id | 作用 |
 | --- | --- | --- | --- |
-| Starter | `synra-plugin-starter` | `@synra-plugin/starter` | 基本能力、手机控制电脑与调试信息的参考插件 |
-| 触摸板 | `synra-plugin-touchpad` | `@synra-plugin/touchpad` | 手机提供触摸板，选定电脑执行鼠标操作 |
+| Starter | [synra-plugin-starter](https://github.com/synra-rs/synra-plugin-starter) | `@synra-plugin/starter` | 基本能力、手机控制电脑与调试信息的参考插件 |
+| 触摸板 | [synra-plugin-touchpad](https://github.com/synra-rs/synra-plugin-touchpad) | `@synra-plugin/touchpad` | 手机提供触摸板，选定电脑执行鼠标操作 |
 
 两个仓库独立管理源码、测试、构建与 manifest，不并入 core、app 或 JS workspace，也不复制成应用内置页面。
 采用现有双轨目标：Rust headless Wasm 负责插件逻辑，Vue UI 通过宿主 SDK 交互。
 系统操作只由受授权的原生宿主实现；插件不能直接访问操作系统、连接数据库或注入原生代码。
 开发可使用本地 SDK 覆盖或固定 Git 版本，不以发布 SDK、插件或网站作为开发前提。
 
-当前状态为需求已记录，等待仓库地址；拿到地址后接入独立工作目录并逐步实现。
+用户已创建两个远端，分别克隆在基座工作区同级目录 synra-plugin-starter/ 与 synra-plugin-touchpad/。
+初始阶段提供固定 Rust 工具链、固定 Git 提交的 SDK、独立 Cargo.lock、headless Wasm 入口及开发检查；不以 SDK 发布为前提。
+Starter 已加入读取宿主 SDK 版本、形态、语言和主题的 debug action；触摸板先提供可独立测试的手势识别库。
+两个仓库仍需接入 Vue UI 和宿主实际能力；触摸板识别库尚未接入 Wasm action，不能据此宣称手机已能控制电脑。
 创建远端、发版、打 tag 与部署由用户处理。
 
 ## 2. Starter
