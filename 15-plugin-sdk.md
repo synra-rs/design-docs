@@ -563,7 +563,8 @@ pub mod platform {
     pub fn open_path(path: &str) -> Result<(), Error>;
     pub fn simulate_keys(chord: &str) -> Result<(), Error>;
     pub fn notify(title: &str, body: &str) -> Result<(), Error>;
-    pub fn read_clipboard() -> Result<String, Error>;
+    /// None means no text; Some("") is valid empty text. The raw WIT outcome contains JSON null or a JSON string.
+    pub fn read_clipboard() -> Result<Option<String>, Error>;
     pub fn write_clipboard(text: &str) -> Result<(), Error>;
     pub fn capabilities() -> PlatformCapabilities;
 }
