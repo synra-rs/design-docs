@@ -206,7 +206,10 @@ pub enum SuggestedAction {
 details.pluginCode 保留原始插件或宿主调用错误码，details.pluginDetails 承载有值时的 WIT details。
 合法 JSON 转为对应 JSON 值；空字符串和非 JSON 文本保留为字符串；缺失则不写 pluginDetails，JSON null 则显式写 null。
 详情始终嵌套，不能覆盖顶层 code、retryable 或动作；未知插件码分类为 internal，但原始码仍可诊断，notImplemented 分类为 unsupported。
-这套规则只描述已有页面调用入口，不代表远程 intent 的错误详情已经贯通；验证见[本轮记录](./history/2026-10-26-error-details.md)。
+这套页面规则的验证见[错误详情记录](./history/2026-10-26-error-details.md)。
+本地与远程 intent 使用同一插件错误分类；SynraError 的可选 JSON details 可供插件 UI 类型读取，
+通用 IPC 错误在 details.context 保留该上下文、details.traceId 保留原操作 trace，不把详情展开为顶层权限或错误分类。
+成功 JSON 与错误在重复请求及数据库恢复中的验证见[意图结果记录](./history/2026-10-26-intent-outcomes.md)。
 
 ```rust
 impl From<synra_core::Error> for IpcError {

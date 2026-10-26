@@ -41,7 +41,7 @@ synra-core/                   # ← Cargo workspace 根 = git 仓库根
 │  ├─ wit-codegen/                 # WIT → Rust/TS 绑定生成
 │  ├─ guards/                      # ★ 结构守卫 + MSRV 检查（Rust 二进制，不是 shell 脚本）
 │  ├─ matrix/                      # ★ feature / target 组合矩阵（Rust 二进制）
-│  └─ api-guard/                   # 稳定 crate 的 public API 快照比对
+│  └─ api-guard/                   # 未发布工作区的领域错误边界及覆盖检查
 ├─ wit/                            # 插件接口定义（组件模型）
 │  ├─ synra-plugin.wit             # 主世界
 │  └─ deps/                        # 依赖的 WIT 包（wasi 等）
@@ -649,7 +649,7 @@ CI 里：
 
 **当前从未发布**。所有 crate 的接口和数据结构可直接重构，不沿用此前的“稳定层需 major + 迁移说明”约定。
 `STABILITY.md` 应记录真实发布状态与边界，具体规则见 [26 §2](./26-core-stability-and-perf.md)。
-API 守卫保留防止越过安全边界与无意暴露内部状态的价值，但不能按 `pub`、DTO 字段或容器名一刀切冻结形状。
+API 守卫核对领域错误边界与工作区覆盖；安全状态的封装仍由类型及行为测试验证，不能按 `pub`、DTO 字段或容器名一刀切冻结形状。
 
 将来对外发布前，按协议、SDK 及真实 Rust 消费者分别声明承诺；下面仅保留发布方案，不表示已经执行发布，
 也不要求为这次设计修订开展发版工作。

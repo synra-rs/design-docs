@@ -67,6 +67,11 @@
 只有测试名称过滤通常只是减少执行数量，不能指望它省去该 target 的编译。
 相关修改后尽早执行 `cargo clippy -p <crate> --all-targets -- -D warnings`。
 
+开发过程中持续清理确认不用的构建变体、临时目录和失败产物，不等磁盘不足再处理；大型链接前再检查一次可用空间。
+保留仍需复用的依赖缓存，避免用全量清缓存代替整理产物。
+优先审查 `cargo clean -p <实际包> --dry-run`，确认 target 的解析绝对路径、目录归属及缓存标识，再按包清理；
+清理前确认相关 Cargo 进程已结束，不清空无关依赖缓存，不删除源码、运行数据或发布物。
+
 core 代码阶段门禁按实际影响执行 `cargo test --workspace`、
 `cargo test -p synra-plugin-host --features wasm-runtime`、
 `cargo clippy --workspace --all-targets -- -D warnings` 与 `cargo run -q -p guards`。
