@@ -41,7 +41,7 @@ D:/Projects/synra-rust/          # 各仓库并排检出
 > 目录名带 `synra-rust-` 前缀是**设计期遗留**，与仓库名（`synra-core` / `synra-app`）不同。
 > 位置按业主指示**不动**；GitHub 上的仓库名才是权威。
 
-**目标形态**（五个独立仓库，对齐本机生态里 `peon-burrow` / `peon-hall` 的做法）：
+**基座目标形态**（五个独立仓库，对齐本机生态里 `peon-burrow` / `peon-hall` 的做法）：
 
 ```
 D:/Projects/
@@ -57,6 +57,8 @@ D:/Projects/
 > `packages/theme`，包名 `@synra/theme`，**外部 UI 的适配一律走子路径**（[28 §1.3、§2 R2](./28-app-ui.md)）。
 > 记在这里是因为"六个"这个念头很自然：**它被否决的理由不是麻烦，是消费者拿到的东西不同**
 > （`./unocss`、`./vitepress`、`./css` 是三个入口，而不是三个包）。
+
+官方插件在基座之外另建独立仓库：`synra-plugin-starter` 与 `synra-plugin-touchpad`，需求见 [29](./29-official-plugins.md)。
 
 ### 1.1 `design-docs` 与 `docs` 是**两个不同的仓库**
 
@@ -184,7 +186,7 @@ synra-js/packages/
 
 ```
 design-docs/
-├─ README.md · 01-charter.md · … · 28-app-ui.md   # 28 篇（见 §4 分流表）
+├─ README.md · 01-charter.md · … · 29-official-plugins.md   # 29 篇（见 §4 分流表）
 ├─ history/                                  # 开发与调查记录归档，不是当前规范
 └─ 无构建：纯 Markdown，不上站点（理由见 §1.1）
 ```
@@ -291,6 +293,7 @@ docs/
 | **26** | ★ [**核心稳定性、封装与性能**](./26-core-stability-and-perf.md) | `synra-core` | 三条贯穿性要求的**可检查规则**：稳定层义务、封装四律、热路径零分配、数据结构选型 |
 | **27** | ★ [**官网与文档站**](./27-website.md)                | `docs` | 站点结构、双语策略、Netlify 部署、**schema 托管与冻结**、写作规范 |
 | **28** | ★ [**App UI 规范**](./28-app-ui.md)                  | `synra-app` + `synra-js` + `docs` | **三个消费者**（宿主 / 插件 / 官网）的同一套 token 与 **53 条规则**：`@synra/theme` 的多入口形状（`./unocss` / `./antd` / `./vitepress` / `./css`）、断点、字体、色彩与材质、组件层（antd）的绑定方式、文案、无障碍下限、强制执行与守不住的部分 |
+| **29** | [**Starter 与触摸板插件**](./29-official-plugins.md) | 独立插件仓库 | Electron 参考、基本能力、五种触摸手势、输入会话与验收 |
 
 > **归属列用的是真实仓库名**（`synra-core` / `synra-app` / `synra-js` / `docs`）。本仓库（`design-docs`）本身是设计文档的家，不再单列一列。
 >

@@ -549,3 +549,16 @@ M0 ──▶ M1 ──▶ M2 ──▶ M3
 | TS 类型（给插件作者）       | `@synra/client`（[23](./23-client-library.md)）        | `.d.ts` only，零运行时    |
 | 插件模板                  | `synra-plugin new`                 | headless 与 hybrid 两种模板 |
 | 文档                      | `design-docs/`（内部设计）与 `docs/`（用户文档） | Markdown                |
+
+## 官方插件开发需求
+
+新增需求见 [29 · Starter 与触摸板](./29-official-plugins.md)，两个插件分别由独立仓库承载，远端由用户创建。
+
+| 插件 | 仓库建议 | 当前状态 | 验收重点 |
+| --- | --- | --- | --- |
+| Starter | synra-plugin-starter | 需求已记录，待仓库地址与宿主能力接入 | 目标电脑选择、电脑选中文本到手机剪贴板、电脑打开链接与 debug；参考旧 Electron starter |
+| 触摸板 | synra-plugin-touchpad | 需求已记录，待仓库地址与鼠标输入服务 | 手机单指移动、双指滚动、左键点击、右键点击及双击保持左键拖拽，断连与撤销后释放按钮 |
+
+这些需求加入整体目标，不替代既有 M0–M6 验收。
+M2 先完善 Rust 作者链路及共享宿主能力，Starter 随后验证 UI 和跨设备流程；触摸板在 M5 补真实手机到电脑的输入验收。
+开发不依赖先发版，插件不能以 mock、本地浏览器 fallback 或 UI 动画替代所要求的电脑端操作。
