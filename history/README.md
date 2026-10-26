@@ -5,6 +5,7 @@
 
 | 记录 | 范围 |
 | --- | --- |
+| [CLI 二进制验证](./2026-10-26-cli-verification.md) | 实际 artifact、完整 WIT ABI、导入声明覆盖、输入与 UI 遍历边界，以及真实 SDK Guest 命令验证 |
 | [SDK 独立资源](./2026-10-26-sdk-resources.md) | 包内 WIT、全部生成物只读门禁与隔离源码依赖的真实构建及装载 |
 | [SDK 旧观察](./sdk-observations.md) | 原实现清单与第 180 轮调查，仅作历史快照 |
 | [Rust 作者链路](./2026-10-26-rust-authoring.md) | SDK 真实导出、无 WASI 构建、CLI 组件输出、实际导入检查与失败重建 |

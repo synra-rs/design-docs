@@ -225,13 +225,15 @@ pub fn to_wire_slug(id: &PluginId) -> PluginSlug;
 
 ## 3. 构建工具链：`synra-plugin` CLI
 
-### 3.1 命令集
+### 3.1 目标命令集
+
+以下命令与检查项尚未全部实现；已接通的构建和二进制验证边界见 §3.2–§3.2.1。
+目标模板只有 headless 与 hybrid，现有纯 UI 模板仍待清理。
 
 ```bash
 # 脚手架
 synra-plugin new my-plugin --template headless        # Rust headless
 synra-plugin new my-plugin --template hybrid          # Rust + Vue UI
-synra-plugin new my-plugin --template ui-only         # 纯 Vue UI
 
 # 构建
 synra-plugin build                # 按 manifest 的 runtime 声明构建对应产物
@@ -270,7 +272,7 @@ synra-plugin test                  # 在沙箱里跑契约测试
 1. `cargo build --target wasm32-unknown-unknown --release --message-format=json-render-diagnostics`；
 2. 从 Cargo 的 compiler-artifact 消息定位当前项目的 cdylib core module，支持自定义库名与 target 目录；
 3. 使用已锁定的 wit-component 库读取 SDK 嵌入的 WIT 元数据，编码并校验组件；
-4. 检查所需导出接口与体积上限，暂存成功后原子替换 manifest 的 headless artifact。
+4. 使用与 verify 相同的静态检查验证完整 WIT ABI 与体积上限，暂存成功后原子替换 manifest 的 headless artifact。
 
 编译失败、缺失或歧义的 Cargo 产物、组件化失败都必须返回失败；
 旧产物仍存在不能把失败重建判为成功，失败不覆盖上次成功的组件。
@@ -279,9 +281,31 @@ synra-plugin test                  # 在沙箱里跑契约测试
 当前编译器与这条链路已在本机验证，见 [开发证据](./history/2026-10-26-rust-authoring.md)。
 独立目录中的 SDK 源码依赖也已通过真实构建与装载，见 [资源隔离验证](./history/2026-10-26-sdk-resources.md)。
 
-目标契约仍包括完整 UI 打包、manifest 规范化和真实二进制自检；
-本次 headless 构建通过不代表这些步骤、纯 UI 模板清理或完整 verify 已完成。
-当前 CLI verify 尚不能仅凭磁盘入口证明实际导入与 manifest 授权一致，不能用其 warning 当作安全验收。
+### 3.2.1 当前 verify 的二进制边界
+
+verify 读取 manifest 声明的 artifact，不以固定 plugin.wasm 或 ui/ 代替实际路径。
+它验证二进制组件、嵌套函数体及生产 WIT world 的导入与导出签名，
+从实际组件提取函数，并复用宿主能力表检查 imports ⊆ manifest capabilities。
+已验证的空导入集可以通过，读取或校验失败必须失败，不能降级为 warning。
+未知接口、资源、WASI、错误版本或签名都不能凭名称近似而通过。
+
+manifest 与 Wasm 采用有界读取，UI 入口与遍历限制在声明的目录内；
+缺失文件、目录链接越界、读取失败和资源上限都给出失败报告。
+
+| 输入 | 当前上限 |
+| --- | --- |
+| manifest.json | 1 MiB |
+| headless artifact | 复用宿主 MAX_COMPONENT_BYTES |
+| UI bundle | 2000 个文件、32 MiB |
+| UI 遍历 | 4000 个目录项，包含文件与目录 |
+
+构建与 verify 使用同一静态组件检查，CLI 的包内 WIT 同样由根契约生成，
+完整生成门禁也检查这一资源，外部使用不依赖源仓库的相邻目录。
+
+这里只检查 manifest 声明，不代表用户已经授予这些能力；装载及调用仍须执行授权闸门。
+静态验证不执行 Guest 初始化，也不证明目标引擎、平台动作或性能预算已经验收。
+完整 UI 打包、manifest 规范化、包身份及声明实现的一致性、纯 UI 模板清理等仍需继续，
+本次二进制检查不等于完整 verify 或 M2 完成；证据见 [记录](./history/2026-10-26-cli-verification.md)。
 
 ### 3.3 Rust 插件模板
 
@@ -434,7 +458,7 @@ async function send() {
 `wit/synra-plugin.wit`，由 `wit-codegen` 同步生成，不能要求消费者拥有源仓库的相邻目录。
 修改主契约后先运行 `cargo run --locked -q -p wit-codegen`，再运行
 `cargo run --locked -q -p wit-codegen -- --check`；只读检查必须覆盖能力表、Host trait、
-可读报告、SDK 导入常量和 SDK WIT 资源，缺失或过时均失败且不自动修复。
+可读报告、SDK 导入常量、SDK WIT 与 CLI WIT 资源，缺失或过时均失败且不自动修复。
 编译器保证绑定符合包内契约，主契约与包内副本的一致性由生成门禁保证。
 本地隔离验证不代表已验证注册表分发，发布仍由业主安排。
 

@@ -972,7 +972,10 @@ MSRV 仍由 `Cargo.toml` 声明，并由专门检查显式选择该版本。
 不开放 WASI、不依赖外部 wasm-tools，也不按库名猜产物路径。
 Cargo JSON 元数据决定当前项目的 cdylib 源文件，manifest 决定最终路径，成功编码后才原子替换输出。
 SDK 携带由根 WIT 契约生成的包内资源，消费者不读取仓库外部路径；
-生成检查覆盖所有派生文件并且只读，资源隔离证据见 [记录](./history/2026-10-26-sdk-resources.md)。
+CLI 同样携带派生 WIT，用于构建与 verify 共用的静态 ABI 检查；
+实际函数导入依据同一 Host 能力表验证声明覆盖，校验失败必须阻止命令成功。
+生成检查覆盖所有派生文件并且只读，证据见 [SDK 资源](./history/2026-10-26-sdk-resources.md)
+与 [CLI 二进制验证](./history/2026-10-26-cli-verification.md)。
 
 Host 的授权依据是组件接口中的真实函数，类型接口本身不作为能力请求；
 未知导入和资源不能被忽略。
