@@ -464,7 +464,7 @@ async fn session_times_out_when_peer_is_silent() {
 | 13 | `network.fetch("http://169.254.169.254/")`         | `IpNotAllowed`（链路本地 / 云元数据）              |
 | 14 | `network.fetch` 后重定向到白名单外                   | 重定向被拦截                                     |
 | 15 | DNS 重绑定（首次白名单 IP，第二次内网）               | 用解析后的 IP 连接 + 每跳重校验 → 拦截             |
-| 16 | `event.emit("_plugin.other.something")`            | `EventNamespaceViolation`                       |
+| 16 | `event.emit("_plugin.@synra-plugin/other.something")`            | `capabilityDenied`，无宿主效果                       |
 | 17 | `device.send` 到未授权设备                          | `CapabilityDenied`                              |
 | 18 | 高频调用 host（1e6/s）                             | 令牌桶限流 `RateLimited`                         |
 | 19 | 发送超大 payload（> 256 KiB）                       | `PayloadTooLarge`                               |

@@ -273,7 +273,7 @@
 ④ [手机内核] IntentRouter
      a. capability 闸门：该插件的 grants 是否覆盖 device:send:<target> + 该 action
      b. 解析目标设备 → TransportRegistry 拿链路（若无则先建连）
-     c. 构造 Envelope { from, to, event: "_plugin.<slug>.<action>", request_id, trace_id, payload }
+     c. 构造 Envelope { from, to, event: "_plugin.<full-plugin-id>.<action>", request_id, trace_id, payload }
      d. 交给 synra-net 发送
                                          ── 网络 ──▶
 ⑤ [PC 内核] 入站

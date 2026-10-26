@@ -5,6 +5,8 @@
 
 | 记录 | 范围 |
 | --- | --- |
+| [完整事件身份](./2026-10-26-event-identity.md) | 完整包 owner、具体事件授权、模式和长度边界，以及跨发布者与包名前缀冒充拒绝 |
+| [能力旧观察](./capability-observations.md) | 原 10 §8 的源码调查与实现清单，仅作历史快照 |
 | [日志级别范围授权](./2026-10-26-scoped-log.md) | 支持级别的导入可用性、逐次授权、真实 void WIT 越权 trap 与审计 |
 | [网络范围授权](./2026-10-26-scoped-network.md) | 域名与方法授权、通配顺序、逐跳 HTTP、真实 Wasm 及两个宿主的缓存撤销验证 |
 | [CLI 二进制验证](./2026-10-26-cli-verification.md) | 实际 artifact、完整 WIT ABI、导入声明覆盖、输入与 UI 遍历边界，以及真实 SDK Guest 命令验证 |

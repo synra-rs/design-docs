@@ -29,7 +29,7 @@
 ┌──────────────────────────────────────────────────────────────┐
 │ 应用层   Intent / Share / Clipboard / Plugin Action           │
 ├──────────────────────────────────────────────────────────────┤
-│ 事件层   EventName（_synra.* / _plugin.<slug>.* / 数据面名）    │
+│ 事件层   EventName（_synra.* / _plugin.<full-plugin-id>.* / 数据面名）    │
 ├──────────────────────────────────────────────────────────────┤
 │ 信封层   Envelope（固定字段；固定 8 个 + 2 个可选）              │
 ├──────────────────────────────────────────────────────────────┤
@@ -387,7 +387,7 @@ impl Envelope {
 | 前缀                    | 谁可以发                                | 语义                              |
 | ----------------------- | --------------------------------------- | --------------------------------- |
 | `_synra.`               | 仅内核                                   | 系统事件（配对、意图回执、插件同步…） |
-| `_plugin.<slug>.`       | 只有该 slug 的插件（内核强制）             | 插件事件                          |
+| `_plugin.<full-plugin-id>.`       | 只有该完整 id 的插件（内核强制）             | 插件事件                          |
 | **数据面裸名**           | 仅内核                                   | `file.transfer.*`（见 §8）         |
 | `synra.internal.`       | 仅内核进程内（不经网络）                   | 控制面 / 宿主内部                  |
 
@@ -399,8 +399,8 @@ impl EventName {
     /// 构造系统事件
     pub fn system(logical: &str) -> Result<Self, EventNameError>;
 
-    /// 构造插件事件（内核侧调用；插件自己不能指定 slug）
-    pub fn plugin(slug: &PluginSlug, logical: &str) -> Result<Self, EventNameError>;
+    /// 构造插件事件（内核侧调用；完整插件 id 由调用上下文绑定）
+    pub fn plugin(plugin: &PluginId, logical: &str) -> Result<Self, EventNameError>;
 
     /// 数据面事件
     pub fn data_plane(logical: DataPlaneEvent) -> Self;
@@ -413,7 +413,7 @@ impl EventName {
 **硬约束（内核强制，不是约定）**：
 
 ```
-插件 emit 的事件，其 `_plugin.<slug>.` 部分**必须**等于该插件自己的 slug。
+插件 emit 的事件，其 `_plugin.<full-plugin-id>.` 部分**必须**等于该插件完整的 @scope/name。
 否则返回 CapabilityDenied（理由：伪造其它插件的事件）。
 ```
 
@@ -427,7 +427,7 @@ impl EventName {
 | 谁定义 payload | **内核**（Rust 类型；插件直接拿到解析好的结构）             | 插件作者（manifest 里的 JSON Schema）      |
 | 前进兼容性    | 由内核负责（`#[non_exhaustive]` + Feature，[§9](#9-协议演进)） | 由**声明对比**保证（§6.6）                  |
 | 谁能发        | 内核（少数白名单事件允许插件发，见 §6.5）                   | 该插件自己（命名空间强制）                   |
-| 命名          | `device.*` / `file.transfer.*` / `_synra.*`             | `_plugin.<自己的 slug>.*`                  |
+| 命名          | `device.*` / `file.transfer.*` / `_synra.*`             | `_plugin.<full-plugin-id>.*`                  |
 
 > **设计原则**：内核提供的是**能力面**（"有设备上线了"、"文件收完了"、"有分享进来了"），
 > 插件提供的是**语义**（"这是一条聊天消息"、"这是一份发票"）。
@@ -592,9 +592,9 @@ pub enum DataPlaneEvent {
 #### 命名规则（内核强制，不是约定）
 
 ```
-_plugin.<slug>.<logical…>
+_plugin.<full-plugin-id>.<logical…>
 
-  slug     必须等于该插件 manifest 的 slug（字符集 [a-z0-9-]，长度 1..=48）
+  full-plugin-id 必须等于 manifest.id，保留发布者及完整包名，长度不超过 128 字节
   logical  插件自己定，允许 `.` 与 `*`（`*` 只用于 handles 的匹配，不用于发送）
 ```
 
@@ -602,7 +602,7 @@ _plugin.<slug>.<logical…>
 
 | # | 规则                                                                     | 违反时                         |
 | - | ------------------------------------------------------------------------ | ------------------------------ |
-| 1 | 插件只能发 `_plugin.<自己的 slug>.*`                                        | `CapabilityDenied`（伪造他人事件） |
+| 1 | 插件只能发 `_plugin.<full-plugin-id>.*`                                        | `CapabilityDenied`（伪造他人事件） |
 | 2 | 插件不能发 `_synra.*` / `device.*` / `file.transfer.*`                      | `CapabilityDenied`             |
 | 3 | 发送还需要 `event:emit:<具体名或通配>` 能力                                 | `CapabilityDenied`             |
 | 4 | 接收需要在 manifest `handles` 里声明（否则内核不投递）                        | 静默不投递（记审计）             |
@@ -621,7 +621,7 @@ _plugin.<slug>.<logical…>
 {
   "events": [
     {
-      "name": "_plugin.chat.text",
+      "name": "_plugin.@synra-plugin/chat.text",
       "payload": {
         "type": "object",
         "required": ["body"],
@@ -634,7 +634,7 @@ _plugin.<slug>.<logical…>
       }
     },
     {
-      "name": "_plugin.chat.typing",
+      "name": "_plugin.@synra-plugin/chat.typing",
       "payload": { "type": "object", "properties": {}, "additionalProperties": false }
     }
   ]
@@ -667,7 +667,7 @@ _plugin.<slug>.<logical…>
 
 ### 6.6 前进兼容：双方的 schema 必须兼容
 
-跨设备插件事件是**契约**：A 设备的插件发 `_plugin.chat.text`，B 设备的同名插件收。
+跨设备插件事件是**契约**：A 设备的插件发 `_plugin.@synra-plugin/chat.text`，B 设备的同名插件收。
 两台设备上的插件版本可能不同，所以**安装/激活阶段就要检查兼容性**。
 
 ```
@@ -744,7 +744,7 @@ pub enum Inbound {
 
     /// 插件事件（路由给插件，见 [13 §4.3](./13-plugin-authoring.md)）
     /// ★ payload 是借用帧缓冲的 RawValue，`logical` 也借用 —— 热路径零分配（§6.8）
-    Plugin { slug: PluginSlug, logical: CompactStr, payload: Option<&'a RawValue> },
+    Plugin { owner: PluginId, logical: CompactStr, payload: Option<&'a RawValue> },
 
     /// 未知但格式合法的事件（内核记录并忽略，**不报错、不断链**）
     Unknown { event: EventName, payload: Option<&'a RawValue> },

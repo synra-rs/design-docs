@@ -575,7 +575,7 @@ impl Kernel {
      - 校验目标设备的 PlatformCapabilities 覆盖 required_caps
        （例如 iOS 不支持 simulate_keys → 提前拒绝，而不是远端失败）
 7. 下发：
-     - 构造 Envelope { event: "_plugin.{slug}.{action}", payload, request_id, trace_id }
+     - 构造 Envelope { event: "_plugin.{plugin_id}.{action}", payload, request_id, trace_id }
      - Transfer/Transport 发送
      - 注册超时定时器
 8. 回执：

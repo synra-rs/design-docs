@@ -145,7 +145,7 @@ synra-plugin-chat/
     "device:send:*",
     "device:broadcast",
     "storage:local:read", "storage:local:write",
-    "event:emit:_plugin.chat.*",
+    "event:emit:_plugin.@synra-plugin/chat.*",
     { "cap": "network:fetch:api.github.com", "optional": true }
   ],
 
@@ -168,10 +168,10 @@ synra-plugin-chat/
   ],
 
   // ── ★ 自己定义的事件（名字 + payload 形状）──
-  //    命名空间 `_plugin.<slug>.` 由内核强制；名字与 schema 在这里声明一次
+  //    命名空间 `_plugin.<full-plugin-id>.` 由内核强制；名字与 schema 在这里声明一次
   "events": [
     {
-      "name": "_plugin.chat.text",
+      "name": "_plugin.@synra-plugin/chat.text",
       "payload": {
         "type": "object",
         "required": ["body"],
@@ -182,14 +182,14 @@ synra-plugin-chat/
         "additionalProperties": false
       }
     },
-    { "name": "_plugin.chat.typing",
+    { "name": "_plugin.@synra-plugin/chat.typing",
       "payload": { "type": "object", "properties": {}, "additionalProperties": false } }
   ],
 
   // ── ★ 声明它要处理哪些入站事件（基础事件 + 自己的事件）──
   //    完整的基础事件目录见 [04 §6.3](./04-wire-protocol.md)
   "handles": [
-    { "event": "_plugin.chat.*" },                          // 自己的（单段通配）
+    { "event": "_plugin.@synra-plugin/chat.*" },                          // 自己的（单段通配）
     { "event": "_synra.transfer.completed" },                // ★ 基础事件：文件收完
     { "event": "_synra.device.changed" },                    // ★ 基础事件：设备列表变化
     { "event": "_synra.share.received" }                     // ★ 基础事件：没人处理的分享
@@ -320,7 +320,7 @@ impl GithubBridge {
     /// 返回 `Some` = 给发送方回执；`None` = 不回执（详见 §4.3 ③）。
     fn on_event(event: InboundEvent) -> Result<Option<Value>, Error> {
         match event.event.as_str() {
-            "_plugin.chat.text" => {
+            "_plugin.@synra-plugin/chat.text" => {
                 let body = event.payload["body"].as_str().ok_or(Error::invalid_argument("body"))?;
                 synra::platform::notify("新消息", body)?;      // 过闸门：platform:notify
                 Ok(Some(json!({ "received": true })))          // 回执
@@ -382,13 +382,13 @@ static GITHUB_RE: Lazy<Regex> = Lazy::new(|| {
 {
   // 声明式路由：内核只把匹配的事件投给我（★ 见 §10-5 的设计讨论）
   "handles": [
-    { "event": "_plugin.chat.text" },                    // 精确
-    { "event": "_plugin.chat.*" },                       // 单段通配
+    { "event": "_plugin.@synra-plugin/chat.text" },                    // 精确
+    { "event": "_plugin.@synra-plugin/chat.*" },                       // 单段通配
     { "event": "file.transfer.complete",                 // 数据面事件 + 条件
       "match": { "meta.kind": "attachment" } }
   ],
   "capabilities": [
-    { "cap": "event:emit:_plugin.chat.*" },              // 发事件的能力（按命名空间授权）
+    { "cap": "event:emit:_plugin.@synra-plugin/chat.*" },              // 发事件的能力（按命名空间授权）
     { "cap": "device:send:*" },
     { "cap": "platform:notify" }
   ]
@@ -410,7 +410,7 @@ impl ChatPlugin {
         // 按事件名分支。★ 这里是普通 Rust 代码：可以 if/loop/调 host function
         match event.event.as_str() {
             // 来自另一台设备的聊天消息
-            "_plugin.chat.text" => {
+            "_plugin.@synra-plugin/chat.text" => {
                 let body = event.payload["body"]
                     .as_str()
                     .ok_or(Error::invalid_argument("body"))?;
@@ -452,13 +452,13 @@ impl ChatPlugin {
 
 ```
 [设备 A] 插件 UI 按钮
-   │ synra.device.send({ to: 'dev_b', event: '_plugin.chat.text', payload: { body: 'hi' } })
+   │ synra.device.send({ to: 'dev_b', event: '_plugin.@synra-plugin/chat.text', payload: { body: 'hi' } })
    ▼
-[设备 A] 内核  → 过闸门 event:emit:_plugin.chat.*  → 装信封（trace_id / request_id）
+[设备 A] 内核  → 过闸门 event:emit:_plugin.@synra-plugin/chat.*  → 装信封（trace_id / request_id）
    │ TCP
    ▼
 [设备 B] 内核
-   ├─ 解帧 → 校验信封 → 事件是 `_plugin.chat.text`
+   ├─ 解帧 → 校验信封 → 事件是 `_plugin.@synra-plugin/chat.text`
    ├─ ★ 查路由表：谁声明了 handles 匹配这个事件？（manifest 装载时就建好的索引）
    │     → chat-plugin 命中
    ├─ 从实例池取一个实例 → 调 Wasm: on_event(InboundEvent { event, from, payload, reply_to })
@@ -503,7 +503,7 @@ impl ChatPlugin {
 // synra.json
 { "handles": [ { "event": "_synra.transfer.completed" },
                { "event": "_synra.device.changed" },
-               { "event": "_plugin.chat.text" } ] }
+               { "event": "_plugin.@synra-plugin/chat.text" } ] }
 ```
 
 ```rust
@@ -522,7 +522,7 @@ fn on_event(e: InboundEvent) -> Result<Option<Value>, Error> {
         }
         // 插件自定义事件是裸 JSON —— 内核不认识它的形状
         BuiltinEvent::None => match e.event.as_str() {
-            "_plugin.chat.text" => { /* serde 反序列化 e.payload */ }
+            "_plugin.@synra-plugin/chat.text" => { /* serde 反序列化 e.payload */ }
             _ => Ok(None),
         },
         _ => Ok(None),
@@ -532,14 +532,14 @@ fn on_event(e: InboundEvent) -> Result<Option<Value>, Error> {
 
 **三条关键区别**（作者必须知道）：
 
-|                    | 基础事件（`_synra.*` / `file.transfer.*`）        | 自定义事件（`_plugin.<你的 slug>.*`）            |
+|                    | 基础事件（`_synra.*` / `file.transfer.*`）        | 自定义事件（`_plugin.<full-plugin-id>.*`）            |
 | ------------------ | ---------------------------------------------- | --------------------------------------------- |
 | 谁定义 payload      | **内核**（Rust 类型，强类型给你）                  | **你**（manifest 里的 JSON Schema）              |
 | 能不能自己发         | 只有白名单两条（[04 §6.5](./04-wire-protocol.md)） | ✅ 只能发自己命名空间下的                          |
 | 跨设备兼容谁负责      | 内核（`#[non_exhaustive]` + Feature）             | **你的 schema**：安装时对比双方声明，不兼容就拒绝激活（[04 §6.6](./04-wire-protocol.md)） |
 
 > **所以"作者也可以写自己的"是**：在 manifest 的 `events` 里声明名字 + payload schema，
-> 在 `handles` 里声明要收哪些，在 `on_event` 里 match。命名空间 `_plugin.<slug>.` 由内核强制，
+> 在 `handles` 里声明要收哪些，在 `on_event` 里 match。命名空间 `_plugin.<full-plugin-id>.` 由内核强制，
 > 你无法（也不需要）伪造别人的事件。
 
 #### ⑦ 这条路径上仍然 🔴 未定的三件事
@@ -766,7 +766,7 @@ dist/ui.zip          （zip 内路径 < 256 字符，拒绝符号链接，禁止
           │     · 目标设备的 PlatformCapabilities 覆盖所需能力
           ▼
  ┌──────────────────┐
- │ synra-net         │ ⑥ Envelope { event: "_plugin.github-bridge.open-url",
+ │ synra-net         │ ⑥ Envelope { event: "_plugin.@synra-plugin/github-bridge.open-url",
  └────────┬─────────┘                request_id, trace_id, payload:{url} }
           │
           └──────────────── TCP（端口 32100）──────────────────────────▶
@@ -1087,7 +1087,7 @@ UI 部分与 headless 部分的能力面**本质上不同**（§5.2 vs §4.4）�
 
 **问题**：这是整套设计里**最不确定**的一块。
 
-内核收到 `_plugin.chat.text` 或 `file.transfer.complete`，要交给插件的 `on_event`。
+内核收到 `_plugin.@synra-plugin/chat.text` 或 `file.transfer.complete`，要交给插件的 `on_event`。
 但**插件是池化的**，"交给哪个实例"没有天然答案。而且"订阅"这个概念在池化模型下不成立
 （订阅意味着一个**稳定的回调目标**）。
 
@@ -1103,7 +1103,7 @@ UI 部分与 headless 部分的能力面**本质上不同**（§5.2 vs §4.4）�
 **倾向**：**A**（声明式路由）作为默认，**D** 作为逃生舱。
 具体形态：
 ```
-manifest.handles = [ { event: "_plugin.chat.*" }, { event: "file.transfer.complete", kind: "attachment" } ]
+manifest.handles = [ { event: "_plugin.@synra-plugin/chat.*" }, { event: "file.transfer.complete", kind: "attachment" } ]
                     ↓ 内核收到匹配事件
                 Wasm: on_event(InboundEvent { event, from, payload, reply_to })
                     ↓ 需要回执时

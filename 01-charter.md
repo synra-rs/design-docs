@@ -117,7 +117,7 @@
 | **Peer / Device（设备）**        | 一个可被发现的宿主。有稳定的 `device_id`（UUID）与可变的 `display_name`。                          |
 | **Link（链路）**                | 两台设备之间的一条 TCP 长连接。有类型状态机（`Connecting → Ready → Draining`）。                    |
 | **Envelope（信封）**            | 一次跨设备消息的外层结构。字段固定（[04 §5](./04-wire-protocol.md)）。                             |
-| **Event（事件名）**             | 信封里的路由键。系统前缀 `_synra.`，插件前缀 `_plugin.<slug>.`，数据面用裸名。                       |
+| **Event（事件名）**             | 信封里的路由键。系统前缀 `_synra.`，插件前缀 `_plugin.<full-plugin-id>.`，数据面用裸名。                       |
 | **Discovery（发现）**           | 通过 UDP 广播 + mDNS 找到局域网内其它宿主，并通过 TCP 握手确认其存在。                              |
 | **TrustLevel（信任等级）**      | `Advertised`（仅听说）/ `Handshaked`（握过手）/ `Paired`（已配对）。**只有 ≥ Handshaked 才进 UI。**   |
 | **Pairing（配对）**             | 用户明确同意后，两台设备互相持久化记录，之后可自动重连。                                            |

@@ -262,7 +262,7 @@ pub struct SessionTimeouts {
   > `EventName::check_emittable_by` 的注释写着"The host calls this on every outbound plugin event.
   > It is the difference between 'plugins have their own namespace' being true and it being a sentence in a document"——
   > 而 **孿主从来没调过它**，六个调用点全在它自己的测试模块里。
-  > 于是两件事都是允许的：插件发另一个插件命名空间的事件（`_plugin.notes.*`），
+  > 于是两件事都是允许的：插件发另一个插件命名空间的事件（`_plugin.@synra-plugin/notes.*`），
   > 以及插件发孿主事件（`_synra.device.changed`）。本轮接上了（`event-emit` / `device-send` / `device-broadcast` 三处）。
   > ★ 而且接上后立刻发现**测试配置用的事件名 `a.b` 根本不合法**（语法只收
   > `_synra.` / `_plugin.` / `synra.internal.` / `device.` / `file.transfer.` 五个命名空间）——

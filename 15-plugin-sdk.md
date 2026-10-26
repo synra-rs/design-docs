@@ -79,7 +79,7 @@
     { "cap": "device:broadcast" },
     { "cap": "storage:local:read" },
     { "cap": "storage:local:write" },
-    { "cap": "event:emit:_plugin.chat.*" },
+    { "cap": "event:emit:_plugin.@synra-plugin/chat.*" },
     { "cap": "event:subscribe:_plugin.*.*" },
     { "cap": "ui:page" }
   ],
@@ -100,11 +100,11 @@
   ],
 
   // ── ★ 自己定义的事件（名字 + payload schema）──
-  //    命名空间 `_plugin.<slug>.` 由内核强制；这里声明一次，
+  //    命名空间 `_plugin.<full-plugin-id>.` 由内核强制；这里声明一次，
   //    `synra-plugin build` 会据此生成 Rust 常量，作者不写字符串（[13 §4.3 ⑦](./13-plugin-authoring.md)）
   "events": [
     {
-      "name": "_plugin.chat.text",
+      "name": "_plugin.@synra-plugin/chat.text",
       "payload": {
         "type": "object",
         "required": ["body"],
@@ -115,14 +115,14 @@
         "additionalProperties": false
       }
     },
-    { "name": "_plugin.chat.typing",
+    { "name": "_plugin.@synra-plugin/chat.typing",
       "payload": { "type": "object", "properties": {}, "additionalProperties": false } }
   ],
 
   // ── ★ 要处理的入站事件（基础事件 + 自己的事件）──
   //    基础事件目录见 [04 §6.3](./04-wire-protocol.md)；没声明的不会被投递
   "handles": [
-    { "event": "_plugin.chat.*" },
+    { "event": "_plugin.@synra-plugin/chat.*" },
     { "event": "_synra.transfer.completed" },
     { "event": "_synra.device.changed" }
   ],
