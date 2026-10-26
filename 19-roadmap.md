@@ -227,7 +227,8 @@ CLI 已接入实际 artifact 的二进制、嵌套函数体、WIT ABI 与导入�
 含实际子进程与 PowerShell 语义验证，见[命令 IO 记录](./history/2026-10-26-command-io.md)。
 Wasm outcome 与插件页面 RPC 已保留原始错误码和可选详情，见[错误详情记录](./history/2026-10-26-error-details.md)；
 本地及远程 intent 共用错误分类，成功 JSON、完整错误和原操作 trace 已贯通重复回复及数据库恢复，见[意图结果记录](./history/2026-10-26-intent-outcomes.md)。
-生产事件投递及订阅回调、设备与动作范围授权、IPv6 范围语法及进行中 IO 的撤销取消仍待收敛。
+设备发送和跨插件动作的导入及调用范围已收敛到实际设备 UUID、完整插件 id 和动作名，见[范围授权记录](./history/2026-10-26-scoped-targets.md)。
+生产事件投递及订阅回调、设备发送与跨插件执行服务、IPv6 范围语法及进行中 IO 的撤销取消仍待收敛。
 本地安装、完整用户授权与真实平台动作、verify 其余验收、UI 构建及性能验收仍待完成，本轮不等于 M2 完成。
 
 ### 目标

@@ -658,7 +658,7 @@ pub struct ActionDecl {
 
 1. 插件必须在 manifest 里**声明**它能提供的 action（不能只靠运行时 `action-declare`）；
 2. 运行时 `action-declare` 只是**注册具体实现**，且名字必须在 manifest 声明集合内；
-3. 调用方必须声明 `action:invoke:<plugin>:<name>`。允许通配：`action:invoke:*:format-date`；
+3. 调用方必须声明 `action:invoke:<完整 @scope/name>:<name>`。允许通配授权：`action:invoke:*:format-date`；实际参数不能为通配符，动作名须为 1–64 个 ASCII 字母、数字、点、下划线或连字符；manifest 与运行时共用校验；
 4. **跨插件调用有超时与配额**：防止链式调用无限扩散（A → B → C → A）；
 5. **调用链深度上限**（默认 8），超过则拒绝并报 `ActionChainTooDeep`。
 

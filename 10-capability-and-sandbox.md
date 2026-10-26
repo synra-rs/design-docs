@@ -62,7 +62,7 @@ NAME       ::= [a-z][a-z0-9-]{0,63}
 | ---------- | -------------------- | ------------------------------------------------- |
 | `log`      | 日志                 | `log:*`、`log:debug`                              |
 | `event`    | 事件总线             | `event:emit:_plugin.@synra-plugin/chat.*`、`event:subscribe:_synra.device.*` |
-| `device`   | 跨设备               | `device:list`、`device:send:@synra-pc`、`device:broadcast` |
+| `device`   | 跨设备               | `device:list`、`device:send:<device-uuid>`、`device:broadcast` |
 | `storage`  | 插件私有存储          | `storage:local:read`、`storage:local:write`、`storage:secure:read` |
 | `network`  | 网络（宿主代理）      | `network:fetch:api.github.com`、`network:fetch:api.x.com:POST`、`network:websocket` |
 | `fs`       | 文件系统（沙箱内）    | `fs:read:/data/**`、`fs:write:/cache/*`、`fs:watch` |
@@ -81,11 +81,11 @@ NAME       ::= [a-z][a-z0-9-]{0,63}
 
 | domain    | qualifier 形态              | 匹配语义                                                     |
 | --------- | --------------------------- | ------------------------------------------------------------ |
-| `device`  | `@device-id` / `@self` / `*`  | 目标设备 id（`@` 前缀为设备 id 的显示别名约定）                 |
+| `device`  | `<device-uuid>` / `*` | 目标为规范小写、带连字符的设备 UUID；显示名称和别名不参与授权 |
 | `network` | `<host>` 或 `<host>:<METHOD>` | 域名精确匹配（**小写、去尾点、punycode 归一**）；METHOD 大写精确 |
 | `fs`      | `<absolute-path-glob>`       | 沙箱内绝对路径（**先 canonicalize 再比较**，见 §4.3）           |
 | `event`   | `<event-pattern>`            | 事件名 glob（`*` 单段，`**` 多段）                              |
-| `action`  | `<name>`                     | 动作名精确或 glob                                              |
+| `action`  | invoke 为 `<full-plugin-id>:<name>` | 完整包 id 和动作分别匹配；通配只出现在授权模式中 |
 | `ui`      | `<pageKey>`                  | 页面 key                                                      |
 
 **`network` 的规范化规则**（必须严格）：
@@ -151,7 +151,7 @@ manifest 的具体域名与 methods 必须双向一致：列出的方法均有�
 两个宿主通过 synra-fetch 的共享插件入口传入新读取的授权；客户端缓存不能保存方法权限。
 损坏的持久化授权整体拒绝，不能跳过错误后保留部分权限；拒绝保持 `capabilityDenied` 及审计分类。
 
-当前具体域名策略仍拒绝仅有族通配符的实际出站请求；IPv6 范围语法与其他动态函数族尚未收敛。
+当前具体域名策略仍拒绝仅有族通配符的实际出站请求；IPv6 范围语法及尚未列出的动态函数族继续按路线图推进。
 授权撤销验证覆盖后续调用，进行中的同步 IO 取消仍属于 D2 后续工作。
 验证证据见[网络范围授权](./history/2026-10-26-scoped-network.md)。
 
@@ -184,6 +184,24 @@ event-emit 的族标签 `event:emit:*` 仅判断是否拥有发射范围；
 接收模式中的完整包 id 是一个段；`@` 与 `/` 只在该 owner 段内按 PluginId 语法接受。
 该规则只收敛身份、语法及授权；生产事件投递、订阅回调和设备操作仍按路线图继续开发。
 证据见[完整事件身份记录](./history/2026-10-26-event-identity.md)。
+
+### 2.8 设备目标与跨插件动作的范围
+
+device-send 的族标签为 `device:send:*`，action-invoke 为 `action:invoke:*:*`，action-declare 为 `action:declare:*`；
+导入阶段可由窄范围声明覆盖，调用阶段分别派生 `device:send:<实际设备 UUID>` 和
+`action:invoke:<完整 @scope/name>:<实际动作名>`，必须由该次会话的授权覆盖。
+动作声明同样按实际名称检查 `action:declare:<name>`；裸 `action:declare` 不覆盖具体注册。
+两个动作限定段各自占据位置；`action:invoke:*` 不能匹配完整调用，也不提供旧标签兼容分支。
+
+实际设备参数只接受规范 UUID，不能传显示名称、@self、通配符或其他别名；界面先从设备列表取得 id。
+实际动作名为 1–64 个 ASCII 字母、数字、点、下划线或连字符，不能包含冒号、通配符或包路径。
+manifest、运行时声明和跨插件调用共用名字校验；完整插件 id 必须通过 PluginId 校验，不按短包名比较。
+授权拒绝先于速率预算和宿主效果；拒绝详情指明实际缺失范围，没有任何相关授权时指明函数族。
+设备发送继续独立检查事件所有权，持有全设备授权也不能冒充其他插件发事件。
+
+真实 Wasm 回归复用同一实例并更换当前调用会话，验证窄范围、不同目标及撤销后拒绝；
+CLI verify 读取真实组件的实际导入，并验证窄范围 manifest 与缺少限定段的拒绝。
+这不代表生产设备投递、跨插件执行服务或进行中调用的撤销取消已经完成；见[范围授权记录](./history/2026-10-26-scoped-targets.md)。
 
 ## 3. 三层闸门
 
