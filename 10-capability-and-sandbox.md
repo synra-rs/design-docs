@@ -126,13 +126,34 @@ pub fn verify_effective_caps(
     // 1. manifest 声明必须语法合法
     // 2. 用户授予必须是 manifest 的子集
     // 3. wasm import 的 interface 必须被授予覆盖
-    //    （例如 import 了 host.network-fetch，但没授予任何 network:fetch:* → 拒绝装载）
+    //    （例如 import 了 host.network-fetch，但没有任何 fetch 范围授权 → 拒绝装载）
     // 4. 反向：授予了但 wasm 没 import → 警告（不拒绝）
 }
 ```
 
 
 ---
+
+### 2.5 网络函数可用性与具体请求授权
+
+network-fetch 的导入标签为 `network:fetch:*`，这是函数族标签，不是每次调用的授权目标。
+声明或授予 `network:fetch:api.github.com:GET` 足以覆盖该导入；没有 fetch 范围授权仍拒绝装载。
+运行时必须解析实际 URL 与方法，再检查当前授权，禁止把声明中的通配标签当作请求目标。
+
+具体请求只接受绝对 HTTP/HTTPS URL；与传输共用 URI/方法解析规则，域名转小写并去除末尾点，
+端口不参与 capability 匹配。域名授权覆盖该域名的所有方法，带方法授权仅覆盖该方法；
+这是网络请求的目标构造规则，不改变 §3.3 中通用 capability 的逐段匹配语义。
+限定目标后的 `*` 与 `**` 必须留在原位置，不得被解析器移到前缀。
+manifest 的具体域名与 methods 必须双向一致：列出的方法均有权限支撑，
+有限方法声明也不能由允许更多方法的具体域名权限支撑；methods 为空表示所有方法。
+
+每一跳重定向在 DNS 与套接字操作前重新校验目标及方法，并继续执行域名、IP、体积与超时守卫。
+两个宿主通过 synra-fetch 的共享插件入口传入新读取的授权；客户端缓存不能保存方法权限。
+损坏的持久化授权整体拒绝，不能跳过错误后保留部分权限；拒绝保持 `capabilityDenied` 及审计分类。
+
+当前具体域名策略仍拒绝仅有族通配符的实际出站请求；IPv6 范围语法与其他动态函数族尚未收敛。
+授权撤销验证覆盖后续调用，进行中的同步 IO 取消仍属于 D2 后续工作。
+验证证据见[网络范围授权](./history/2026-10-26-scoped-network.md)。
 
 ## 3. 三层闸门
 
