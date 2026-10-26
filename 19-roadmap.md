@@ -207,6 +207,10 @@ cargo tree -p synra-net -p synra-core | grep -E 'tauri|wry'   # 空
 
 ## M2 · 意图路由与最小插件（3–4 周）
 
+当前 Wasm 双向 ABI 已改用生产 WIT 生成 Host 绑定和类型化 Guest 返回，
+真实组件已覆盖返回、清理、授权拒绝、纯匹配及有界初始化，见 [验证记录](./history/2026-10-26-wasm-abi.md)。
+这只完成宿主边界修复，不代表下列 SDK、安装、路由、平台动作及性能验收全部完成。
+
 ### 目标
 一个 **Rust headless Wasm 插件**能：
 1. 被安装（本地开发路径）；

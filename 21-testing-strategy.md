@@ -397,130 +397,20 @@ async fn session_times_out_when_peer_is_silent() {
 **每个用例是一个故意的恶意 Wasm 插件（或恶意 UI 插件）。**
 这是整套测试里最重要的一组：安全属性在"写错"时功能测试照样全绿，只有对抗测试能发现。
 
-> ### ★ 而这张表的 29 条，**真实状态是什么**（第 71 轮逐条核对）
->
-> 下面那句“未做：没有”已经过时了 —— 大多数用例在之后的轮次里被逐个覆盖，
-> 只是**分散在各自的模块里**。按“未做”去写会写出已经存在的测试，而比那更糟的是它会**掩盖真正没有的那几条**。
->
-> | 用例 | 状态 | 证据 |
-> | --- | --- | --- |
-> | 1 死循环 | **✓ 真实 guest**（第 72 轮） | `a_guest_that_loops_for_ever_is_stopped_by_its_instruction_budget` |
-> | 3 内存上限 | **✓ 真实 guest**（第 72 轮） | `a_guest_cannot_grow_past_the_ceiling_its_budget_names` |
-> | 2 超时 | **✓ 真实 guest（第 73 轮）**：死循环的 guest 被 deadline 截断 | `a_wall_clock_budget_arms_a_deadline_on_the_store` |
-> | 4、5 栈 / 越界 | **配置被证明装上了** ⚠ | 见下面 |
-> | 6 panic | ✓ | `a_plugin_that_panics_the_host_does_not_stop_the_kernel` |
-> | 7 未声明的 host function | ✓ | `IMPORTS_UNKNOWN` 档位 + linker 的导入表 |
-> | 8–10 路径逃逸 / symlink | ✓ | `check_path` 的 `OutsideSandbox`、`is_within`、`expand.rs` **直接拒绝 symlink** |
-> | 11–13 scheme / 环回 / 169.254 | ✓ | `synra_core::network` 的守卫测试（各有一条） |
-> | 14 重定向到白名单外 | ✓ | `a_redirect_to_a_host_nobody_granted_is_refused_at_that_hop` |
-> | 15 DNS 重定向 | ✓ | `FixedResolver`：只交出已校验的地址 |
-> | 16 事件命名空间 | ✓ | `EventName::check_emittable_by` |
-> | 17 `device.send` 未授权 | ✓ | gate 的 `CapabilityDenied` 测试 |
-> | 18 高频调用 | ✓ | `RateKind` 五维，`rate_kind()` 分类 |
-> | 19 超大 payload | ✓ | `PayloadTooLarge`（包体与帧两处） |
-> | 20 递归调 action | **未实现** ✗ | `action_invoke` 在两个宿主里都拒绝 |
-> | 21–24 伪造 manifest / 摘要 / 签名 / 公钥 | ✓ | `verify`、`DigestMismatch`、`BadSignature`、`Untrusted` |
-> | 25–27 zip bomb / tar 穿越 / symlink | ✓ | `artifact::expand::plan`：条目数、单文件、总量、深度、symlink 全有测试 |
-> | 28 宿主 panic | ✓ | `catch_unwind` 的测试 |
-> | 29 `can_handle` 产生副作用 | ✓ | `HostCalls::pure()` + 纯会话拒绝副作用的测试 |
->
-> ★ **而第 96 轮把那修复的另一半也钉住了**：关掉 `timeout: None` 的 deadline 只有在
-> `timeout: Some(_)` **仍然会开**、仍然能停下真客体时才是对的。
-> `a_real_guest_that_loops_is_stopped_by_the_wall_clock_not_by_zero` 跑一个真的死循环，
-> 燃料给足以跑过时钟，所以停下它的必须是**墙上的钟**；
-> 并且断言结果里的 `after` **就是预算的那个时长**（250ms）而不是零 ——
-> `after: 0ns` 正是第 95 轮那个 bug 的签名。
-> ★ 取反对照：把燃料改成 1000⇒红，报 `got FuelExhausted { fuel: 1000 }`，
-> 证明这条测试分得清两层限制。
-> ★ **而第 95 轮把它做成了最强形式：真的客体，穿过 Kernel**：
-> `crates/synra-core/src/dispatch/tests.rs` 的 `a_real_guest_that_loops_is_stopped_without_costing_the_others`。
-> 前一条证的是**内核对结果的处理**，引擎自己的测试证的是**引擎会产生这些结果**，
-> 但没有人把一个**真客体穿过 Kernel** 跑过 —— 而那才是用户拥有的性质。
-> 现在一个真的 `(loop (br))` 被装进 `PluginSet`，引擎真的数指令并真的停下它，
-> 而旁边那个真插件**连续两次**照常工作。
-> ★ **而它当场抓到了一个真的 bug**：预算里 `timeout: None` 的调用
-> 会保留**实例化时为防 start 函数跑飞而设的 `set_epoch_deadline(1)`**，
-> 于是执行器下一次 epoch 推进就中断它，`classify` 报出 `Timeout { after: 0ns }` ——
-> **一个根本没有时限的预算被判为超时**。现在 `None` 会把 deadline 真正卸下。
-> ★ **而它解释了一个旧的“偶发”**：第 75/76 轮记录过一次无法复现的失败，
-> 当时只能写“只出现在全工作区跑的时候”。原因就是它：中断需要 epoch 恰好在调用飞行时推进，
-> 而那只在并行负载下自己发生。新测试故意**先**推进 epoch 再调用，所以不是竞态。
-> ★ **而“卸下”该用什么值也是跑出来的**：`u64::MAX` 在 wasmtime 内部
-> **直接 panic**（`attempt to add with overflow`，store.rs），因为它把 deadline 加到当前 epoch 上。
-> 改用 `1 << 40`（约三百年，且不会溢出）。
-> ★ **而第 94 轮把那句关键的“内核仍可用 + 其它插件仍可用”补上了**：
-> `crates/synra-core/src/dispatch/tests.rs` 的
-> `every_way_a_plugin_can_misbehave_leaves_the_others_working`。
-> 原来只有两条隔离测试（一条为 trap、一条为 host panic），而脚本档位能表达 **7 种**失败。
-> 现在一张表跑六种：报告失败、trap、燃料耗尽、内存上限、超时、host panic。
-> ★ **而断言包括“之后仍可用”**：每一种失败后再发一次共享，
-> 它必须仍然被那个没坏的插件服务 —— 一个“恢复了但把 set 弄坏了”的调度
-> 会通过上面每一条断言，然后在下一次共享上失败。
-> ★ **而它证什么、不证什么写在测试里**：它证**内核的处理**（给定这个结果，
-> 其他插件仍被问、用户仍拿到提示），**不证引擎会产生这些结果**（那是第 72
-> 轮的燃料/内存真档位测试）。两半同属一个性质，缺一不可。
-> ★ **而取反对照时第一次打在了错的分支上**：我先改的是 `match_share` 的
-> `Err(PluginSetError)` 臂，而 trap/超时走的是 `Ok(CallOutcome)` 在 `take_answer` 里分类。
-> 那一版取反对照**绿了** —— 而一个通过的取反对照并不证明测试是空的，
-> 它证明的是**取反对照打错了地方**。改到正确的分支后报出 `a trap: both were asked`。
-> ★ **而第 72 轮把其中两条从“只在档位上”变成了真的**：用 `deactivate: func()`（**无参数、无返回值**）
-> 做档位。它的 canonical lift 就是一个没有签名的 core 函数，所以手写 `.wat` **四行就够** ——
-> 而指令预算和内存上限是**引擎**的性质而不是接口的，在 `activate` 里死循环和在 `deactivate` 里死循环
-> 测的是**同一个限制**。于是：
->
-> * **燃料**：一个真正死循环的 guest 被停下，结果是 `FuelExhausted { fuel: 100_000 }`；
->   阴性对照（让 guest 直接返回）⇒ 测试红。
-> * **内存**：一个真正一直 `memory.grow` 的 guest，
->   在被拒后自己 `unreachable`（因为被拒的 `memory.grow` **不 trap，只返回 -1**），
->   结果是 `MemoryExceeded { limit }`，而断言比的是**调度给的那个数**：把预算改成 4 MiB
->   而期望 1 MiB ⇒ 红（它不会因为引擎自己的 16 MiB 上限而假绿）。
->
-> ★ 而一个死档位被删了：原来那个把循环 lift 成 `activate` 的 `SPINS`
-> **没有任何人调用**。一个死档位比没有档位更糟：它读起来像覆盖。
->
-> ★ **而 `string -> string` 这条路还是带着证据地 `#[ignore]` 着**（第 73 轮）：试了两种写法，
-> 引擎对每一种都给了确切的回答，而这两句话现在写在 `#[ignore]` 里：
->
-> * 把返回区指针当**前置参数**：`lowered parameter types [I32, I32] do not match parameter types
->   [I32, I32, I32]` —— 也就是说降下来的参数**只有输入串**，没有返回指针；
-> * 把返回区地址当**平的 i32 结果**：编译过，运行时 trap `expected 1 result(s), got 0`。
->
-> ★ 而它的断言也被换了：原来是 `assert!(!text.is_empty() || text.is_empty())` ——
-> **一个对任何字符串都成立的断言**，所以即使档位修好了它也什么都证不了。
-> 现在它比的是那个 21 个字符的答案本身。
->
-> ★ 而另两个限制测试（超时、内存）**之前一直围绕一个 trap 在断言**：
-> 它们用的档位同样有 ABI 错误，所以那次调用立刻 trap，而它们断言的 deadline/ceiling
-> 是在**一次根本没跑起来的调用**上被装上的。现在它们用那个真正会死循环的 guest。
->
-> #### ⚠ 1–5 的真实状态，比“只在档位上”更精确也更值得记
->
-> **全仓只有两个 `#[ignore]`，而它们正是证明真实 guest 能跑通的那两个**，都在 `wasmtime_tests.rs`：
->
-> * `:270` `a_call_reaches_the_guest_and_its_answer_comes_back`
-> * `:306` `a_guest_that_loops_for_ever_is_stopped_by_its_instruction_budget`
->
-> 属性里写的理由是：**手写的 `.wat` 档位不符合 canonical ABI 对 `string` 参数与返回值的要求**，
-> 而修好它的路径是**用 `bindgen!` 从 WIT 文件生成档位**。换句话说：查找、实例化、
-> 安装内存上限、装配 epoch 都有测试，**而“一次完整的调用真的进了 guest 并回来了”没有**。
->
-> ★ 而 `a_wall_clock_budget_arms_a_deadline_on_the_store` 与
-> `a_memory_ceiling_is_installed_before_the_guest_runs` 是**真断言**：它们断言实例实际被给了多少 tick、
-> 以及上限是否装上，而不是断言一个档位的回答。所以这一行的真实状态是：
-> **配置被证明装上了，没被证明对一个真会死循环的 guest 生效。**
->
-> ★ **而一个错误的归因在这里被纠正了**：这两个 `#[ignore]` 一度被说成“因为缺 `wasm32-wasip2` 而阻塞”。
-> `unsafe`/target/`wasm-tools` 那三个理由是 `crates/synra-plugin-sdk/tests/guest/world_fixture.rs` 的，
-> 而那个文件**根本不参与编译** —— 它自己写明了“没有 `#[ignore]`，因为编译不了的测试不是被跳过的测试”。
-> 两件事各自成立，不是一件。
->
+当前 Wasm 边界用例须覆盖真实 guest 返回、成功与失败 outcome、post-return、错误签名，
+以及 guest 经 Host 导入触发的权限检查和副作用拒绝，不能仅比较手写函数名与参数数量表。
+完整生产 WIT world 的组件由 `wit-component` 和 `wit-parser` 在测试中生成，无需外部 wasm-tools 命令。
+
+本次具体证据见 [Wasm ABI 验证](./history/2026-10-26-wasm-abi.md)，
+先前关于 ignored 用例与夹具原因的调查保留于 [历史快照](./history/wasm-abi-observations.md)。
+下表是整体对抗验收要求，本次通过的 ABI 测试不证明每一种攻击或所有生产入口已覆盖。
 
 ### 5.1 headless 插件
 
 | #  | 攻击                                             | 期望结果                                       |
 | -- | ------------------------------------------------ | ---------------------------------------------- |
 | 1  | 死循环（纯计算）                                   | `FuelExhausted`；内核继续正常工作                |
-| 2  | 死循环 + 阻塞 host 调用                            | epoch 中断；`Timeout`                           |
+| 2  | 墙钟超时与 Host IO 阻塞 | Wasm 由 epoch 终止，Host IO 由自身 deadline 或取消终止，分别验证 |
 | 3  | 分配 4 GiB 内存                                   | 内存限制 trap；实例销毁；**宿主内存不增长**        |
 | 4  | 栈溢出（深递归）                                   | trap；实例销毁                                  |
 | 5  | 越界内存访问                                      | trap；**不影响宿主**                             |
@@ -811,49 +701,10 @@ fn event_routing_does_not_allocate() {
       全仓无 `benches/`、无 `criterion`、无 `#[bench]`。唯一被测的是**分配次数**，不是时间。
 - [ ] `fuzz/`：帧解码、信封解析、归档解包、路径解析、capability 解析 —— **未做**，目录不存在。
       现在只有 proptest 覆盖任意字节不 panic；property 测试与 fuzz 的输入族不同，前者通过不能当作后者的结论。
-      ★ **而第 99 轮定位到了其中最具体的一条，并且它已经写在代码里**：
-      `host_calls_tests.rs` 的 `a_pure_session_refuses_the_calls_that_act` 自己写着——
-      *“它证明了拒绝本身有效，而**不证明有任何东西会构造出这样一个 session**”*，
-      而 `Work::allows_side_effects` 到 store 那个标志的**两行是“没有任何测试走到的部分”**。
-      ★ **而原因比“漏了一条测试”更有意思**：引擎测试里没有任何一个客体调用过主机函数。
-      `instantiate` 不接受 session（store 的 `session: None`），只有 `PluginSet` 在每次调用前
-      `set_session`。所以要走到那两行，需要一个**其 `can-handle` 会调用侧效应型主机函数的真客体**，
-      加上一个带 grants 的 session（`LinkerSession::new`）与一个 audit ring（`with_audit`）——
-      因为客体只要忽略返回值就能继续跑，**拒绝只能从审计里看到**。
-      ★ 现成的两个配件已经能拼出它：`ANSWERS` 给了 `string -> string` 的 can-handle ABI，
-      `IMPORTS` 给了 import instance 的写法；而侧效应函数选 `platform-open-url`（`func(url: string) -> outcome`，
-      单个字符串）比 `log`（六个参数）省事。
-      ★ **而第 100 轮写到了哪一步，以及卡在哪里**（配件已回退，因为半成品比没有更糟）：
-      WAT 的骨架跑通了 —— import instance、`core func (canon lower ...)`、
-      `(with "host" (instance ...))`、以及**为什么内存必须自己一个模块**（降低一个带
-      `string` 参数的导入必须指定 memory，而那块内存属于客体，所以不能在它里）。
-      ★ **而第 101 轮把它缩到了一行，并且推翻了上一轮的猜测**：
-      用一组取反对照把它逼到了一个结论 —— **字符串参数本身没问题**：
-      `(func (param "url" string))`（无返回值）能通过验证，报的是后面那个类型不匹配；
-      而**任何返回 `outcome`（variant）的导入都会被 wasmtime 的校验器拒绝**，报
-      `instance not valid to be used as import`。
-      ★ **而它在三种写法下都在同一个偏移（0x5e）上报同一句话**：
-      内联写在 `result` 里、写在 instance 类型内部、以及把 instance 写成命名 `(type $host_t (instance ...))`。
-      这三种都失败，而且**失败与 core 层无关**：
-      把 core instance 里的降低函数换成普通 core 函数（仍保留 variant 导入）依然报同一句。
-      ★ **而这不像是 wasmtime 的缺陷**：真实工具链不把类型写在文本里，而是用
-      `wasm-tools component embed` 把 WIT 类型**嵌进组件的类型段**，再由 `component new` 生成组件。
-      手写路径下这一步无法表达，而 `wasm-tools` 不在离线缓存里。
-      ★ 所以下一步不是“再换一种写法”，而是二选一：引入 `wasm-tools`；
-      或者把对照放在**已有的组件配件**上——即用 `wasm-runtime` 真档位测试里已有的
-      组件产物，而不是手写一个。
-      `platform-open-url: func(url: string) -> outcome`，而 `outcome` 是一个 `variant`（`ok(string)` / `err(error)`，
-      `error` 是一个带 `option<string>` 的 record）。客体导入的类型必须与 linker 定义的一致，
-      而**类型写成一个命名 `$out` 引用时 wasm-tools 报
-      `instance not valid to be used as import`**；内联形式的写法没有试到通。
-      ★ **而真实工具链不这么写**：它用 `wasm-tools component embed/new` 从 WIT 生成配件，
-      类型由 WIT 算出来，手写只是本工作区没有那个工具时的替代。所以下一步有两条路：
-      ①把这个 variant 用内联类型写出来；②引入 `wasm-tools`（当前离线缓存里没有）生成配件。
-      ★ **而本轮没有写它**，因为配件与 host 存根都是真活，写到一半比不写更糟。
-- [ ] `crates/synra-plugin-host/tests/malicious/`：§5.1 的 29 个用例 —— **未做**，目录不存在。
-      这是三份文档里最长的测试清单项，目前一个都没有。
-      孤立的对抗测试是有的（归档穿越/symlink/体积、签名吊销、令牌伪造、装载期 import 覆盖），
-      但 §5.1 那句关键的"**内核仍可用 + 其它插件仍可用**"没有任何测试断言。
+      Guest 到 Host 的真实组件调用已覆盖读取、权限拒绝、无会话和匹配阶段写入拒绝，
+      证据在 `engine/wasmtime_backend/invoke/tests/host.rs`；这不等于已建立 fuzz 基础设施。
+- [ ] 对抗测试统一验收：测试分布在各模块，不能用目录存在与否判断覆盖；
+      当前 ABI、预算及闸门测试需与 §5.1 的攻击逐项对应，尚未按完整清单证明全部验收通过。
 - [ ] UI 插件对抗测试（app 仓库）—— **未做，而且前提不成立**：
       `synra-rust-app/src` 13 个 TS 文件里，`plugin_ui*` 只出现在
       `src/ipc/registration.test.ts` 的"未实现"清单里。

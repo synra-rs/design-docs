@@ -5,6 +5,8 @@
 
 | 记录 | 范围 |
 | --- | --- |
+| [Wasm 双向 ABI](./2026-10-26-wasm-abi.md) | 真实 Guest 返回、WIT Host 绑定、初始化预算与闸门边界验证 |
+| [Wasm 旧调查](./wasm-abi-observations.md) | ABI 修复前的实现清单与测试归因原文，仅作历史快照 |
 | [开发记录](./development-log.md) | 原路线图 §8.6–§8.241，保留原编号 |
 | [插件生命周期观察](./lifecycle-observations.md) | 原生命周期文档开头的调查及更正 |
 | [自动更新重试与扫描测试稳定性](./2026-10-25-update-retries.md) | 共享排期、真实下载失败与重启验证，以及扫描测试竞态修复 |
