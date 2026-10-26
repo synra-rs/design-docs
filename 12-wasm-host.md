@@ -556,7 +556,7 @@ Wasm ABI 的当前实现以生产 WIT 与真实组件测试为准，旧逐轮观
 | Host 绑定 | `engine/wasmtime_backend/bindings.rs` 从生产 WIT 生成类型与注册，`engine/linker/host.rs` 实现全部 Host trait 并经过共享闸门 |
 | Guest 调用 | `engine/wasmtime_backend/invoke.rs` 在执行前校验参数与结果类型，读取字符串或 outcome，并执行 post-return |
 | 初始化 | 独立启动 fuel、epoch deadline 与内存限制，正常构造和无限循环构造均有真实组件测试 |
-| 返回与清理 | 五种 outcome 入口覆盖成功、失败与重复调用，post-return 失败不能报告成功 |
+| 返回与清理 | 五种 outcome 入口覆盖成功、失败与重复调用，错误 code、message、可选 details 完整保留，post-return 失败不能报告成功 |
 | 真实 Host 边界 | 覆盖无会话、无权限、允许读取及匹配阶段禁止写入，并检查宿主实际效果和调用计数 |
 | 类型不符 | 错误 Host 签名在链接时拒绝，错误 Guest 返回类型在执行 guest 指令前拒绝 |
 | 完整目标 | 这些测试不等于 Rust SDK 构建、安装、路由、授权和平台动作全链路验收，也不证明 Android/iOS 运行或性能预算达标 |
@@ -564,3 +564,7 @@ Wasm ABI 的当前实现以生产 WIT 与真实组件测试为准，旧逐轮观
 AOT、安全预编译加载、其他引擎后端、平台运行和性能验收仍须各自提供证据；
 编译通过、配置存在与测试通过不能互相代替。
 整体待办继续以 [19](./19-roadmap.md) 为准，不将本次 ABI 修复记作 M2 或完整开发目标完成。
+
+WIT 的 details 是可选字符串；引擎不解析或重写，须区分缺失、空字符串、JSON null、JSON 文本及非 JSON 文本。
+主动报告 Failed 不算插件失常；上层可以分类错误，但不能丢弃原始插件错误码。
+Wasm 与页面 RPC 的当前传输规则及回归见[错误详情记录](./history/2026-10-26-error-details.md)。

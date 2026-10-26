@@ -202,6 +202,12 @@ pub enum SuggestedAction {
 
 **为什么不用 `anyhow` 直接序列化**：前端需要**可编程**的错误（switch code、渲染按钮），而不是一段字符串。
 
+插件页面的 self.invoke 和经 CallError 返回的直接宿主调用共享错误适配：顶层 code 仍用 IPC 的 ErrorCode，params.reason 保留消息，
+details.pluginCode 保留原始插件或宿主调用错误码，details.pluginDetails 承载有值时的 WIT details。
+合法 JSON 转为对应 JSON 值；空字符串和非 JSON 文本保留为字符串；缺失则不写 pluginDetails，JSON null 则显式写 null。
+详情始终嵌套，不能覆盖顶层 code、retryable 或动作；未知插件码分类为 internal，但原始码仍可诊断，notImplemented 分类为 unsupported。
+这套规则只描述已有页面调用入口，不代表远程 intent 的错误详情已经贯通；验证见[本轮记录](./history/2026-10-26-error-details.md)。
+
 ```rust
 impl From<synra_core::Error> for IpcError {
     fn from(e: synra_core::Error) -> Self {
@@ -630,6 +636,9 @@ Content-Security-Policy:
 ---
 
 ## 9. 实现清单
+
+> **2026-10-26：插件错误详情贯通 Wasm 与页面 RPC。** 引擎保留可选 details，页面保留原始错误码和详情；
+> 生产 self.invoke 经过实际 SQLite、PluginSet 与 Wasm 的回归见[错误详情记录](./history/2026-10-26-error-details.md)。
 
 > **2026-10-26：应用首次配对交互已接入共享受限服务。** 邀请导出、邀请导入与应答展示、应答导入、
 > 任务重读和取消经过应用命令与真实 TLS 验证；全局事件流和 store 保留导航期间的任务，

@@ -225,6 +225,7 @@ CLI 已接入实际 artifact 的二进制、嵌套函数体、WIT ABI 与导入�
 并以真实 Wasm、桌面和 daemon 入口验证分发、返回及授权拒绝，见[平台返回值记录](./history/2026-10-26-platform-values.md)。
 桌面命令现有共享并发、运行与清理、输入输出预算，剪贴板通过 stdin 传递，命令错误保留结构化字段，
 含实际子进程与 PowerShell 语义验证，见[命令 IO 记录](./history/2026-10-26-command-io.md)。
+Wasm outcome 与插件页面 RPC 现保留原始错误码和可选详情，见[错误详情记录](./history/2026-10-26-error-details.md)；远程 intent 的错误结构仍待贯通。
 生产事件投递及订阅回调、设备与动作范围授权、IPv6 范围语法及进行中 IO 的撤销取消仍待收敛。
 本地安装、完整用户授权与真实平台动作、verify 其余验收、UI 构建及性能验收仍待完成，本轮不等于 M2 完成。
 
