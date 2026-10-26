@@ -148,29 +148,12 @@ pub fn build_engine(kind: BackendKind, cfg: &EngineConfig) -> Result<Engine> {
 
 ### 3.1 WASI 的授予策略
 
-**默认不提供任何 WASI 能力**。插件需要的所有系统交互都通过 `synra:plugin/host` 的 host functions（它们过闸门）。
+默认不提供任何 WASI 能力，当前 WIT world 也没有 WASI 导入。
+SDK 使用 wasm32-unknown-unknown core module 与内置组件编码，避免 wasip2 std 自动引入 cli/io/clocks。
+系统交互均经 synra:plugin/host 的能力闸门，日志用 Host log，网络与文件不能绕过宿主。
 
-```rust
-pub struct WasiGrant {
-    /// 是否允许时钟（插件需要时间戳时）
-    pub clocks: bool,                  // 默认 true（只读，无害）
-    /// 是否允许随机数
-    pub random: bool,                  // 默认 true（无害）
-    /// 是否允许标准输出（用于调试日志）
-    pub stdout: bool,                  // 默认 false（改用 host.log）
-    /// 是否允许文件系统预打开目录（**默认空**）
-    pub preopens: Vec<(Utf8PathBuf, Utf8PathBuf)>,
-    /// 是否允许环境变量
-    pub env: Vec<(String, String)>,    // 默认空
-    /// 是否允许 socket
-    pub sockets: bool,                  // ★ 默认 false，且**建议永不开启**
-}
-```
-
-> **为什么 sockets 建议永不开启**：如果插件能直接建 socket，capability 的 `network:fetch:<host>` 就形同虚设（插件可以绕过内核直连任意地址）。
-> 即使 WASI sockets 支持 DNS 白名单，也无法做"重定向逐步校验"与"IP 策略"。**网络必须经内核代理**。
-
----
+若将来引入时钟、随机数等接口，必须另行设计显式授权与资源边界；
+不能把“只读”当作自动授权，也不能由编译器或 adapter 顺带暴露 WASI 系统能力。
 
 ### 3.2 组件初始化预算
 

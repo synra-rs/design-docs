@@ -209,7 +209,9 @@ cargo tree -p synra-net -p synra-core | grep -E 'tauri|wry'   # 空
 
 当前 Wasm 双向 ABI 已改用生产 WIT 生成 Host 绑定和类型化 Guest 返回，
 真实组件已覆盖返回、清理、授权拒绝、纯匹配及有界初始化，见 [验证记录](./history/2026-10-26-wasm-abi.md)。
-这只完成宿主边界修复，不代表下列 SDK、安装、路由、平台动作及性能验收全部完成。
+Rust SDK 的真实导出、CLI headless 构建、组件编码、PluginSet 装载与缺少授权拒绝也已接通，
+并验证自定义库名、target 目录及编译或编码失败后旧产物保留，见 [作者链路记录](./history/2026-10-26-rust-authoring.md)。
+本地安装、完整用户授权与真实平台动作、SDK 独立资源验证、完整 CLI verify、UI 构建及性能验收仍待完成，本轮不等于 M2 完成。
 
 ### 目标
 一个 **Rust headless Wasm 插件**能：

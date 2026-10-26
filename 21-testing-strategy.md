@@ -87,6 +87,30 @@ MSRV、平台构建及 feature 矩阵在依赖、工具链、feature 或相关�
 
 这些是待开发的验收要求，不是现有测试已覆盖的声明，状态见 [19 §0.2](./19-roadmap.md)。
 
+### 1.4 Rust 作者链路门禁
+
+SDK、WIT、导入检查或构建模板变化时，除普通单测外须运行已构建 Rust guest 的显式门禁。
+默认 workspace 单测不隐式下载目标或递归运行 Cargo；没有产物时显式门禁失败，不忽略测试。
+
+在 core 仓库按顺序执行，前一步失败即停止：
+
+```bash
+rustup target add wasm32-unknown-unknown
+cargo build --locked --manifest-path crates/synra-plugin-sdk/tests/guest/Cargo.toml --target wasm32-unknown-unknown --release --target-dir target/sdk-guest
+export SYNRA_RUST_GUEST="$PWD/target/sdk-guest/wasm32-unknown-unknown/release/synra_sdk_fixture.wasm"
+cargo test --locked -p synra-plugin-host --features rust-guest-tests rust_guest
+cargo test --locked -p synra-plugin-cli --features rust-guest-tests --test rust_guest
+```
+
+PowerShell 使用 `$env:SYNRA_RUST_GUEST=(Resolve-Path target/sdk-guest/wasm32-unknown-unknown/release/synra_sdk_fixture.wasm).Path`。
+CI 执行同一组步骤；本机运行不记作远端 runner 已执行。
+
+夹具仅依赖公开 SDK，保留 forbid unsafe，不另生成 WIT；
+测试覆盖真实导出返回、Host 允许与纯匹配拒绝、真实函数导入授权、CLI 生成源码的实际编译与 PluginSet 装载。
+CLI 子构建使用独立缓存、离线依赖解析和进程截止时间，避免嵌套 Cargo 锁与无界等待；
+失败编译或缺少导出的成功编译都不能替换旧产物。
+完整安装、平台动作和性能目标仍需各自的验收证据。
+
 ## 2. 单元测试：必须覆盖的不变量
 
 ### 2.1 `synra-capability`（[10 §2–§3](./10-capability-and-sandbox.md)）

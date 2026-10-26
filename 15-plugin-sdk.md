@@ -265,46 +265,22 @@ synra-plugin test                  # 在沙箱里跑契约测试
 
 ### 3.2 `build` 做什么
 
-```rust
-// tools/synra-plugin-cli/src/cmd/build.rs
+当前 headless 构建按以下固定链路执行，不根据 Rust 版本猜测产物形态：
 
-pub async fn build(opts: BuildOptions) -> Result<BuildReport> {
-    let manifest = Manifest::load(&opts.cwd)?;
+1. `cargo build --target wasm32-unknown-unknown --release --message-format=json-render-diagnostics`；
+2. 从 Cargo 的 compiler-artifact 消息定位当前项目的 cdylib core module，支持自定义库名与 target 目录；
+3. 使用已锁定的 wit-component 库读取 SDK 嵌入的 WIT 元数据，编码并校验组件；
+4. 检查所需导出接口与体积上限，暂存成功后原子替换 manifest 的 headless artifact。
 
-    let mut report = BuildReport::default();
+编译失败、缺失或歧义的 Cargo 产物、组件化失败都必须返回失败；
+旧产物仍存在不能把失败重建判为成功，失败不覆盖上次成功的组件。
+默认生成的 Rust 源实现 lifecycle、share 与 actions guest traits，再调用
+`synra_plugin_sdk::export!(Plugin)`，不手写旧式 C ABI 入口。
+当前编译器与这条链路已在本机验证，见 [开发证据](./history/2026-10-26-rust-authoring.md)。
 
-    // ── headless：cargo build --target wasm32-wasip2 ──
-    if let Some(headless) = &manifest.runtime.headless {
-        let status = Command::new("cargo")
-            .args(["build", "--target", "wasm32-wasip2", "--release"])
-            .env("RUSTFLAGS", "-C link-arg=-zstack-size=1048576")
-            .status()?;
-        // 产物：target/wasm32-wasip2/release/<crate>.wasm
-        // → 复制到 dist/plugin.wasm
-        // → 可选：wasm-opt / strip
-        // → ★ 生成 component（wasm-tools component new）
-        report.artifacts.push(headless_artifact);
-    }
-
-    // ── UI：vite build → zip ──
-    if let Some(ui) = &manifest.runtime.ui {
-        // 1. 在 ui/ 目录跑 vite build（输出到 dist/ui/）
-        // 2. ★ 校验产物不含外部网络引用（connect-src 'none'）
-        // 3. 校验不含内联 eval（CSP 兼容）
-        // 4. 打包为 dist/ui.zip
-        report.artifacts.push(ui_artifact);
-    }
-
-    // ── manifest 内联（规范化后）──
-    write_normalized_manifest(&opts.cwd, &manifest)?;
-
-    // ── 自检 ──
-    let verify = verify(&opts.cwd, VerifyMode::Normal).await?;
-    report.verify = verify;
-
-    Ok(report)
-}
-```
+目标契约仍包括完整 UI 打包、manifest 规范化和真实二进制自检；
+本次 headless 构建通过不代表这些步骤、纯 UI 模板清理或完整 verify 已完成。
+当前 CLI verify 尚不能仅凭磁盘入口证明实际导入与 manifest 授权一致，不能用其 warning 当作安全验收。
 
 ### 3.3 Rust 插件模板
 
@@ -449,7 +425,12 @@ async function send() {
 
 ## 4. Rust SDK（`synra-plugin-sdk`）
 
-### 4.1 结构
+当前低层 API 是生产 WIT 生成的 `host`、`exports`、边界类型与 `export!` 宏。
+公开 Outcome、Error、LogLevel、DeviceTarget 等直接来自同一份生成绑定，
+不使用宿主 manifest 模型充当 Guest ABI 类型；Guest 不链接签名、协议或宿主运行时依赖。
+下列 namespace 薄封装、`#[plugin]`、类型化 JSON 和内存 MockHost 是目标作者体验，尚未全部实现。
+
+### 4.1 结构（目标封装）
 
 ```text
 crates/synra-plugin-sdk/
@@ -490,7 +471,7 @@ impl ChatPlugin {
 2. 生成 JSON 序列化的适配层（WIT 用 string，Rust 用类型）；
 3. **编译期检查**：
    - 函数签名与 WIT 世界一致；
-   - `can_handle` **不得**调用任何有副作用的 host function（用 trait bound 或 lint 检查）；
+   - 可用受限上下文或 lint 提示匹配阶段的副作用误用；最终拒绝由宿主逐次调用的纯上下文强制，不能靠 Rust trait bound 证明任意调用图无副作用；
    - 返回值类型实现 `Serialize`。
 
 ### 4.3 9 个 namespace 的 Rust 形态

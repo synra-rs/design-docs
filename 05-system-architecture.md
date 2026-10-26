@@ -304,7 +304,7 @@
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │  形态 A：Headless 插件（推荐用于所有"动作/数据处理"插件）                       │
 │                                                                             │
-│   artifact: <plugin>.wasm  （wasm32-wasip2 组件）                            │
+│   artifact: <plugin>.wasm  （无 WASI 的组件）                            │
 │   运行位置: 内核内的 wasmtime 实例                                            │
 │   接口:     WIT 世界（synra:plugin@1.0.0）                                    │
 │   能力:     只能通过 host functions 访问宿主；无文件、无网络、无时钟（除非授予）│

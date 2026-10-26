@@ -5,6 +5,8 @@
 
 | 记录 | 范围 |
 | --- | --- |
+| [Rust 作者链路](./2026-10-26-rust-authoring.md) | SDK 真实导出、无 WASI 构建、CLI 组件输出、实际导入检查与失败重建 |
+| [Rust 构建旧观察](./rust-authoring-observations.md) | 原构建方案与纯度调查，仅作历史快照 |
 | [Wasm 双向 ABI](./2026-10-26-wasm-abi.md) | 真实 Guest 返回、WIT Host 绑定、初始化预算与闸门边界验证 |
 | [Wasm 旧调查](./wasm-abi-observations.md) | ABI 修复前的实现清单与测试归因原文，仅作历史快照 |
 | [开发记录](./development-log.md) | 原路线图 §8.6–§8.241，保留原编号 |

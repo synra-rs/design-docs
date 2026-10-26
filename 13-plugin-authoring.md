@@ -57,7 +57,7 @@
 
 ```
 synra-plugin-github-bridge/
-├─ Cargo.toml                 # crate-type = ["cdylib"], 目标 wasm32-wasip2
+├─ Cargo.toml                 # crate-type = ["cdylib"], 目标 wasm32-unknown-unknown
 ├─ synra.json                 # ★ manifest（作者手写，构建时会规范化内联）
 ├─ src/
 │  ├─ lib.rs                  # ★ 唯一入口：#[plugin] impl
@@ -271,7 +271,7 @@ impl GithubBridge {
 
     /// 判断能否处理一个分享项。
     /// ✅ 同步、纯计算、有 fuel 预算（默认 50ms）
-    /// ❌ 不允许调用任何有副作用的 host function（SDK 在类型上挡住）
+    /// ❌ 不允许调用任何有副作用的 host function（宿主在纯匹配上下文中强制拒绝）
     fn can_handle(item: ShareItem) -> ShareDecision {
         if let Some(caps) = GITHUB_RE.captures(&item.text) {
             let url = normalize_github_url(&caps);
@@ -559,7 +559,7 @@ fn on_event(e: InboundEvent) -> Result<Option<Value>, Error> {
 
 | 插件的部分            | 作者写什么语言                                              | 作者的机器上需要什么                                        |
 | --------------------- | --------------------------------------------------------- | --------------------------------------------------------- |
-| **headless（逻辑）**   | **Rust**（`on_event` / `execute` / `can_handle` 的函数体）    | Rust 工具链 + `wasm32-wasip2` target + `synra-plugin` CLI   |
+| **headless（逻辑）**   | **Rust**（`on_event` / `execute` / `can_handle` 的函数体）    | Rust 工具链 + `wasm32-unknown-unknown` target + `synra-plugin` CLI   |
 | **UI（界面）**         | TypeScript / Vue 等                                        | Node + pnpm；**不写也不编译 Rust**                            |
 
 也就是说："作者不接触 Rust"**只对 UI 部分成立**——UI 部分消费的是 `@synra/client` 这个
@@ -591,10 +591,10 @@ synra::action    // declare / invoke / list（跨插件）
 
 ```
 src/*.rs
-   │  cargo build --target wasm32-wasip2 --release
+   │  cargo build --target wasm32-unknown-unknown --release
    ▼
-target/wasm32-wasip2/release/<crate>.wasm        ← 核心模块（或已是组件，视 Rust 版本）
-   │  wasm-tools component new（若产出的是核心模块）  🔴 见 §10-8
+Cargo compiler-artifact 消息定位 cdylib core module（不猜库名或 target 目录）
+   │  CLI 内置 wit-component + SDK 的 WIT 元数据，校验后原子写入 manifest artifact
    ▼
 dist/plugin.wasm                                 ← Wasm 组件，实现 wit/synra-plugin.wit 的 world
    │  synra-plugin verify
@@ -974,11 +974,12 @@ dist/ui.zip          （zip 内路径 < 256 字符，拒绝符号链接，禁止
 | 项 | 对账结果 |
 | - | -------- |
 | [10-1](#10-1--定时任务的载体) 定时任务的载体 | ✅ **契约已选 A**：`lifecycle` 里是 `on-tick: func(tick-json: string) -> outcome`，由**宿主**调用，因此调度器归内核、与实例池解耦。文档标 🔴 是过时的 |
-| [10-2](#10-2--can_handle-的批量与能力边界) 批量与边界 | 🟡 **一半已定**：`share.can-handle` 是**单项**（选 A）。但"纯函数如何在类型上表达"仍未做——`can-handle` 与 `execute` 同属 `share` 接口，实例化时无法只给 `env` 导入 |
+| [10-2](#10-2--can_handle-的批量与能力边界) 批量与边界 | **已定**：单项调用；宿主逐次设置纯上下文并拒绝副作用，SDK 类型提示不作为安全边界 |
 | [10-4](#10-4--两套能力声明还是一套) 一套还是两套 | ✅ **契约已选一套**：`Manifest.capabilities: Vec<CapabilityDeclaration>` 只有一个字段，没有 UI / headless 两份 |
 | [10-5](#10-5--入站事件的分发模型) 入站事件分发 | ❌ **仍真空**：WIT 里**没有** `on-event`。§4.3 的 `on_event` 只存在于本文档 |
 | [10-7](#10-7--stateful-true-的确切语义) `stateful: true` | ❌ **仍真空**：`Manifest` 没有 `stateful` 字段 |
-| 10-3 / 10-6 / 10-8 | ❌ 仍待定，且无法从契约反推 |
+| 10-8 | 已定：无 WASI core module 与内置组件编码，见本节决策 |
+| 10-3 / 10-6 | ❌ 仍待定，且无法从契约反推 |
 
 > **能力闸门这一项已经比本文档设想的更强**：宿主函数上的 `@capability("…")` 注解由 `tools/wit-codegen`
 > 读取并生成能力表，于是"宿主调了没有 capability 的函数"是**编译期**失败，而不是运行期才发现。
@@ -1019,9 +1020,10 @@ dist/ui.zip          （zip 内路径 < 256 字符，拒绝符号链接，禁止
 **倾向**：先 **A**，`shareHandlers` 预筛（§3.1）把插件数降下来。
 **但需要确认**：预筛的准确率——如果预筛太粗（比如所有声明 `text` 的插件都进），A 的调用数还是很高。
 
-**关联的更深问题**：**"纯函数"这个约束怎么在类型上表达？**
-现在只有文档说"can_handle 不许有副作用"。真正做的话，WIT 里应该给 `can_handle` 一个**只 import 了 `env` 的独立接口**——
-这样宿主在实例化时就能保证它调不到任何有副作用的东西。**这是否要做？**（我倾向要做，它是 [21 §8.3.3](./21-testing-strategy.md) 那条"安全属性必须显式断言"的编译期版本。）
+**纯度契约**：同一组件同时实现 can-handle 与 execute，宿主在每次调用前设置是否允许副作用，
+所有 Host 导入经共享闸门读取这个上下文；即使插件持有写入或打开 URL 的授权，匹配时仍拒绝。
+SDK 可提供更窄的作者 API，但不能据此宣称任意 Rust 调用图在编译期无副作用。
+真实编译 Guest 的匹配拒绝与执行允许均由宿主边界测试验证。
 
 ---
 
@@ -1147,20 +1149,17 @@ N 个这样的插件会持续消耗 CPU。
 
 ---
 
-### 10-8 ★ 构建链的确切工具（wasm32-wasip2 的产出形态）
+### 10-8 ★ 构建链的确切工具（无 WASI Guest）
 
-**问题**：Rust 的 `wasm32-wasip2` target 在不同版本下产出不同：
-- 较新版本 `cargo build --target wasm32-wasip2` 直接产出**组件**；
-- 较早/某些配置下产出**核心模块**，需要 `wasm-tools component new` + adapter。
+采用 `wasm32-unknown-unknown` 生成 core module，由 CLI 内置的 wit-component 编码组件，
+ABI 元数据由固定版本的 SDK wit-bindgen 生成；不需要外部 wasm-tools 或 WASI adapter。
+当前 Rust wasip2 的 std 会引入 WASI cli/io/clocks 接口，与“默认不提供 WASI”的宿主契约冲突，
+因此不能把 wasip2 组件编译成功当作可装载证明。
 
-**这是一个 spike 项**（[19 §0.1](./19-roadmap.md) spike 2/3 顺带验证），但**现在就要定文档口径**：
-
-**倾向**：
-- 文档写"`cargo build --target wasm32-wasip2 --release` 产出 Wasm 组件"；
-- `synra-plugin build` **自动探测**：如果产出是核心模块，自动跑 `wasm-tools component new`；
-- **锁定 `wasm-tools` / `wit-bindgen` 的版本**（写进 `synra-plugin-cli` 的 `Cargo.toml`，并在 `verify` 时检查插件是用哪个版本构建的）。
-
-**需要确认**：是否允许插件作者用自己的 `wasm-tools` 版本（可能导致组件不兼容）。
+构建从 Cargo JSON 元数据读取实际产物，不猜库名、路径或组件形态；
+开发者可使用自己的 Cargo target 目录，最终位置仍以 manifest 为准。
+SDK 和编码器版本由对应 Cargo.toml 与锁文件维护，不在规范中再复制版本号。
+装载、实际调用、权限拒绝和失败重建由真实 Rust guest 门禁验证，见 [21](./21-testing-strategy.md)。
 
 ---
 
