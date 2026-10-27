@@ -202,7 +202,7 @@ pub fn to_wire_slug(id: &PluginId) -> PluginSlug;
 | `events[].payload` 的 schema 位置无引用、`format`、正则 | 两者 | 拒绝；属性名及 `const` 数据不是 schema 关键词 |
 | schema 的字符串类型声明 `maxLength`，schema 和 payload 满足大小、深度及节点预算 | 两者及投递 | 拒绝 |
 | `handles[].event` 是基础事件或合法命名空间的事件选择器，允许接收其他包的事件 | 两者 | 拒绝（见 [13 §10-5](./13-plugin-authoring.md)） |
-| headless 组件满足整个 WIT world 的必需导出，包括 `lifecycle.on-event` | 真实组件构建、装载及 CLI 组件验证 | 拒绝；manifest 的可选实现布尔值不构成二进制证明 |
+| headless 组件满足整个 WIT world 的必需导出，包括 `lifecycle.on-event` | CLI、原生安装与装载共用静态组件检查 | 拒绝；manifest 声明不替代二进制导入、导出及函数体检查 |
 | `pages[].key` 无重复                       | CLI+UI     | 拒绝                       |
 | `compose` 无环                             | 装载期      | 拒绝                       |
 | `sdk.min` ≤ 宿主版本                       | 装载期      | 拒绝（附升级提示）           |
@@ -228,7 +228,7 @@ pub fn to_wire_slug(id: &PluginId) -> PluginSlug;
 ### 3.1 目标命令集
 
 以下命令与检查项尚未全部实现；已接通的构建和二进制验证边界见 §3.2–§3.2.1。
-目标模板只有 headless 与 hybrid，现有纯 UI 模板仍待清理。
+模板只有 headless 与 hybrid；纯 UI 模板已移除，公共 manifest 校验拒绝缺少 headless 的插件。
 
 ```bash
 # 脚手架
@@ -299,13 +299,17 @@ manifest 与 Wasm 采用有界读取，UI 入口与遍历限制在声明的目�
 | UI bundle | 2000 个文件、32 MiB |
 | UI 遍历 | 4000 个目录项，包含文件与目录 |
 
-构建与 verify 使用同一静态组件检查，CLI 的包内 WIT 同样由根契约生成，
+构建、verify、原生安装和执行型 PluginSet 装载共用宿主的静态组件检查，
+从实际 artifact 提取导入，不接受调用方提供的 imports 或实现布尔值作为证明。
+安装在签名、manifest 和组件校验通过后才交给所选引擎编译；静态检查不实例化 Guest。
+CLI 的包内 WIT 同样由根契约生成，
 完整生成门禁也检查这一资源，外部使用不依赖源仓库的相邻目录。
 
 这里只检查 manifest 声明，不代表用户已经授予这些能力；装载及调用仍须执行授权闸门。
 静态验证不执行 Guest 初始化，也不证明目标引擎、平台动作或性能预算已经验收。
-完整 UI 打包、manifest 规范化、包身份及声明实现的一致性、纯 UI 模板清理等仍需继续，
-本次二进制检查不等于完整 verify 或 M2 完成；证据见 [记录](./history/2026-10-26-cli-verification.md)。
+完整 UI 打包、manifest 规范化、包身份的其余一致性验收等仍需继续，
+本次二进制检查不等于完整 verify 或 M2 完成；证据见 [CLI 记录](./history/2026-10-26-cli-verification.md)
+和[入口收敛记录](./history/2026-10-27-component-contract.md)。
 
 ### 3.3 Rust 插件模板
 
