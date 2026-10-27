@@ -186,9 +186,8 @@ interface host {
     // —— log:* ——
     log: func(level: log-level, message: string, ctx: option<string>);
 
-    // —— event:emit:* / event:subscribe:* ——
+    // —— event:emit:*；接收由 manifest.handles 声明 ——
     event-emit: func(event: string, payload: string) -> outcome;
-    event-subscribe: func(pattern: string) -> outcome;   // 回调经 guest export
 
     // —— device:list / device:send[:target] / device:broadcast ——
     device-list: func() -> list<device-target>;
@@ -286,13 +285,11 @@ interface share {
    - ⚠️ 代价：序列化开销。**但**capability 闸门与审计需要结构化数据，所以**内核侧会解析**这些 JSON。
 2. **`outcome` 是一等类型**，不是抛异常。Wasm 里没有异常，trap 只用于"不可恢复的 bug"。
 3. **`env-*` 无闸门**，其余**全部**经闸门。
-4. **`event-subscribe` 采用 guest export 回调**（WIT 的 resource/回调），内核持有 guest 的回调表。
-   > ★ **而它在 30 轮前是假的。** `host_calls.rs` 的 `event-subscribe` 分支
-   > 校验了参数非空、然后返回 `Ok("")`，注释写着"回答的是该 pattern 已被记下"——
-   > **什么都没记**：没有回调表，`Host` trait 也没有对应方法。
-   > ★ 这比拒绝更糟，而且插件**无法发现**：订阅了却从来没收到事件的插件，
-   > 分不清"还没发生什么"和"这个孿主什么都不会送"；而审计会把一个**并不存在的能力**
-   > 记成"已授权且成功使用"。已改为坦白拒绝（`notImplemented`），并有两条测试钉住。
+4. **headless 使用 manifest `handles` 与必需的 `lifecycle.on-event(event-json) -> outcome`**。
+   > 2026-10-27 决策：移除没有稳定实例归属的 `event-subscribe` WIT import，
+   > 由宿主选择当前实例池中的实例投递；接收仍需具体事件的 `event:subscribe:<name>` 授权。
+   > 本地 `event-emit` 成功表示入队，处理结果由有界诊断记录；不自动回复、不重试。
+   > UI 的 JS 事件流订阅保持独立，详见 [13 §10-5](./13-plugin-authoring.md)。
 5. **`can-handle` 返回 JSON 字符串而不是 `outcome`**：因为"不处理"不是错误。
    > 匹配调用经 `Work::allows_side_effects`、StoreData 和共享 HostCalls 进入纯上下文，
    > 持有授权的插件也不能在匹配阶段执行副作用；真实 Rust guest 已覆盖拒绝与正常执行，

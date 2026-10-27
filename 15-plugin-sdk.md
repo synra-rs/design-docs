@@ -199,10 +199,10 @@ pub fn to_wire_slug(id: &PluginId) -> PluginSlug;
 | `events[].name` 在该插件内唯一              | 两者        | 拒绝                       |
 | `events[].name` 前缀等于自己的 wire slug     | 两者        | 拒绝（命名空间越权）           |
 | `events[].payload` 是顶层 object schema     | 两者        | 拒绝                       |
-| `events[].payload` 里无 `$ref`/`format`/正则 | `verify`   | 拒绝                       |
-| `events[].payload` 的 `maxLength`/`maximum` 有界 | `verify` | 拒绝                     |
-| `handles[].event` 是"基础常量 / 自己声明过的名字 / 合法通配"三者之一 | `verify` | 拒绝（🔴 见 [13 §10-5](./13-plugin-authoring.md)） |
-| 声明的入口与实现的方法**双向**对应            | 两者        | 拒绝（有 `handles` 必须有 `on_event`，反之亦然） |
+| `events[].payload` 的 schema 位置无引用、`format`、正则 | 两者 | 拒绝；属性名及 `const` 数据不是 schema 关键词 |
+| schema 的字符串类型声明 `maxLength`，schema 和 payload 满足大小、深度及节点预算 | 两者及投递 | 拒绝 |
+| `handles[].event` 是基础事件或合法命名空间的事件选择器，允许接收其他包的事件 | 两者 | 拒绝（见 [13 §10-5](./13-plugin-authoring.md)） |
+| headless 组件满足整个 WIT world 的必需导出，包括 `lifecycle.on-event` | 真实组件构建、装载及 CLI 组件验证 | 拒绝；manifest 的可选实现布尔值不构成二进制证明 |
 | `pages[].key` 无重复                       | CLI+UI     | 拒绝                       |
 | `compose` 无环                             | 装载期      | 拒绝                       |
 | `sdk.min` ≤ 宿主版本                       | 装载期      | 拒绝（附升级提示）           |
@@ -521,8 +521,7 @@ pub mod log {
 
 pub mod event {
     pub fn emit(event: &str, payload: impl Serialize) -> Result<(), Error>;
-    /// 注册一个处理器（内核推送时调用）
-    pub fn subscribe(pattern: &str, handler: impl Fn(&str, &[u8]) + 'static);
+    // 接收通过 manifest.handles + lifecycle::Guest::on_event，不注册 Rust 闭包。
 }
 
 pub mod device {

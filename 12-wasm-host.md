@@ -3,6 +3,11 @@
 > 本文定义 headless 插件的执行环境：wasmtime 配置、组件模型、资源限制、中断机制、实例池与故障隔离。
 > 对应 [06 §3.5](./06-workspace-layout.md) 的 `synra-plugin-host` crate。
 
+> 2026-10-27 事件契约：headless world 必须导出 `lifecycle.on-event(event-json) -> outcome`，
+> 经普通 `Work::Event` 调用，复用实例策略、fuel、超时、授权和审计。接收选择器来自 manifest `handles`；
+> 不提供动态 `event-subscribe` host import。宿主共享的本地事件服务异步投递，
+> 避免在 guest 的 host call 内重入 PluginSet 锁，完整边界见 [13 §10-5](./13-plugin-authoring.md)。
+
 ---
 
 ## 1. 为什么是 Wasm + 组件模型

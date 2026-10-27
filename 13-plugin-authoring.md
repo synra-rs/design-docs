@@ -397,6 +397,10 @@ static GITHUB_RE: Lazy<Regex> = Lazy::new(|| {
 
 #### ② Rust 里实现 `on_event`
 
+> 下方高级 Rust 宏与跨设备回执示例是待实现的作者接口设想。
+> 当前实际 SDK 使用生成的 `lifecycle::Guest::on_event(String) -> Outcome`，上下文和本地
+> 入队语义以 [§10-5](#10-5--入站事件的分发模型) 为准；返回值当前不会自动发回另一台设备。
+
 ```rust
 // src/lib.rs
 use synra_plugin_sdk::prelude::*;
@@ -441,6 +445,8 @@ impl ChatPlugin {
 
 #### ③ 三种回执方式（作者按需选）
 
+> 以下为远端请求回复的目标行为，尚待生产接线；本地事件处理结果只记录在诊断中。
+
 | 想做什么                       | 怎么做                                              | 结果 |
 | ------------------------------ | --------------------------------------------------- | ---- |
 | **同步回一个值给发送方**         | `Ok(Some(value))`                                    | 内核按信封的 `reply_to` 发一条结果事件（[04 §5.2](./04-wire-protocol.md)） |
@@ -449,6 +455,8 @@ impl ChatPlugin {
 | **处理失败**                    | `Err(Error::...)`                                    | 内核发结构化错误（如果 `reply_to` 存在），并记审计；**不会静默失败** |
 
 #### ④ 全链路（从 UI 点击到回调执行）
+
+> 此跨设备链路仍待完成，不作为本地事件服务已通过的验收证据。
 
 ```
 [设备 A] 插件 UI 按钮
@@ -976,7 +984,7 @@ dist/ui.zip          （zip 内路径 < 256 字符，拒绝符号链接，禁止
 | [10-1](#10-1--定时任务的载体) 定时任务的载体 | ✅ **契约已选 A**：`lifecycle` 里是 `on-tick: func(tick-json: string) -> outcome`，由**宿主**调用，因此调度器归内核、与实例池解耦。文档标 🔴 是过时的 |
 | [10-2](#10-2--can_handle-的批量与能力边界) 批量与边界 | **已定**：单项调用；宿主逐次设置纯上下文并拒绝副作用，SDK 类型提示不作为安全边界 |
 | [10-4](#10-4--两套能力声明还是一套) 一套还是两套 | ✅ **契约已选一套**：`Manifest.capabilities: Vec<CapabilityDeclaration>` 只有一个字段，没有 UI / headless 两份 |
-| [10-5](#10-5--入站事件的分发模型) 入站事件分发 | ❌ **仍真空**：WIT 里**没有** `on-event`。§4.3 的 `on_event` 只存在于本文档 |
+| [10-5](#10-5--入站事件的分发模型) 入站事件分发 | 已确定声明式 `handles` + 必需 WIT `on-event`；本地服务开发中，远端请求回复仍待实现 |
 | [10-7](#10-7--stateful-true-的确切语义) `stateful: true` | ❌ **仍真空**：`Manifest` 没有 `stateful` 字段 |
 | 10-8 | 已定：无 WASI core module 与内置组件编码，见本节决策 |
 | 10-3 / 10-6 | ❌ 仍待定，且无法从契约反推 |
@@ -1085,35 +1093,30 @@ UI 部分与 headless 部分的能力面**本质上不同**（§5.2 vs §4.4）�
 
 ### 10-5 ★★ 入站事件的分发模型
 
-**问题**：这是整套设计里**最不确定**的一块。
+**2026-10-27 决策：声明式路由。** manifest `handles` 选择事件，宿主经普通实例池调用
+必需的 WIT `lifecycle.on-event(event-json: string) -> outcome`。移除 headless 的
+`event-subscribe` import；`stateful` 只改变实例策略，事件语义一致。UI 的 JS 事件流订阅另行管理。
 
-内核收到 `_plugin.@synra-plugin/chat.text` 或 `file.transfer.complete`，要交给插件的 `on_event`。
-但**插件是池化的**，"交给哪个实例"没有天然答案。而且"订阅"这个概念在池化模型下不成立
-（订阅意味着一个**稳定的回调目标**）。
+上下文 JSON 字段为 `event`、`from`、`senderPluginId`、`requestId`、`traceId`、`payload`；
+前五项由宿主提供，payload 内同名字段不能覆盖身份。`handles` 可接收其他完整包命名空间的事件，
+但每次投递仍需具体 `event:subscribe:<event>` 授权；发射只允许自己声明的完整包命名空间。
+`handles[].match` 对对象递归做子集匹配，对标量和数组做 JSON Schema `const` 匹配。
 
-**选项**：
+本地生产入口由两个宿主共用 core 的事件服务，开发中验收以实际 guest → 队列 → guest → SQLite
+链路为准。入队成功与处理成功分开：`event-emit` 的 `outcome` 只回答入队，handler 的 `outcome`
+记录执行结果；其值不自动成为远端回复，不重试。远端请求回复及系统事件源需单独完成生产接线。
 
-| 选项                                                          | 语义                             | 优点                          | 缺点                                              |
-| ------------------------------------------------------------- | -------------------------------- | ----------------------------- | ------------------------------------------------- |
-| A. **声明式路由**（manifest `handles` + 内核调用 `on_event`）    | "我看到符合条件的事件就调你"        | 与池化一致；可审计、可限流       | 插件不能"运行时动态订阅"；每个事件都要过一次 Wasm 调用 |
-| B. **订阅回调**（`event::subscribe` + guest callback）          | 传统发布/订阅                     | 作者熟悉                       | 与池化冲突（回调目标不稳定）；需要长驻实例           |
-| C. **显式拉取**（内核把待处理事件排队，插件在 `on_timer` 或下次调用时拉） | 插件自己掌握节奏          | 与池化完全兼容；天然批处理        | 实时性差（要靠 timer 唤醒）                          |
-| D. A + 需要长驻的插件用 `stateful: true`                        | 混合                            | 兼顾                          | 两套语义                                          |
+队列上限 128 项、8 MiB 编码 payload，单条 64 KiB，等待期限 5 秒；
+单条因果链最大深度 8、发射和投递各 32 次。每个插件最多 16 个事件声明与 16 个 handler，
+策略缓存最多 32 个装载代次，最近诊断最多 64 条且不保存 payload。
+服务随所属 PluginSet 销毁请求停机，停止接收并清空待投递队列；显式停机同样生效。
+已运行的调用按原调用预算结束，服务不复用于其他 runtime；这不等同于任意进行中宿主 IO 已支持取消。
+入队与执行边界都核对当前启用、信任、版本、manifest consent 和具体授权；
+卸载或同版本重载使旧代次任务失效。队列锁与数据库锁均不得跨 guest 执行。
 
-**倾向**：**A**（声明式路由）作为默认，**D** 作为逃生舱。
-具体形态：
-```
-manifest.handles = [ { event: "_plugin.@synra-plugin/chat.*" }, { event: "file.transfer.complete", kind: "attachment" } ]
-                    ↓ 内核收到匹配事件
-                Wasm: on_event(InboundEvent { event, from, payload, reply_to })
-                    ↓ 需要回执时
-                返回 Result<Option<Value>, Error>  → 内核按 reply_to 发回
-```
-
-**需要确认的问题**：
-1. `on_event` 返回 `Option<Value>`（回执）还是 void（只能自己用 `device::send` 回）？
-2. 事件量大时（比如每块 `file.transfer.chunk`）会不会把内核拖垮？需要"批量投递"吗？
-3. `handles` 的匹配语法和 `capabilities` 里的 `event:emit:*` 是两套还是复用？
+payload schema 使用受限 Draft 2020-12：顶层 object，禁止引用、format 和正则，
+字符串类型需 `maxLength`；schema 和 payload 都有深度、节点和编码大小预算。
+校验 schema 的关键词只解释 schema 位置，属性名和 `const` 数据不作为关键词。
 
 ---
 
