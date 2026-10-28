@@ -379,7 +379,7 @@
 | Wasm 接口                 | 组件模型 + WIT                                                    | 需要接口级别类型安全与版本化演进                           |
 | 传输                      | TCP + 自定义帧起步，QUIC 可选                                       | 局域网够用；明文可调试；性能瓶颈不在传输                   |
 | 移动端 Wasm               | 内嵌 wasmtime（pulle/winch）                                       | 换"一份 artifact 全平台跑"（iOS 无 JIT）                   |
-| UI 插件隔离               | 独立 origin + CSP；桌面**可选**独立 WebView                         | `connect-src 'none'` 让插件无法绕过内核出网                |
+| UI 插件隔离               | 独立 origin + CSP；桌面**可选**独立 WebView                         | CSP 仅允许本机 IPC，普通出网经内核                |
 | 插件安装                  | 分发预构建 artifact + 强制签名                                       | 不在用户机执行构建/安装脚本                               |
 | 持久化                    | SQLite（`rusqlite` bundled）                                      | 有关系数据 + 需要事务 + 需要并发读                          |
 | 集群 / 选主               | **不做**                                                          | 当前场景全是对等点对点；复杂度收益不成立                    |

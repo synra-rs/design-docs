@@ -37,7 +37,7 @@
 ### 0.2 为什么这件事值得一篇文档
 
 因为宿主界面与**第三方**插件界面必须看起来像同一个产品，而它们之间**没有运行时联系**：
-插件页是一个独立文档、独立 origin、`connect-src 'none'`（[08 §7.3](./08-ipc-and-frontend.md)）。
+插件页是一个独立文档、独立 origin、CSP 仅允许本机 IPC（[08 §7.3](./08-ipc-and-frontend.md)）。
 宿主无法给插件页加样式，插件也无法从宿主继承变量。**唯一能共享的就是一份在各自构建期被读进去的 token。**
 
 ### 0.3 编号约定
@@ -494,7 +494,7 @@ tokens (TS) ──┬──► theme.colors / theme.spacing / …   → 生成 u
 用 `@unocss/preset-web-fonts`（`unocss` 包内含）。**不变量**：字体文件最终必须**在产物里**，
 运行期一次网络请求都不许有。
 
-理由：宿主主窗口 CSP 是 `default-src 'self'`；插件页是 `font-src 'self'` 且 `connect-src 'none'`
+理由：宿主主窗口 CSP 是 `default-src 'self'`；插件页是 `font-src 'self'` 且禁止普通网络直连
 （[08 §7.3](./08-ipc-and-frontend.md)）。**任何指向 CDN 的 `@font-face` 在插件页里都是必然失败**，
 而失败的样子是"字体悄悄变了"，不是报错。
 
@@ -826,7 +826,7 @@ UnoCSS 是**构建期**的，插件的 CSS 编译进它自己的产物。于是�
 
 **不设 `presetIcons` 的 `cdn` 选项** —— 这就是"不取 CDN"，+ `@iconify-json/*` 作为 devDependency。
 
-理由：插件页 `connect-src 'none'`，运行期取图标**必然失败**，而失败的样子是一排空方块——
+理由：插件页禁止普通网络直连，运行期远程取图标**必然失败**，而失败的样子是一排空方块——
 它看起来像图标库坏了，而不是像网络被拒。**注意**：这一条与 §1.4 引用的参考工程相反
 （那边写的是 `cdn: 'https://esm.sh/'`），那个写法在 Synra 的两个 CSP 下都不能用。
 

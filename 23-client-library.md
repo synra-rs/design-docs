@@ -432,7 +432,7 @@ export interface StorageNamespace {
 }
 
 export interface NetworkNamespace {
-  /** ★ 唯一的出网路径（CSP `connect-src 'none'` 会让直接 fetch 失败） */
+  /** ★ 唯一的出网路径（CSP 仅允许本机 IPC，直接网络 fetch 会失败） */
   fetch(input: string, init?: SynraFetchInit): Promise<SynraResponse>
 }
 

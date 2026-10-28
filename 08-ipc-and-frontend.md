@@ -594,15 +594,19 @@ Content-Security-Policy:
   style-src 'self' 'unsafe-inline';
   img-src 'self' data: blob:;
   font-src 'self';
-  connect-src 'none';         ← ★ 插件不能直接发网络请求，必须走 synra.network.fetch
+  connect-src ipc: https://ipc.localhost;
   frame-src 'none';
   object-src 'none';
   base-uri 'none';
   form-action 'none';
 ```
 
-**`connect-src 'none'` 是关键**：它让 UI 插件**无法绕过内核**直接 `fetch`。
-如果插件确实需要网络，走 `synra.network.fetch`（内核代理 + 闸门 + SSRF 防护）。
+**仅允许本机 IPC 是关键**：`ipc:` 是原生 WebKit 的 Tauri 传输，HTTPS 地址是这些插件窗口在
+Windows/Android 上显式选择的本机协议映射。主窗口使用 `ipc: http://ipc.localhost`。
+这不允许普通 HTTP、WebSocket 或插件 origin 的直接连接；真正的网络请求仍走
+`synra.network.fetch`（内核代理 + 闸门 + SSRF 防护）。Tauri command ACL、调用方界面和会话权限继续逐层校验。
+设置为 `connect-src 'none'` 会连 Tauri 自己的传输一起阻断，并触发带告警的 postMessage 回退。
+iframe 若经父窗口转发，可继续使用 `connect-src 'none'`；原生独立 WebView 使用上述本机 IPC 例外。
 
 ---
 
@@ -635,6 +639,10 @@ Content-Security-Policy:
 ---
 
 ## 9. 实现清单
+
+> **2026-10-28：Windows 插件窗口与 IPC 策略修复。** Open 改为异步 Tauri 命令，验收入口经过前端实际 IPC；
+> 主窗口组件样式与插件本机 IPC 的 CSP 已修正，空配置保留必填数组，本机旧开发库已备份修复。
+> 具体原因、测试及真实界面验收边界见[修复记录](./history/2026-10-28-plugin-window-repairs.md)。
 
 > **2026-10-26：插件错误详情贯通 Wasm 与页面 RPC。** 引擎保留可选 details，页面保留原始错误码和详情；
 > 生产 self.invoke 经过实际 SQLite、PluginSet 与 Wasm 的回归见[错误详情记录](./history/2026-10-26-error-details.md)。
@@ -1232,13 +1240,9 @@ Content-Security-Policy:
       `tauri-2.12.1/src/app.rs:2267` 一次就对），handler 是 `commands::plugin_ui::serve`：
       已知 id 取自 `hosted_ui`（页面只能点名宿主开过窗口的插件）→ `split_ui_url` → `ui_file` →
       `200`（带 content-type）/ **`403`**（路径规则拒绝）/ **`404`**（包缺文件）。
-      ★ **CSP 的结论是"继承 + 文档自带"**：Tauri 2.12 **没有公开的 per-window CSP**（`set_csp` 是 `pub(crate)`，
-      见 `tauri-2.12.1/src/…/mod.rs:53`），所以插件页拿到的就是 `tauri.conf.json` 的全局策略
-      `default-src 'self'; connect-src 'none'; img-src 'self' data:; style-src 'self' 'unsafe-inline'`。
-      ★ **handler 现在给 200 响应加上 `Content-Security-Policy` 头**（`plugin_ui::PLUGIN_CSP`，策略与 09 §416 一致：
-      `default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;
-      font-src 'self'; connect-src 'none'; base-uri 'none'; form-action 'none'`），所以 `connect-src 'none'` 是**文档
-      自带的属性**，不再只依赖全局设置；两者同时生效时浏览器取交集。
+      ★ **2026-10-28 修正早期的“继承”推断**：Tauri 的全局 CSP 用于主程序资产，自定义协议须为自己的响应附上策略。
+      主窗口只允许 `ipc: http://ipc.localhost` 连接；协议 handler 的 200 响应带 `PLUGIN_CSP`，
+      插件连接只允许 `ipc: https://ipc.localhost`，完整规则见 §7.3。普通网络直连仍被拒绝。
       但 `'self'` 在 `synra-plugin://` 这个 origin 下具体意味着什么，只能由一次真实运行确认 —— 这是本仓库唯一无法用
       `cargo check` 回答的问题，记在这里而不是假装它已解决。
 - [x] 插件 WebView 初始化脚本（token 闭包注入）—— **部分做了**（2026-10-18）：

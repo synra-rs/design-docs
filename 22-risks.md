@@ -366,7 +366,7 @@ iOS 是否进 M5 由 M4 结束时的评估决定（[R-14]）。
 | 3 | wasmtime 能交叉编译到 iOS aarch64                         | 同上（需 macOS）                                    | 同上                                | ❌ 无    |
 | 4 | `rusqlite bundled` 能交叉编译到移动端                      | 最小 SQLite 项目交叉编译                            | 改用 `redb`（纯 Rust）               | ❌ 无    |
 | 5 | Tauri 的多个 WebView 在 Windows/macOS 上能独立 origin     | 两个 WebView + 不同自定义协议 + 跨 origin 访问断言    | UI 插件退化为 sandbox iframe（同 origin） | ❌ 无 |
-| 6 | 自定义协议 + CSP 能阻止 UI 插件的网络请求                  | 对抗测试（`connect-src 'none'`）                    | 需要在协议层再加一层代理              | ❌ 无    |
+| 6 | 自定义协议 + CSP 能阻止 UI 插件的网络请求                  | 对抗测试（拒绝普通网络直连）                    | 需要在协议层再加一层代理              | ❌ 无    |
 | 8 | Tauri IPC 在移动端的性能可接受（尤其是大 payload）           | 传一个 1 MB 的 blob 测延迟（M5 才做）                | 大对象走文件通道而不是 IPC             | ❌ 无    |
 
 **参照**：`peon-burrow` 在动手前也做了同类验证（`rcgen` 自签证书、`port: 0` 等），

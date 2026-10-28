@@ -30,7 +30,7 @@
 │   产物：  plugin.wasm  +  ui.zip                                                  │
 │   跑在：  Wasm 实例 + 一个隔离的 WebView（独立 origin）                             │
 │   能做：  渲染页面，通过注入的 window.synra 调内核；调自己 headless 部分的 action     │
-│   不能：  直连网络（CSP connect-src 'none'）、读写文件、模拟按键、管理其它插件         │
+│   不能：  直连网络（CSP 仅允许本机 IPC）、读写文件、模拟按键、管理其它插件         │
 │                                                                                  │
 │   例：chat（消息列表）、ps-shortcuts（快捷键面板）、settings-panel                  │
 └──────────────────────────────────────────────────────────────────────────────────┘
@@ -641,7 +641,8 @@ synra-app 的主 WebView（宿主 UI）
   │    │ 插件页面（独立 WebView 或 sandbox iframe，独立 origin）      │ │
   │    │  origin: synra-plugin://<plugin-id>/                       │ │
   │    │  CSP:    default-src 'none'; script-src 'self';            │ │
-  │    │          connect-src 'none'; object-src 'none'             │ │
+  │    │          connect-src ipc: https://ipc.localhost;          │ │
+  │    │          object-src 'none'                                │ │
   │    │                                                            │ │
   │    │  ┌──────────────────────────────────────────────────────┐ │ │
   │    │  │ 插件的 ui.zip 内容（自带一份 Vue，不与宿主共享）         │ │ │
@@ -719,7 +720,7 @@ interface SynraClient {
 | 任何 `plugin.*` 管理方法   | 插件不能安装/启用/停用其它插件，也不能替用户授权            |
 | `config.set`              | 插件只能读写自己的 storage，不能改全局配置                 |
 | `localStorage` / `indexedDB` | WebView 层面禁用（无持久化 profile），持久化只走 `storage`  |
-| 直接的 `fetch`            | CSP `connect-src 'none'` 会拦住                          |
+| 直接的 `fetch`            | 仅允许本机 IPC 的 CSP 会拦住                          |
 
 ### 5.3 UI 侧的构建
 
@@ -737,7 +738,7 @@ dist/ui.zip          （zip 内路径 < 256 字符，拒绝符号链接，禁止
 | `base: './'`（产物里是相对路径）                       | 要在 `synra-plugin://` 自定义协议下工作 |
 | 无 `eval` / `new Function`（CSP 无 `unsafe-eval`）     | 否则页面里脚本直接报错                |
 | 无内联 `<script>` 之外的远程 URL 引用                   | CSP `script-src 'self'` 会拦          |
-| 产物里不出现 `http://` / `https://` 的 API 调用         | `connect-src 'none'` 会拦；必须走 `synra.network.fetch` |
+| 产物里不出现 `http://` / `https://` 的 API 调用         | 普通网络直连会被 CSP 拦截；必须走 `synra.network.fetch` |
 
 ---
 

@@ -278,8 +278,8 @@ Linux（WebKitGTK）          → B（独立 origin + CSP）
 ```
 
 **关键具体措施**（无论哪层）：
-- CSP：`default-src 'none'; script-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'`
-- **`connect-src 'none'`** 让插件无法绕过内核直接发网络请求；
+- CSP：`default-src 'none'; script-src 'self'; connect-src ipc: https://ipc.localhost; object-src 'none'; base-uri 'none'`
+- **CSP 仅允许本机 IPC**，普通网络请求仍须经过内核；原生与 HTTPS 映射见 [08 §7.3](./08-ipc-and-frontend.md)；
 - 每个插件一个**会话令牌**（闭包注入，不在 `window` 上）；
 - IPC 方法白名单（`PluginUiOp`），**UI 插件永远不能模拟按键、读写任意文件、管理其他插件**。
 

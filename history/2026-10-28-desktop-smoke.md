@@ -13,6 +13,10 @@ App 新增显式 `--starter-ui-smoke <dist>` 开发入口，仅在 desktop debug
 
 ## 真实启动发现的问题
 
+后续复核发现：此处最初从 setup 直接调用 Rust wrapper，未覆盖前端 IPC 的 Windows command 线程。
+现已改为真实 IPC 打开，并检查组件动态样式；后续死锁、CSP 与验收边界见
+[插件窗口修复记录](./2026-10-28-plugin-window-repairs.md)。
+
 首轮 Windows 启动在窗口出现前栈溢出。进程 75736 的本机 crash dump 显示
 `0xc00000fd`，故障点为 `__chkstk`，栈上调用者为 Cranelift 的
 `constructor_simplify`；PE header 的主线程 stack reserve 为 1048576 字节。
