@@ -290,6 +290,8 @@ interface share {
    > 由宿主选择当前实例池中的实例投递；接收仍需具体事件的 `event:subscribe:<name>` 授权。
    > 本地 `event-emit` 成功表示入队，处理结果由有界诊断记录；不自动回复、不重试。
    > UI 的 JS 事件流订阅保持独立，详见 [13 §10-5](./13-plugin-authoring.md)。
+   > 2026-10-28：远端插件事件接收已接入同一有界 worker，执行前复核原设备授权和接收插件授权。
+   > 认证连接的 admission 回执只表示入队，不能视为动作成功；发送端仍待实现，见[远端接收记录](./history/2026-10-28-remote-plugin-events.md)。
 5. **`can-handle` 返回 JSON 字符串而不是 `outcome`**：因为"不处理"不是错误。
    > 匹配调用经 `Work::allows_side_effects`、StoreData 和共享 HostCalls 进入纯上下文，
    > 持有授权的插件也不能在匹配阶段执行副作用；真实 Rust guest 已覆盖拒绝与正常执行，

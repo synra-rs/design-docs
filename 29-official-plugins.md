@@ -20,7 +20,8 @@ Starter 已加入读取宿主 SDK 版本、形态、语言和主题的 debug act
 Starter 已接入 Vue 本机诊断页，实际 Windows WebView 的按钮→IPC→Wasm→页面结果已验证
 （[桌面验收记录](./history/2026-10-28-desktop-smoke.md)）；视觉排版及手机到电脑能力仍待验收和开发。
 Starter 的明确目标选择及设备列表权限边界已接入（[记录](./history/2026-10-28-starter-targets.md)）；
-它保留离线状态，不自动改用第一台，远端执行服务仍待实现。
+它保留离线状态，不自动改用第一台；远端事件接收已接入共享服务（[接收证据](./history/2026-10-28-remote-plugin-events.md)），
+发送端和业务结果关联仍待实现，入队回执不表示插件动作已成功。
 触摸板仍需接入 Vue UI、Wasm action 和宿主实际输入服务，不能据此宣称手机已能控制电脑。
 创建远端、发版、打 tag 与部署由用户处理。
 
