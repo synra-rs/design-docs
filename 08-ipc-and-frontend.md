@@ -555,39 +555,35 @@ pub enum PluginUiOp {
 
 ### 7.3 插件 WebView 的创建
 
-```rust
-// src-tauri/src/plugin_ui.rs
+宿主的 `open_request` 读取 manifest、签发令牌并预留窗口；创建失败或窗口销毁时撤销会话。
+完整插件 id 不直接放进 URL authority 或窗口 label：`@scope/name` 会被标准 URL 解析成用户信息和路径。
 
-pub async fn open_plugin_page(
-    app: &AppHandle,
-    plugin_id: &PluginId,
-    page_key: &str,
-) -> Result<WebviewWindow, PluginUiError> {
-    // 1. 校验插件已激活且是 UI/hybrid
-    let session = app.state::<AppState>();
-    let plugin = session.plugins.require_active_ui(plugin_id)?;
+每个插件用完整 id 的 SHA-256 派生独立 origin，十六进制摘要分成两个 32 字符 DNS label：
 
-    // 2. 签发 UI 会话令牌
-    let nonce = session.ui_sessions.issue(plugin_id.clone(), plugin.version.clone(), plugin.grants.clone());
-
-    // 3. 构建插件页面 URL
-    //    ★ 独立 origin：synra-plugin://<plugin-id>/<page-key>/
-    //      通过 Tauri 的自定义协议 handler 提供文件，并强制 CSP
-    let url = format!("synra-plugin://{}/{}", plugin_id, page_key);
-
-    // 4. 创建 WebView，注入初始化脚本（含 token，闭包捕获，不上 window）
-    let window = WebviewWindowBuilder::new(app, format!("plugin-{}-{}", plugin_id, page_key), WebviewUrl::CustomProtocol(url))
-        .title(plugin.title.clone())
-        .initialization_script(build_plugin_init_script(nonce))
-        .on_navigation(move |url| {
-            // ★ 限制导航范围：只允许插件自己的 origin 与白名单外链
-            url.scheme() == "synra-plugin" || is_external_link(url)
-        })
-        .build()?;
-
-    Ok(window)
-}
+```text
+synra-plugin://p<digest前32字符>.<digest后32字符>.localhost/<entry>#<defaultPage>
 ```
+
+`entry` 是 ZIP 内真实文件路径，保留目录和扩展名，并通过 URL 路径分段编码；`defaultPage` 可选，作为 hash 路由。
+相对资源以该 HTML 地址解析，不使用文件 stem 或页面 key 代替入口文件。
+窗口 label 使用完整摘要前缀和独立文档 id，只包含 Tauri 接受的字符，不包含私有 RPC nonce。
+同一有效授权代次复用当前文档；替换后的窗口使用新 label，旧窗口的延迟销毁不会撤销新会话。
+
+插件必须已启用且已同意授权才可打开 UI；创建时从同一数据库读事务取得权限与持久授权代次。
+RPC、ready 及资源读取均重检当前代次，停用、授权变更、活动版本切换和同版本 reload 使旧页面失效，
+同版本重装也不能恢复旧 nonce。资源请求以框架提供的 WebView label 绑定所属页面。
+后台检查请求销毁失效窗口，失败保留记录重试；拒绝旧调用不依赖原生窗口是否已关闭。
+只有显式 ready 报告能标记监听器已安装，授权检查、资源读取和清理扫描本身不改变 readiness。
+验证记录见[UI 授权代次](./history/2026-10-28-ui-authority.md)。
+
+Windows/Android 显式使用 HTTPS 自定义协议映射，对应
+`https://synra-plugin.p<前32字符>.<后32字符>.localhost/<entry>`。
+导航校验把原生协议和这个明确选择的映射归一化，只允许同一文档的 fragment 变化，拒绝更换插件、文件、query 或外部地址。
+`window.open` 始终拒绝。
+
+Tauri 将带摘要域名的页面视作 remote origin；须为 `plugin-*` 窗口显式配置该 HTTPS origin 的 capability。
+原生构建从共享 `CommandRegistry` 生成两组 app-command 权限：主窗口只有 Host 入口，插件页面只有
+`plugin_ui_ready` 和 `plugin_ui_rpc`；运行时 invoke handler 仍校验调用方 interface，RPC 再校验会话和具体权限。
 
 **CSP（由自定义协议 handler 注入响应头）**：
 

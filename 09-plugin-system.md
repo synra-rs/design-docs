@@ -315,7 +315,7 @@ UI 插件跑在 WebView 里，**天然比 Wasm 弱**。分层处理：
 
 ```rust
 pub enum UiIsolation {
-    /// 独立 WebView，独立 origin（如 synra-plugin://<plugin-id>/）
+    /// 独立 WebView，独立 origin（完整插件 id 的摘要域名，见 08 §7.3）
     SeparateWebview { origin: String },
     /// sandbox iframe，宽松 CSP
     SandboxedIframe { csp: Csp },

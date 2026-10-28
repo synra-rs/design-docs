@@ -78,7 +78,7 @@ synra-core/spike/            # 不进 workspace，用完可删（或归档）
 | 编号 | 状态 | 开发内容与完成判据 |
 | --- | --- | --- |
 | D1 | 开发中 | 已加入共享凭据及认证通道（[认证证据](./history/2026-10-26-device-authentication.md)）、Windows 原生密钥后端与登记恢复（[本机持久化](./history/2026-10-26-device-credentials.md)）、带外邀请与受限同意（[首次核验](./history/2026-10-26-pairing-consent.md)）、凭据持久绑定与授权代次（[持久绑定](./history/2026-10-26-peer-trust.md)）、Hello 身份复核与逐帧授权（[入口验证](./history/2026-10-26-authenticated-peer.md)），以及两个宿主的原生启动与业务入口接入（[宿主验证](./history/2026-10-26-host-authentication.md)）；CLI/daemon 首次配对已接入共享任务，含握手前持久预留、真实取消及撤销后晚到连接拒绝（[首次配对入口](./history/2026-10-26-first-pairing.md)）；应用首次配对交互也已接入同一服务，含导航后的任务重读及过期、取消提示（[应用验证](./history/2026-10-26-app-first-pairing.md)）；CLI 显式身份修复、原子撤销与有界旧密钥清理已接入共享流程，含跨进程互斥、进程退出和原生重启验证（[修复验证](./history/2026-10-26-identity-repair.md)）；应用设置页修复交互已接入共享类型、状态、错误分类及维护流程，含固定指纹确认、失败后状态复核和清理重试（[应用修复验证](./history/2026-10-26-app-identity-repair.md)）；公开登记及身份元数据缺失恢复已接入，包含禁止自动换钥、保留原指纹确认、同一设备 id 恢复与沿革丢失拒绝（[恢复验证](./history/2026-10-26-registration-recovery.md)）；Android 等平台后端及运行、整库或平台恢复与完整业务链路仍待完成 |
-| D2 | 开发中 | 自动更新到期筛选及失败重试规则已收敛到 core，两个宿主的真实下载失败与重启测试通过（[证据](./history/2026-10-25-update-retries.md)）；应用与 daemon 文件发送已共用提议、窗口、完成和摘要确认流程，并覆盖生产接收端、拒绝、取消及缺少确认（[发送流程](./history/2026-10-26-transfer-workflow.md)）；完整更新、授权、撤销和启停服务尚待收敛，仍需验证同一结果、同一事件及竞态下的提交重检 |
+| D2 | 开发中 | 自动更新到期筛选及失败重试规则已收敛到 core，两个宿主的真实下载失败与重启测试通过（[证据](./history/2026-10-25-update-retries.md)）；应用与 daemon 文件发送已共用提议、窗口、完成和摘要确认流程，并覆盖生产接收端、拒绝、取消及缺少确认（[发送流程](./history/2026-10-26-transfer-workflow.md)）；插件页面已绑定持久授权代次，覆盖停用、重载、撤销和重装后拒绝旧页面（[UI 授权](./history/2026-10-28-ui-authority.md)）；完整更新、授权、撤销和启停服务尚待收敛，仍需验证同一结果、同一事件及竞态下的提交重检 |
 | D3 | 待开发 | 分离安装记录、任务与运行实例；真实更新场景能同时显示旧版运行、新版下载或失败，重启不从持久标志推断实例仍活着 |
 | D4 | 待开发 | 数据迁移工作副本与提交恢复：隔离迁移写入，记录提交阶段；注入各切换点故障及重启，拒绝混合版本或混合数据代次加载；分开报告安装成功与激活失败 |
 | D5 | 已实现并本地验证 | 未发布约定、领域错误边界守卫及真实工作区覆盖检查已落地；11 项专门回归、全工作区测试、严格 Clippy 及实际调用方检查通过，见[验证记录](./history/2026-10-26-unpublished-api.md) |
@@ -206,6 +206,8 @@ cargo tree -p synra-net -p synra-core | grep -E 'tauri|wry'   # 空
 ---
 
 ## M2 · 意图路由与最小插件（3–4 周）
+
+CLI 已接通完整 headless/hybrid 安装目录、实际 UI ZIP、tgz 与原生安装链路；普通失败保留旧包，成功重建移除旧签名，见[本轮证据](./history/2026-10-27-hybrid-packages.md)。这不表示官方插件的手机 UI 或跨设备动作已完成。
 
 当前 Wasm 双向 ABI 已改用生产 WIT 生成 Host 绑定和类型化 Guest 返回，
 真实组件已覆盖返回、清理、授权拒绝、纯匹配及有界初始化，见 [验证记录](./history/2026-10-26-wasm-abi.md)。
@@ -569,7 +571,7 @@ M0 ──▶ M1 ──▶ M2 ──▶ M3
 
 | 插件 | 独立仓库 | 当前状态 | 验收重点 |
 | --- | --- | --- | --- |
-| Starter | [synra-plugin-starter](https://github.com/synra-rs/synra-plugin-starter) | 已接入，建立 headless 工程及基础 debug action，待 UI 和宿主能力 | 目标电脑选择、电脑选中文本到手机剪贴板、电脑打开链接与 debug；参考旧 Electron starter |
+| Starter | [synra-plugin-starter](https://github.com/synra-rs/synra-plugin-starter) | 开发中：本机诊断及真实 Windows WebView→IPC→Wasm 已通过，目标选择已接入；视觉排版与两端能力仍待验收（[诊断](./history/2026-10-28-desktop-smoke.md)、[目标选择](./history/2026-10-28-starter-targets.md)） | 目标电脑选择、电脑选中文本到手机剪贴板、电脑打开链接与 debug；参考旧 Electron starter |
 | 触摸板 | [synra-plugin-touchpad](https://github.com/synra-rs/synra-plugin-touchpad) | 已接入，建立 headless 工程及纯手势识别库，待接入 Wasm、UI 和鼠标输入服务 | 手机单指移动、双指滚动、左键点击、右键点击及双击保持左键拖拽，断连与撤销后释放按钮 |
 
 这些需求加入整体目标，不替代既有 M0–M6 验收。

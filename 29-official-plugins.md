@@ -17,7 +17,11 @@
 用户已创建两个远端，分别克隆在基座工作区同级目录 synra-plugin-starter/ 与 synra-plugin-touchpad/。
 初始阶段提供固定 Rust 工具链、固定 Git 提交的 SDK、独立 Cargo.lock、headless Wasm 入口及开发检查；不以 SDK 发布为前提。
 Starter 已加入读取宿主 SDK 版本、形态、语言和主题的 debug action；触摸板先提供可独立测试的手势识别库。
-两个仓库仍需接入 Vue UI 和宿主实际能力；触摸板识别库尚未接入 Wasm action，不能据此宣称手机已能控制电脑。
+Starter 已接入 Vue 本机诊断页，实际 Windows WebView 的按钮→IPC→Wasm→页面结果已验证
+（[桌面验收记录](./history/2026-10-28-desktop-smoke.md)）；视觉排版及手机到电脑能力仍待验收和开发。
+Starter 的明确目标选择及设备列表权限边界已接入（[记录](./history/2026-10-28-starter-targets.md)）；
+它保留离线状态，不自动改用第一台，远端执行服务仍待实现。
+触摸板仍需接入 Vue UI、Wasm action 和宿主实际输入服务，不能据此宣称手机已能控制电脑。
 创建远端、发版、打 tag 与部署由用户处理。
 
 ## 2. Starter

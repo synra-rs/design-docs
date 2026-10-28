@@ -59,14 +59,14 @@
 
   "runtime": {
     "headless": {
-      "artifact": "dist/plugin.wasm",  // 相对包根
+      "artifact": "plugin.wasm",  // 相对包根
       "stateful": false,               // 是否可在实例间保留内存状态
       "hints": ["cpu-heavy"]           // 可选软提示（宿主可忽略）
     },
     "ui": {
-      "artifact": "dist/ui.zip",
+      "artifact": "ui.zip",
       "entry": "index.html",           // zip 内的入口
-      "defaultPage": "home"            // 可选：默认页面 key
+      "defaultPage": "home"            // 可选：入口文档的 hash 路由
     }
     // 至少填一个；两个都填 = hybrid
   },
@@ -233,33 +233,32 @@ pub fn to_wire_slug(id: &PluginId) -> PluginSlug;
 ```bash
 # 脚手架
 synra-plugin new my-plugin --template headless        # Rust headless
-synra-plugin new my-plugin --template hybrid          # Rust + Vue UI
+synra-plugin new my-plugin --template hybrid          # Rust + 静态 UI，可配置 Vue 等框架构建
 
 # 构建
 synra-plugin build                # 按 manifest 的 runtime 声明构建对应产物
-synra-plugin build --release
-synra-plugin build --no-ui        # 只构建 headless
+synra-plugin build --dry-run      # 只查看构建计划，不执行命令
 
 # 校验（提交前必跑）
-synra-plugin verify
+synra-plugin verify --dir dist
   ├─ manifest schema + 一致性
   ├─ capability 语法 + domain 适用性
   ├─ wasm imports ⊆ capabilities        ← ★ 关键检查
   ├─ 无禁用 import（sockets / fs preopens）
-  ├─ ui.zip 结构 + CSP 兼容检查
+  ├─ ui.zip 结构、入口、实际字节与 CRC 检查
   ├─ 体积上限
   └─ WIT 版本兼容
-synra-plugin verify --strict        # CI 用：警告也当错误
+synra-plugin verify --dir dist --json        # CI 用：警告也当错误
 
 # 签名
-synra-plugin sign --key ~/.synra/keys/dev.key
-synra-plugin keygen --out ~/.synra/keys/dev.key
+synra-plugin sign --dir dist --key ~/.synra/keys/dev.key
+synra-plugin sign --generate-key                    # 生成密钥；私钥由作者安全保存
 
 # 发布
-synra-plugin pack                  # 生成 .synra 包（tarball）
-synra-plugin publish               # 上传到 registry
+synra-plugin pack --dir dist       # 生成 npm 兼容 .tgz，未上传
+synra-plugin publish --index dist/plugin.json       # 检查静态分发文件，不上传
 
-# 开发
+# 尚未实现的开发工具规划（不是当前可执行命令）
 synra-plugin dev                   # 监听变更 → 重建 → 热重载到运行中的宿主
 synra-plugin dev --host 127.0.0.1:39001   # 指定宿主
 synra-plugin test                  # 在沙箱里跑契约测试
@@ -267,19 +266,40 @@ synra-plugin test                  # 在沙箱里跑契约测试
 
 ### 3.2 `build` 做什么
 
-当前 headless 构建按以下固定链路执行，不根据 Rust 版本猜测产物形态：
+当前 build 在项目根执行，默认输出完整的 `dist/` 安装目录；manifest 的 artifact 路径相对该包根，
+不相对源码根。headless 与 hybrid 共用以下链路：
 
-1. `cargo build --target wasm32-unknown-unknown --release --message-format=json-render-diagnostics`；
-2. 从 Cargo 的 compiler-artifact 消息定位当前项目的 cdylib core module，支持自定义库名与 target 目录；
-3. 使用已锁定的 wit-component 库读取 SDK 嵌入的 WIT 元数据，编码并校验组件；
-4. 使用与 verify 相同的静态检查验证完整 WIT ABI 与体积上限，暂存成功后原子替换 manifest 的 headless artifact。
+1. 在项目根取得跨进程构建锁，创建独立暂存目录；
+2. `cargo build --target wasm32-unknown-unknown --release --message-format=json-render-diagnostics`；
+3. 从 compiler-artifact 消息定位当前项目的 cdylib，支持自定义库名与 target 目录；
+4. 使用锁定的 wit-component 读取 SDK 的 WIT 元数据，编码并检查完整组件；
+5. hybrid 执行显式配置的 UI 命令（可省略），将静态目录打包为 manifest 声明的 ZIP；
+6. 将 manifest 快照写入暂存包，使用与 verify 相同的实际组件和 ZIP 检查；
+7. 验证成功后整体替换属于当前项目和插件的 `dist/`；普通失败保留上次完整包。
+   Windows 的非空目录不能原子覆盖，因此使用旧目录备份、重命名和失败恢复；不承诺替换期间没有短暂缺口。
+   下次构建会恢复中断发布留下的旧目录。成功重建不继承旧签名，须重新签名。
 
-编译失败、缺失或歧义的 Cargo 产物、组件化失败都必须返回失败；
-旧产物仍存在不能把失败重建判为成功，失败不覆盖上次成功的组件。
-默认生成的 Rust 源实现 lifecycle、share 与 actions guest traits，再调用
-`synra_plugin_sdk::export!(Plugin)`，不手写旧式 C ABI 入口。
-当前编译器与这条链路已在本机验证，见 [开发证据](./history/2026-10-26-rust-authoring.md)。
-独立目录中的 SDK 源码依赖也已通过真实构建与装载，见 [资源隔离验证](./history/2026-10-26-sdk-resources.md)。
+默认 hybrid 脚手架包含 Rust headless 和静态 `ui/index.html`，声明 `plugin.wasm` 与 `ui.zip`，
+不要求安装前端包管理器。框架项目在 Cargo.toml 中明确配置构建目录、argv 命令及资源来源：
+
+```toml
+[package.metadata.synra.ui]
+source = "ui/dist"
+directory = "ui"
+command = ["pnpm", "run", "build"]
+```
+
+命令直接以 argv 执行，不自动安装依赖、不猜测包管理器、不拼接 shell 命令字符串；
+Windows 上应配置实际可执行入口（例如安装方式提供的 `pnpm.cmd`）。
+未声明 metadata 时仅打包静态 `ui/`。source 和 directory 必须在项目内，
+资源来源不能与输出目录重叠，链接和特殊文件被拒绝。构建命令是作者信任的本地程序，
+作者须让它写入自己的 UI 资源目录，不得写入 CLI 管理的输出和暂存目录。
+
+UI ZIP 按文件名排序、固定元数据，以 stored 条目写入；外层 tgz 负责压缩。
+编译、组件化、UI 命令、缺少入口和 ZIP 校验失败均返回失败，不能用旧文件冒充成功。
+默认 Rust 源实现生产 guest traits 并调用 SDK export 宏。
+真实 headless 与 hybrid 脚手架、tgz 解包、SQLite 安装及重建失败已通过本地链路，
+见[本轮记录](./history/2026-10-27-hybrid-packages.md)。
 
 ### 3.2.1 当前 verify 的二进制边界
 
@@ -289,15 +309,15 @@ verify 读取 manifest 声明的 artifact，不以固定 plugin.wasm 或 ui/ 代
 已验证的空导入集可以通过，读取或校验失败必须失败，不能降级为 warning。
 未知接口、资源、WASI、错误版本或签名都不能凭名称近似而通过。
 
-manifest 与 Wasm 采用有界读取，UI 入口与遍历限制在声明的目录内；
-缺失文件、目录链接越界、读取失败和资源上限都给出失败报告。
+manifest 与 Wasm 采用有界读取，UI artifact 必须是 ZIP 文件；检查实际目录记录、入口、CRC 与资源预算。
+缺失文件、路径越界、链接、重复条目、读取失败和资源上限均给出失败报告。
 
 | 输入 | 当前上限 |
 | --- | --- |
 | manifest.json | 1 MiB |
 | headless artifact | 复用宿主 MAX_COMPONENT_BYTES |
-| UI bundle | 2000 个文件、32 MiB |
-| UI 遍历 | 4000 个目录项，包含文件与目录 |
+| UI ZIP 编码大小 | 32 MiB |\n| UI 解包内容 | 2000 个文件、64 MiB |
+| ZIP 目录 | 4096 个目录项，包含文件与目录；读取器分配索引前检查 |
 
 构建、verify、原生安装和执行型 PluginSet 装载共用宿主的静态组件检查，
 从实际 artifact 提取导入，不接受调用方提供的 imports 或实现布尔值作为证明。

@@ -388,7 +388,7 @@ export interface EventNamespace {
 }
 
 export interface DeviceNamespace {
-  /** 已配对 + 在线的设备 */
+  /** 已配对且未屏蔽的设备；保留离线项，通过 online 表达连接状态。需要 device:list。 */
   list(): Promise<DeviceTarget[]>
   send(req: { to: DeviceId; event: string; payload?: unknown }): Promise<void>
   broadcast(req: { event: string; payload?: unknown }): Promise<void>
@@ -511,7 +511,7 @@ const canPick = synra.device.supported.includes('device.pick')
 
 async function chooseTarget(): Promise<DeviceId | null> {
   if (canPick) return synra.device.pick({ title: '在哪台设备执行？' })
-  return devices[0]?.deviceId ?? null        // 退化：默认第一台
+  return null // 展示插件自己的显式选择控件；不能自动改用第一台
 }
 ```
 
@@ -743,17 +743,15 @@ let off: Unsubscribe | undefined
 onMounted(async () => {
   synra.ready()                                    // 告诉宿主"页面已就绪"
   devices.value = await synra.device.list()
-  target.value = devices.value[0]?.deviceId ?? null
   off = synra.device.onChange(d => { devices.value = d })
 })
 
 onUnmounted(() => off?.())
 
 async function pickTarget() {
-  // ★ 渐进增强：宿主支持就用原生选择器，否则退回默认第一台
-  target.value = synra.device.supported.includes('device.pick')
-    ? await synra.device.pick({ title: '在哪台设备执行？' })
-    : (devices.value[0]?.deviceId ?? null)
+  // 宿主支持时使用原生选择器，否则由下面的 select 控件明确选择。
+  if (synra.device.supported.includes('device.pick'))
+    target.value = await synra.device.pick({ title: '在哪台设备执行？' })
 }
 
 async function openOnLaptop(url: string) {
@@ -765,6 +763,15 @@ async function openOnLaptop(url: string) {
   }
 }
 </script>
+<template>
+  <label for="target">在哪台设备执行</label>
+  <select id="target" v-model="target">
+    <option :value="null">请选择目标设备</option>
+    <option v-for="device in devices" :key="device.deviceId" :value="device.deviceId">
+      {{ device.displayName }} · {{ device.online ? '在线' : '离线' }} · {{ device.deviceId }}
+    </option>
+  </select>
+</template>
 ```
 
 模板里的 `ui/tsconfig.json`（由 `synra-plugin new` 生成）：
