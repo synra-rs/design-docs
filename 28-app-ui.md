@@ -487,6 +487,26 @@ tokens (TS) ──┬──► theme.colors / theme.spacing / …   → 生成 u
 
 ---
 
+### R54 · 壳层约束视口，主区域独立滚动（MUST）
+
+桌面框架必须受视口高度约束，不能仅设 `min-height` 再让内容把文档撑高。
+Grid 主轨道采用 `minmax(0, 1fr)`，对应子项允许收缩；长内容在区域内滚动。
+
+- 侧栏品牌和设备信息保持可见，只有菜单区域在溢出时纵向滚动。
+- 内容区是页面的主要滚动容器，支持键盘聚焦、可见焦点；到达边界时不带动文档。
+- 每个新路由从内容顶部开始；短页面与长页面之间保留稳定的滚动条占位。
+- 小屏底部导航占独立行，内容区使用剩余高度，保留 safe-area 和 44px 触控目标。
+- 不给每张卡片再加独立纵向滚动，避免不必要的多层滚动。
+
+当前窄栏为 96px，容纳组件库原生 80px 折叠菜单与两侧内边距；品牌、菜单图标和设备图标居中对齐。
+`scrollbar-gutter` 和 `overscroll-behavior` 是渐进增强，视口约束与内容可达性不能依赖其可用性。
+布局验收必须检查真实浏览器中的尺寸、滚动位置与键盘交互，jsdom 中检查类名不能证明布局有效。
+
+依据：[Microsoft NavigationView](https://learn.microsoft.com/en-us/windows/apps/develop/ui/controls/navigationview)、
+[MDN overflow](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/overflow)。
+
+---
+
 ## 5. 字体与排版
 
 ### R17 · 字体用 `presetWebFonts`，且必须落在产物里（MUST）
