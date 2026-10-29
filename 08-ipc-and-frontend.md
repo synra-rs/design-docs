@@ -121,7 +121,7 @@
 #[tauri::command] async fn transfer_send_file(state: State<'_, AppState>, req: SendFileRequest) -> Result<TransferId, IpcError>;
 #[tauri::command] async fn transfer_send_text(state: State<'_, AppState>, req: SendTextRequest) -> Result<TransferId, IpcError>;
 #[tauri::command] async fn transfer_cancel(state: State<'_, AppState>, transfer_id: TransferId) -> Result<(), IpcError>;
-#[tauri::command] async fn transfer_respond(state: State<'_, AppState>, transfer_id: TransferId, accept: bool) -> Result<(), IpcError>;
+#[tauri::command] async fn transfer_respond(state: State<'_, AppState>, transfer_id: TransferId, accept: bool, remember: Option<bool>) -> Result<(), IpcError>;
 #[tauri::command] async fn transfer_list(state: State<'_, AppState>) -> Result<Vec<TransferSnapshot>, IpcError>;
 
 // ─────────── plugins ───────────
@@ -639,6 +639,10 @@ iframe 若经父窗口转发，可继续使用 `connect-src 'none'`；原生独�
 ---
 
 ## 9. 实现清单
+
+> **2026-10-29：接收回应和记住偏好的Native配套（应用443ba7c）。** 有效问题只回应一次，保存失败不提交接受，配置变化通知前端；无人回应120秒后拒绝，队列32项，列表256个有效设备ID，取消配对与接受核对串行。
+> 每个问题独立锁，持久化不占注册表锁；提示退休先于ID复用，阻止旧清理误删新对象。回应/取消配对Tauri命令显式在线程池执行。
+> 374项Rust库测试、默认check、无默认全目标Clippy、修改的8个文件格式和8项shapes通过；没有重建EXE或声称真实双设备完成。失败/并发/重启证据与准确范围见[第九批记录](./history/2026-10-29-transfer-consent.md)，下一步继续设置分类与局部恢复。
 
 > **2026-10-29：全局接收确认的前端反馈与恢复（应用67d9868）。** 排队对象与授权选择隔离，失败保留请求并就近显示，回应成功后等待权威状态；手动检查只读且防止旧读取恢复已结束记录。
 > 445项/46文件前端测试、全量lint、生产构建和8项shapes通过；桌面/390px隔离样例检查生产组件，临时页面已清理。本批未改Rust或重建EXE。
