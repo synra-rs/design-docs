@@ -1,6 +1,6 @@
 # Synra UI 交互设计梳理
 
-> 日期：2026-10-29。交付类型：**研究、现状审查与后续实施设计**；本轮没有改应用代码。
+> 日期：2026-10-29。本目录包含研究、现状审查与实施设计；**当前开发进展见[11](./11-current-progress.md)**。
 > 参考：[Folo](https://github.com/RSSNext/Folo)，重点是交互与信息组织；保留 Vue 3、Ant Design Vue、UnoCSS、`@synra/theme`。
 > 现状基线：`synra-app@759af79`；Folo 源码基线：`68edee907003a90877f2ffa6bd9ed9bedababfd4`。
 
@@ -43,7 +43,8 @@ Folo 提供交互思路；列表、卡片、分栏、就地展开、Drawer 都�
 | [08 · 设置与系统界面](./08-settings-and-system-surfaces.md) | 设置分类、通知、确认、托盘及独立插件页面如何一致 |
 | [09 · 视觉与组件约定](./09-visual-and-components.md) | 保留组件库时，如何降低噪声并维护可读性 |
 | [10 · 实施与验收](./10-delivery-and-acceptance.md) | 按什么批次做，怎样避免功能丢失与性能退化 |
-| [截图索引](./evidence/README.md) | 本轮保存的 12 张原始截图、步骤与限制 |
+| [11 · 当前开发进展](./11-current-progress.md) | 哪些已实现，接下来做什么，与设计/历史分开记录 |
+| [截图索引](./evidence/README.md) | 最初研究保存的 12 张原始截图、步骤与限制 |
 
 实现一页前先读 00，再读 03、04 与对应页面候选方案，最后以 10 验收。01、02 是设计依据，不是要重新执行的开发步骤。
 
