@@ -504,6 +504,9 @@ Grid 主轨道采用 `minmax(0, 1fr)`，对应子项允许收缩；长内容在�
 多语言窄屏验收须同时比较主内容区的 `scrollWidth` 与 `clientWidth`，不能只检查文档没有横向溢出。
 安装输入与操作按钮在空间不足时换行，避免输入框被挤窄或内容区出现不必要的横向滚动。
 
+依据：[Microsoft NavigationView](https://learn.microsoft.com/en-us/windows/apps/develop/ui/controls/navigationview)、
+[MDN overflow](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/overflow)。
+
 ### R55 · 说明文字退居次级，高级内容按需展开（MUST）
 
 说明使用共享 `inkDim` 和小字号，不与标题、操作或错误争夺注意力；不得靠局部色值绕过主题。
@@ -511,8 +514,15 @@ Grid 主轨道采用 `minmax(0, 1fr)`，对应子项允许收缩；长内容在�
 设备密钥、注册表、诊断和性能等内容默认折叠；身份异常及必须处理的警告仍须展开可见。
 性能轮询只在高级设置展开期间运行，收起或卸载即停止。
 
-依据：[Microsoft NavigationView](https://learn.microsoft.com/en-us/windows/apps/develop/ui/controls/navigationview)、
-[MDN overflow](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/overflow)。
+### R56 · 主程序是通用宿主，具体功能属于插件（MUST）
+
+主程序固定界面仅包含设备发现与配对、插件安装和权限管理、应用设置与诊断，以及通用任务/传输记录和必要控制。
+分享内容、读取剪贴板、发送文字或文件、打开接收文件等具体业务入口应由插件页面提供，不内置在首页或设备列表。
+运行插件页面的“打开”、任务授权/拒绝、传输取消属于宿主管理，不属于具体插件业务。
+
+首页可展示连接情况、已接收/已完成等状态、插件标识、调用记录和接收文件元数据，预览数据也可保留。
+此类记录中的插件名不代表插件能指定首页 UI 位置，也不能据此硬编码对应功能。
+共享内核、传输服务和平台适配能力仍是插件运行基础设施；这条边界约束宿主的固定产品界面。
 
 ---
 
