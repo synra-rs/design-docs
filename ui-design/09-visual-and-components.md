@@ -95,9 +95,9 @@ Tooltip 不能是屏幕阅读器名称的唯一来源；aria-label 应有当前�
 | 设计原语 | 优先组件 | 本地封装的职责 |
 | --- | --- | --- |
 | PageHeader / 分组工具栏 | 现有布局 utility＋AButton | 标题、动作槽、换行，不读业务 store |
-| 对象行 / ActivityRow | AList、ATag、AButton、ASwitch、AProgress | 统一排版与可见性，不管理第二份任务状态 |
+| 对象摘要 / ActivityRow | 布局 utility；按需使用 AList、ATag、AButton、ASwitch、AProgress | 行、卡片、面板按任务选择；统一排版与可见性，不管理第二份任务状态 |
 | RowActions | ADropdown＋AMenu＋ATooltip | 共享动作、名称、busy、事件边界 |
-| 对象详情 | ADrawer＋ATabs/ADescriptions/ACollapse | 焦点、对象选择、延迟内容与窄屏布局 |
+| 对象详情 | 就地内容或独立页；按需使用 ADrawer、ATabs、ADescriptions、ACollapse | 按信息量选择容器；处理焦点、对象选择、延迟内容与窄屏布局 |
 | SettingRow | 表单标签＋输入/开关/选择 | label关联、必要说明、错误位置 |
 | HelpText / HelpTrigger | 现有 HelpText＋ATooltip/APopover | 非必要说明按需出现 |
 | ConfirmAction | AModal；简单无额外选择可沿用APopconfirm | 对象、后果、默认选择、确认中状态 |
