@@ -1,5 +1,7 @@
 # 01 · Folo 参考研究
 
+> 参考资料库，不是需要逐项迁移的功能清单。采用与否以 [00 · 专业软件的完成度](./00-product-quality-bar.md) 和当前页面任务判断。
+
 ## 1. 研究范围与可信度
 
 日期：2026-10-29。查阅 [Folo 仓库](https://github.com/RSSNext/Folo) 与 [公开 Web 应用](https://app.folo.is/)。
