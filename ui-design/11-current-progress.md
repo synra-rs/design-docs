@@ -1081,6 +1081,39 @@ return messages.notices.generic
 
 **这一轮没有改动。**
 
+### 16.34 同一段查找写了两遍（已合并）
+
+16.33 判了「if 链比查表稳」，这一轮反过来把**所有查表的地方**列出来，看还有谁在查：
+
+```
+ErrorNotice.vue:12   messages.actions[action.kind]
+ErrorNotice.vue:17   messages.actions[action.kind]
+ErrorNotice.vue:67   messages.kernelErrors[props.message ...] ?? messages.errors[props.code ...] ?? unknown
+HomePage.vue:593     messages.kernelErrors[error.message ...] ?? messages.errors[error.code ...] ?? unknown
+```
+
+前两条是动作标签（16.31 已守）。**后两条是同一段逻辑，一字不差地写在了两个文件里**，而 `HomePage` 那份的注释自己写着：
+
+> The same lookup `ErrorNotice` does, and for the same reason
+
+**"same lookup" 就是问题所在。** 三行 `??` 链，两个地方要保持一致：查找顺序是**决定**而不是细节（key 比 code 具体，code 比什么都没有具体）。谁哪天在 `ErrorNotice` 里加一层（比如从 `params` 取一段），`HomePage` 那份不会跟——**同一类失败在两个屏幕上得到两种解释**，比任何一种解释都糟。
+
+**合成一个函数**，放在 `messages/errors.ts`（三张表都在那个文件里）：
+
+```ts
+export function errorSentence(code: string, message?: string | undefined): string {
+  return (message === undefined ? undefined : kernelErrors[message as keyof typeof kernelErrors])
+    ?? errors[code as keyof typeof errors]
+    ?? errors.unknown
+}
+```
+
+`ErrorNotice` 变成 `errorSentence(props.code, props.message)`，`HomePage` 变成 `errorSentence(error.code, error.message)`。
+
+**`message` 声明为可选**，因为不是每个拒绝都带 key——`from_synra_error` 能构造就构造，构造不出时只有 code。
+
+**门禁**：490 条测试不增不减（这是重构，行为不变）、lint 0、check 8 项。
+
 ## 17. 下一步：继续整理页面与恢复流程
 
 | 顺序 | 工作 | 当前边界 |
