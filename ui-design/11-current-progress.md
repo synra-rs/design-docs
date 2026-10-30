@@ -486,6 +486,8 @@ antd 打开弹层时会记下 `document.activeElement`，关闭时**默认归还
 
 **另外 12 处 `truncate` 的判断**（都不改，理由各不同）：`peerName`、`displayName`、`platform`、`version` 是短标识且用户可改；`SearchPalette` 的 `item.label` 是页面名，标题旁就是它的全称；`SettingsDiagnostics` 的 `seriesKey` 是图表序列的短键；`HomePage` 传输行的 `fileName` 在行内仍可读到完整值所在的那次传输。
 
+**验证方式**：假内核的 `plugins_publishers` 固定返回 `[]`，是刻意的空状态，所以**只有测试证据，没有截图**。测试断言指纹 span 的 class 里没有 `truncate`、且 `title` 是完整值。原来那条测试用的是 `AB12 CD34 EF56 7890`——短到截不截断都过，**测不出问题**，现在补了 class 断言。
+
 ### 16.11 反查：该截断的有没有没截断，以及一处漏掉的 `title`
 
 上两条查的是"截断后拿不到完整值"，这条反过来查"有没有该约束却没约束的长内容"。
@@ -504,9 +506,25 @@ function deviceName(deviceId: string): string {
 
 **设备不在 store 里时它回退成 deviceId 本身。** 也就是说，一台未登记的候选设备，那一行里**唯一的文字就是这段 UUID**，而它正好被截断。两台同名设备也只能靠这段 id 区分，同样被截断。
 
-补 `title` 就够了——截断保留（行不该被长 id 撑开），但完整值随时可取。测试断言 `title` 等于完整 deviceId。
+补 `title` 就够了——截断保留（行不该被长 id 撑开），但完整值随时可取。测试断言 `title` 等于完整 deviceId。假内核的候选数据来自 `INTENT`，那个 fixture 的 `candidates` 是空数组，所以这一行同样**只有测试证据，没有截图**。
 
-**验证方式同上一条**：假内核的 `plugins_publishers` 也固定返回 `[]`，同样刻意的空状态，所以**只有测试证据，没有截图**。测试断言指纹 span 的 class 里没有 `truncate`、且 `title` 是完整值。原来那条测试用的是 `AB12 CD34 EF56 7890`——短到截不截断都过，**测不出问题**，现在补了 class 断言。
+### 16.12 `08` 设置与系统面：三处核对
+
+换一种查法——`05`（首页）那条线查完了，改看 `08` 整章。九节里挑了三处容易"写了但没做"的：
+
+**§3 切分类时的草稿（通过）**。原文要求"暂存在当前会话""真正离开设置时提供保存/放弃选择，不能静默丢失或偷偷提交"。实现是 `v-show` 切分类（内容不卸载，草稿天然保住）加 `onBeforeRouteLeave`（`leaveOpen` 弹层，`saveAndLeave` 走保存后离开，`resolveLeave(false)` 走放弃/取消）。**两半都在**。
+
+**§7 通知跳转插件详情（通过）**。原文要求"真正打开目标详情，不只把插件页滚到顶"。`NoticeHost` 走 `?plugin=`，插件页的 `targetPluginId` 接住，测试覆盖了新进入、同页切换、目标不存在三种情况。
+
+**§6 指标"不支持"与"为空"（判断不了）**。原文："指标不支持与指标为空分开"。查下来：
+
+- `MetricsSnapshot` DTO 只有 `values`、`overflowedTotal`、`maxSeriesPerMetric`，**没有表达"不支持"的字段**
+- 文案只有 `empty: 'No metric has been recorded yet.'`，**没有"不支持"这一类**
+- `diag_metrics` 的实现不在这个仓库（`command.rs` 只有命令契约），看不到内核在什么条件下会拒绝
+
+界面上 `metricsEnabled` 是**可见性**（分类激活 + 面板展开 + 窗口可见），不是能力判断；空列表一律显示"还没记录过指标"。
+
+**所以这条要么已经隐含满足（内核从不"不支持"），要么缺一个真实场景，而我无法从这个仓库判断是哪种。** 不是遗漏，是证据不足——把它留在这里，比修改一个我理解不透的语义安全。
 
 ## 17. 下一步：继续整理页面与恢复流程
 
