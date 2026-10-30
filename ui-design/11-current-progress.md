@@ -943,6 +943,35 @@ messages.kernelErrors[props.message] ?? messages.errors[props.code] ?? messages.
 
 **门禁**：483 条测试（+12）、lint 0、check 8 项。
 
+### 16.29 命令契约与假内核：这个检查已经在，而且比我要写的稳
+
+16.28 用"两份清单对差集"找到 14 个错误码，这一轮想用同一个办法查另一对——**内核 `command.rs` 声明的命令，和前端实际调用/假内核应答的命令**。
+
+翻进去发现**这件事已经做了**，`src/ipc/commands.test.ts`：
+
+```ts
+function declaredArities(): Map<string, Arity> {
+  // 正则读 command.rs 的 `"name" => Domain, Interface, Arity, mutate` 行
+}
+```
+
+然后对 `ANSWERED` 表里每条命令断言 `arities.get(command)` 有值——**假内核能答一条契约里没有的命令，测试就红**（注释原话：`Not a skip: ... the fake inventing a command`）。
+
+**它还处理了我这几轮反复栽的那个坑**：解析出问题时不静默跳过，而是主动抛错——
+
+```ts
+if (arities.has(name))
+  throw new Error(`${name} was parsed twice from ${CONTRACT_RS}; the table's format has changed`)
+if (arities.size === 0)
+  throw new Error(`no commands were parsed from ${CONTRACT_RS}; ...`)
+```
+
+**解析器坏了会说"我坏了"，不会说"没发现问题"。** 这正是 32 轮那次缺的东西（正则跨标签导致 80 个假命中），也是 44 轮那次缺的东西（大括号栈没弹导致上百个假缺失）。
+
+**顺手核了一个硬编码数**：`DECLARED_COMMANDS = 60`，注释说 `registration.test.ts` 从另一侧钉住它。数了一遍 `command.rs`，**实际 60 条，对得上**。
+
+**这一轮没有产出修改。** 产出是一个判断：这套「清单对清单」的检查在这个仓库里不是空白，命令这一侧已经做得很完整，只有文案那一侧漏了（16.28 补的）。
+
 ## 17. 下一步：继续整理页面与恢复流程
 
 | 顺序 | 工作 | 当前边界 |
