@@ -1197,6 +1197,30 @@ ref<{ code: string, message: string, actions?: readonly SuggestedAction[] | unde
 
 **这一轮没有改动。** 16.36 那处修完之后，这一类（模板定死单位导致量级失真）在这个仓库里没有第二例。
 
+### 16.38 想在浏览器里看到那个体积，看不到
+
+16.36 修的是安装预览的体积单位。前几轮都是读代码加单元测试，这一轮想换一种验证方式：**真在浏览器里把它看一遍。**
+
+**结果看到一半。** 起了 dev（`5180`），打开 `/#/plugins`，点「Install plugin」——安装区出现了，两种来源（从目录、从注册表）都在：
+
+```
+region "Install plugin"
+  LabelText "From a directory"    @e12 radio [checked]
+  LabelText "From the registry"   @e14 radio
+  @e16 textbox "Directory to install from"
+  @e17 button "Install" [disabled]
+  @e18 button "Choose folder"
+  @e19 button "Choose package"
+```
+
+切到「From the registry」后输入框变成 `Plugin id, e.g. @acme/hello`。**两种来源都没有直接给出体积**——预览是按了 Install 之后、内核回 `plugins_preview` 才有的，而假内核在浏览器里对这一条没有固定应答。
+
+**所以「87 KB 现在显示成 87.0 KiB」这件事，我是靠 `format.test.ts` 那 11 条断言证明的，不是在画面上看到的。** 单元测试比截图更硬（它断言了十一个输入），但它证明的是函数，不是页面接线；页面接线这一层，只有代码阅读（`L211` 调用 `formatBytes(preview.sizeBytes)`，模板去掉了 `MiB`）。
+
+**记下这个边界，免得以后有人以为这一条有截图证据。**
+
+**顺带记一个我自己的操作失误**：为了找 `sizeBytes` 在哪儿定义，我跑了 `grep --include=*.ts`，结果零命中——**因为那个表达式在 `.vue` 文件里**。上一轮刚在文档里写过「正则能数出行，数不出结构」，这一轮又栽在同一类事上：**限定范围时把它要找的东西排除掉了。** 直接 `read` 那几行，一秒就看到了。
+
 ## 17. 下一步：继续整理页面与恢复流程
 
 | 顺序 | 工作 | 当前边界 |
