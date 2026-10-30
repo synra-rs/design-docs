@@ -1051,6 +1051,36 @@ fn code_key(code: ErrorCode) -> String {
 
 **顺带一个查询技巧**：`Select-String -Pattern '"error\.[a-z]+[A-Z]\w*"'` 这类正则会被 `error.aB`（测试里的变量名拼出来的字符串）之类的东西污染。判断"内核写出哪些 key"不能只看匹配结果，要看它出现在**生产代码还是 `#[cfg(test)]`**——`error.capability_denied` 那三条命中全在 `mod tests` 里。
 
+### 16.33 `NoticeHost` 用 if 链而不是查表，所以没有同类缺口
+
+16.32 收尾了 `ErrorNotice` 的三个输入。照同一类组件找下一个：`NoticeHost` 是提示（notice）的呈现，也在按 message 找文案。
+
+**结构不同，而且更稳。** `headline` 是一串 `if (value.message === 'notice.xxx') return ...`，最后一行是兜底：
+
+```ts
+return messages.notices.generic
+```
+
+**没有索引访问，所以不存在"表里没有就 `undefined`"那种形状。** 未知 key 落在一句通用的话上。
+
+**那这句兜底会不会被用户看到？** 查了生产代码（排除 `#[cfg(test)]`）：
+
+| 发出方 | notice key |
+| --- | --- |
+| `deeplink.rs` | `unknownLink` |
+| `shell.rs` | `dropIgnored`、`installed`、`updated`、`alreadyInstalled`、`newerInstalled` |
+| `commands/plugins.rs` | `updated` |
+| `commands/plugin_updates.rs` | `updates` |
+| `listener.rs` | `received` |
+
+**八种，`headline` 八种都有分支，一个不漏。** 内核自己不产生 notice——`synra-ipc` 里唯一一条 `notice.something` 是测试值。
+
+**所以 `generic`（"The kernel has something to say."）目前走不到。** 它是一句没信息量的话，但一句**永远不显示**的没信息量的话，不构成 `04 §6` 那类问题。
+
+**顺带核了 `showAction`**：它把五种"包类"通知列出来给"去插件页"的入口，`unknownLink` 不在其中（它是个坏链接，跳过去没有意义），`received` 也不在（文件已经到手）。这两处"没有按钮"是对的，不是漏。
+
+**这一轮没有改动。**
+
 ## 17. 下一步：继续整理页面与恢复流程
 
 | 顺序 | 工作 | 当前边界 |
