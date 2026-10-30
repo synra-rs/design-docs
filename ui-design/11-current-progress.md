@@ -283,8 +283,8 @@ F 的验收里有一句“测量后决定虚拟化/分页”。补上这个结�
 
 **B. 核对通过、没有改动的**
 
-`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.44`
-——覆盖 `03 §4/§5/§6`、`04 §4.3/§5/§6`、`06` **全章**、`07 §2/§5.2/§5.3/§6/§8`、`08` 各节、`09 §7/§8`、命令契约与假内核一致性、`NoticeHost`、`healthLabel`。
+`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.45`
+——覆盖 `03 §4/§5/§6`、`04 §4.3/§5/§6`、`06` **全章**、`07 §2/§5.2/§5.3/§6/§8/§9`、`08` 各节、`09 §7/§8`、命令契约与假内核一致性、`NoticeHost`、`healthLabel`。
 
 **C. 自己推翻自己的（过程记录，比结论更该读）**
 
@@ -1472,6 +1472,46 @@ left.every(capability => right.includes(capability))   // permissionChanged 用
 > `network:fetch:<host>` grants, so the call either reaches the network the user allowed…
 
 **能力是否需要"范围判定"由内核决定，界面把 `net:fetch:api.github.com` 当成一个不可拆的字符串。** 谁在界面上按冒号切分去猜，就会把"只允许 github"读成"允许所有网络"——这正是 `§2` 那句禁令针对的东西。
+
+### 16.45 `07 §9`：发现区的三种空状态真的分开了
+
+`§9` 有一句具体到能一眼照做的：
+
+> 无匹配与列表加载失败、**没有注册表配置**是三种状态；**不要都画"暂无插件"**
+
+**三种里前两种（通过）**。`PluginsPage` 的三段互斥：
+
+| 条件 | 显示 |
+| --- | --- |
+| `searched && !busy && !error && results.length === 0` | `catalog.empty`（搜过，没匹配） |
+| `!searched && !busy && !error` | `catalog.idle`（还没搜过） |
+| `catalogError` | `ErrorNotice`（带原因和恢复入口） |
+
+代码注释自己引用了 `§9`：
+
+> The three states are separate on purpose… **never searched, searched with no match, and failed are not "no plugins"**, and only the first one can still offer the local install path.
+
+**「加载失败」不是一句"暂无"，是一条 `ErrorNotice`**——它有 code、message 和可执行动作。
+
+**第三种（"没有注册表配置"）查得绕了一段弯路，记下来**：
+
+我先在 `registry_install.rs` 找到 `"no registry is configured for \`{package}\`"`，配的是 `ErrorCode::Unsupported`，一度以为界面会说成"此版本暂不支持"。**但那一段是安装路径，不是检索路径**（`§9` 管的是搜索与发现）。
+
+回到 `catalog.rs` 才看清真正的形状：检索只有两个出口——
+
+```rust
+match client.packument(package, now_ms) {
+    Ok(fetched) => Ok(...),
+    Err(CatalogError::Unreachable { attempts, .. }) => Refusal::new(DeviceOffline, "no registry answered for ..."),
+    Err(error) => Refusal::new(Unsupported, error.to_string()),
+}
+```
+
+**`Unsupported` 这里是兜底，它的 message 是一句完整的话（不是 message key），带上了真正的失败原因。** 而 `catalog.rs` 开头的注释说明了为什么"没配置注册表"在检索这一侧不常见：
+
+> `RegistryConfig`'s default is the public registry, and the answer depends on whether there is a network.
+
+**所以我判为满足**：用户看到的是一句具体原因（或"没有注册表应答"+ 每个镜像的失败描述），不是"暂无插件"。**但这第三种状态是靠兜底分支承载的，没有专门文案**——记在这里，比声称"三种都分得干干净净"准确。
 
 ## 17. 下一步：继续整理页面与恢复流程
 
