@@ -1014,6 +1014,43 @@ pub health: String,
 
 **门禁**：490 条测试（+7）、lint 0、check 8 项。
 
+### 16.32 `kernelErrors` 八个键里六个是历史残留——但不是缺陷
+
+16.31 补了动作文案的守卫，这一轮照同一条路查第三个表：`ErrorNotice` 的查找顺序是 `kernelErrors[message] ?? errors[code] ?? unknown`，前两个表都由索引访问，都不报错。
+
+**`errors[code]` 那条已经在 16.28/16.31 有守卫了。这一轮查 `kernelErrors[message]`。**
+
+**先追 message key 是怎么生成的**，答案在 `synra-ipc/src/error.rs:261`：
+
+```rust
+/// The `snake_case` name of an error code, which is what its message key ends with.
+///
+/// Derived from serde's own serialisation so the key and the wire code cannot disagree: a hand-written table
+/// would be one more place to update when a code is added.
+fn code_key(code: ErrorCode) -> String {
+    serde_json::to_value(code).ok().and_then(|v| v.as_str().map(str::to_owned)).unwrap_or_else(|| "unknown".to_owned())
+}
+```
+
+配合 `L222` 的 `format!("error.{}", code_key(error.code))`——**message key 就是 `error.<serde 名>`，也就是 `error.not_paired`、`error.plugin_not_installed` 这种蛇形**。而且它从 serde 派生，加了新 code 自动有 key，**不存在手工表漂移**。
+
+**这一下把 `kernelErrors` 的形状照出来了**。它的键是驼峰：`identityHistoryMissing`、`badArgument`、`bridgeFailed`、`capabilityDenied`、`commandNotFound`、`storeUnavailable`、`timeout`、`unsupported`。
+
+| 键 | 会不会被 `code_key` 生成 | 结论 |
+| --- | --- | --- |
+| `timeout` | 会（单字 code 序列化后无下划线） | 有效 |
+| `unsupported` | 会 | 有效 |
+| `badArgument`、`bridgeFailed`、`capabilityDenied`、`commandNotFound`、`storeUnavailable` | **不会**（会生成 `bad_argument`…） | **永远匹配不上** |
+| `identityHistoryMissing` | 不会，但它是 `src-tauri` 里**手写**的 `IpcError::new(code, "error.identityHistoryMissing")` | 有效，且是唯一一处不改写 code 的地方 |
+
+**所以这六个驼峰键是死代码。** 但它们**不造成缺陷**：匹配不上就落到 `errors[code]`，而那条在 16.28 已经补到十一个可操作 code——**界面不会因此说「That did not work.」**
+
+**为什么仍是残留而不是隐患**：`code_key` 的注释把道理讲透了——手写表是"多加一个要更新的地方"。这六个键正是那张手写表留下来的。
+
+**这一轮没有改代码。** 删掉六个键是纯清理，风险是万一某处真的按驼峰构造了 key；收益是少一处会让人误以为还有第二条查找路径的东西。**记在这里，不动手。**
+
+**顺带一个查询技巧**：`Select-String -Pattern '"error\.[a-z]+[A-Z]\w*"'` 这类正则会被 `error.aB`（测试里的变量名拼出来的字符串）之类的东西污染。判断"内核写出哪些 key"不能只看匹配结果，要看它出现在**生产代码还是 `#[cfg(test)]`**——`error.capability_denied` 那三条命中全在 `mod tests` 里。
+
 ## 17. 下一步：继续整理页面与恢复流程
 
 | 顺序 | 工作 | 当前边界 |
