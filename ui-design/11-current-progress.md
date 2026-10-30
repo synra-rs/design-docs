@@ -362,7 +362,28 @@ F 的验收里有一句“测量后决定虚拟化/分页”。补上这个结�
 
 所以这条的正确结论是：**200% 缩放下（等效 952 宽）rail 形态正常**，证据见 `evidence/2026-10-30-states/04`。而"952×243"那个结果没有产品意义，不该拿来当证据，也不该拿来报缺陷。
 
-### 16.6 切换语言不丢草稿（实测通过）
+### 16.6 弹层关闭后的焦点归还：代码路径成立，但我没能实测出来
+
+`10 §6` 弹层维度有一条"焦点归还"，`04 §4.1` 也要求没有不可见的焦点目标。
+
+**先查了实现的三种可能**：
+
+1. 插件页 `closeRemoval()` 只写 `removing.value = undefined`，**没有显式 `.focus()`**——第一眼像是漏了。
+2. 但 `@synra/theme` 里另外三处（PairingPanel、SearchPalette、TransferPrompt）都显式写了焦点转移，说明这个项目在意这件事。
+3. 关键在 `node_modules/ant-design-vue/es/vc-dialog/Dialog.js:58`：
+
+```js
+if (props.mask && lastOutSideActiveElementRef.value && props.focusTriggerAfterClose) {
+  lastOutSideActiveElementRef.value.focus({ preventScroll: true });
+```
+
+antd 打开弹层时会记下 `document.activeElement`，关闭时**默认归还**（`focusTriggerAfterClose` 默认 true）。所以 `closeRemoval()` 不写 `.focus()` 是**对的**——手写反而会覆盖记录值。这也解释了为什么其他三处会写：它们不是 Modal，是自定义面板。
+
+**但我没能把这一步实测出来**：尝试了 Escape 后截图看 Remove 按钮有没有焦点环、Tab 与 Shift+Tab 判断落点，都没得到确定结论。BSK 的 `press` 不接受 `Shift+Tab` 组合（实际只发了 Tab），而焦点环又依赖 `:focus-visible`，鼠标点击触发的归还**不显示环**。
+
+**结论**：按代码路径判断应当正常，但没有实测证据。这条标为"代码确认、未实测"，不写成通过。
+
+### 16.7 切换语言不丢草稿（实测通过）
 
 `10 §6` 语言维度那条的原文是"打开弹层时切换语言且不丢草稿"。**弹层开着时够不到设置页**，所以按字面测不了。取它真正要保的性质：**界面上有一份没保存的输入时，换语言不能把它冲掉**。设置页的名称草稿正好是这个场景。
 
