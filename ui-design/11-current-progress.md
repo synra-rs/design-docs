@@ -668,6 +668,37 @@ const currentTask = computed(() => pairing.snapshot && (pairing.active || pairin
 
 `§2` 还有两处不在本仓库：扫描器本身的行为（`devices_scan_*`）与真实网络发现，属于内核。
 
+### 16.20 `06 §3`/§4.2 两个入口：这次是找反例，没找到
+
+前几轮的写法是"逐条核对、记录通过"。这一轮换了方向：**假设某条没实现，去找它**。挑的是最容易被改版弄丢的三条。
+
+**页头入口仍能导出邀请（没丢）**。`§3 L50` 特意写了一句"无目标设备时导出邀请的现有能力要保留，不能因为改成列表行入口而丢失"——这句话本身就是在防一种具体的退化。`PairingPanel` 第一步的默认值是：
+
+```ts
+const step = ref<'create' | 'accept' | 'reply'>(props.selected ? 'accept' : 'create')
+```
+
+没有选中设备时默认落在 `create`（生成邀请），**页头入口的能力还在**。
+
+**只有 listen/connect 要求目标（没强制选设备）**。`cannotStart` 的条件包含 `!props.selected`——但这只挡住 `listen` / `connect`；生成邀请不需要目标。`§3 L51` 那句"不把每一步都强制先从发现列表选择"成立。
+
+**附近设备入口给出名称与完整 ID（没漏）**。`PairingPanel:119`：
+
+```vue
+{{ messages.devices.pairingSelected(selected.displayName, selected.deviceId) }}
+```
+
+两个都传了。`selected` 是 `devices.get(id)` 拿到的完整 `DeviceCard`，不是只带名字的简化对象。
+
+**信任提示确实在界面上（不是只写在文档里）**。`§4.2 L65` 要求向用户说明网络发现不能验证身份，查文案：
+
+> Only import content received directly from the intended device through a trusted channel. **Network discovery cannot verify its identity.**
+> 请仅导入通过可信渠道从目标设备直接获得的内容；**网络发现无法验证设备身份**。
+
+中英都有，且渲染在选中设备信息下方（`HelpText`）。
+
+**这一轮找不到反例。** 三条都是我预期可能出问题的地方，都站住了。
+
 ## 17. 下一步：继续整理页面与恢复流程
 
 | 顺序 | 工作 | 当前边界 |
