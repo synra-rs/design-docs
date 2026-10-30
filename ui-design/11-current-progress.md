@@ -283,8 +283,8 @@ F 的验收里有一句“测量后决定虚拟化/分页”。补上这个结�
 
 **B. 核对通过、没有改动的**
 
-`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`
-——覆盖 `03 §4/§5/§6`、`04 §4.3/§5/§6`、`06` **全章**、`08` 各节、`09 §7/§8`、命令契约与假内核一致性、`NoticeHost`、`healthLabel`。
+`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`
+——覆盖 `03 §4/§5/§6`、`04 §4.3/§5/§6`、`06` **全章**、`07 §5.2`、`08` 各节、`09 §7/§8`、命令契约与假内核一致性、`NoticeHost`、`healthLabel`。
 
 **C. 自己推翻自己的（过程记录，比结论更该读）**
 
@@ -1265,6 +1265,37 @@ region "Install plugin"
 **记下这个边界，免得以后有人以为这一条有截图证据。**
 
 **顺带记一个我自己的操作失误**：为了找 `sizeBytes` 在哪儿定义，我跑了 `grep --include=*.ts`，结果零命中——**因为那个表达式在 `.vue` 文件里**。上一轮刚在文档里写过「正则能数出行，数不出结构」，这一轮又栽在同一类事上：**限定范围时把它要找的东西排除掉了。** 直接 `read` 那几行，一秒就看到了。
+
+### 16.39 `07 §5.2`：预览没说成已验证，能力清单在正文里
+
+`07` 十节此前只核过 §7（发布者）。这一轮看 §5.2，它的标题本身就是一条禁令：
+
+> 不把"预览"说成"已验证"
+
+**预览里没有可信勾选（通过）**。安装预览弹窗（`PluginsPage.vue:179-214`）依次是：名称·版本、发布者、目录键、能力清单、UI/headless、体积。**没有任何表示"已验证"的标记**，上方的注释把边界写死了：
+
+> The preview is the publisher's own claim — **the signature is checked on the bytes** — and it is a question, not an approval: the plugin still lands switched off and untrusted.
+
+**能力清单是完整列表、在正文里（通过）**。`v-for` 逐条列出 `preview.capabilities`，不是折进 tooltip、也不是只在 hover 出现；没有能力时给一句 `preview.none`。
+
+**「缺构建产物要明确提示」——这条要求落在另一处（通过，但机制不是安装报错）**。前端文案表里搜不到 `ui.zip` 或构建产物的专门句子，一开始以为缺。追下去发现提示不在安装报错里，在**安装后的插件状态**里：
+
+```rust
+fn state_reason(...) -> Option<String> {
+    ...
+    if state_word == "unreadable" { return Some("its manifest could not be read".to_owned()) }
+    if state_word == "faulted" { return Some(refused.map_or_else(|| "it failed to start".to_owned(), str::to_owned)) }
+    ...
+    if state.plugins.is_none() { return Some("this build has no plugin engine".to_owned()) }
+```
+
+这段的注释（`plugins.rs:983`）说得比文档还准：
+
+> Without it `unavailable` covers a crash loop, a missing artifact and a build without an engine, and **the user is sent to the wrong place**.
+
+`stateReason` 由 `PluginsPage:396` 渲染成一条 warning。**所以「缺产物」有句子，只是它讲的是"为什么这个插件不可用"，不是"你选错了目录"。** 这与 §5.2 的措辞（"在输入/结果处明确提示"）不完全一致，但目的达到：用户不会没有线索。
+
+**一处值得记的实现**：`stores/plugins.ts:84` 在收到 health 事件时，会把 `stateReason` 换成 `explanation`。看起来像"覆盖了具体原因"，但只在 `health === 'faulted'` 时发生——那时 `explanation` 正是"为什么被停用"，比旧快照的 `stateReason` 更新。**用更新的信息覆盖旧的是对的。**
 
 ## 17. 下一步：继续整理页面与恢复流程
 
