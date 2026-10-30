@@ -283,8 +283,8 @@ F 的验收里有一句“测量后决定虚拟化/分页”。补上这个结�
 
 **B. 核对通过、没有改动的**
 
-`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`、`16.40`、`16.41`
-——覆盖 `03 §4/§5/§6`、`04 §4.3/§5/§6`、`06` **全章**、`07 §5.2/§5.3/§6`、`08` 各节、`09 §7/§8`、命令契约与假内核一致性、`NoticeHost`、`healthLabel`。
+`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.42`
+——覆盖 `03 §4/§5/§6`、`04 §4.3/§5/§6`、`06` **全章**、`07 §5.2/§5.3/§6/§8(移除)`、`08` 各节、`09 §7/§8`、命令契约与假内核一致性、`NoticeHost`、`healthLabel`。
 
 **C. 自己推翻自己的（过程记录，比结论更该读）**
 
@@ -1369,6 +1369,39 @@ selection[outcome.value.pluginId] = [...outcome.value.granted]
 > Replacing the card locally as well would be a second description of the same change, and **the two would disagree the first time the kernel answered something other than what the click assumed**.
 
 **`§6` 六条至此全部核完，无缺陷。**
+
+### 16.42 `07 §8` 移除：先把结果取出来，再删行
+
+`§8` 的移除段有三句，最硬的一句是：
+
+> 移除前按对象阻止重复操作，失败仍可定位该插件；**界面不能因为先删行就吞掉残留清理错误**
+
+**这一条踩上去很像**：`remove()` 确实先删行（`pluginsStore.forget(plugin.pluginId)`），删了之后卡片就不在列表里了，后续的错误给谁看？
+
+**读下去才发现不会吞**。顺序是：
+
+1. `uninstall(...)` 返回 `outcome`——**回收量 `bytesFreed`、残留 `leftovers`、`dataKept` 都在这个返回值里**
+2. 删行（`forget`）
+3. 从 `outcome` 取 `freed`、`leftovers`，拼成句子写进页面级 `note`
+4. 重新读列表
+
+**关键在第 3 步：残留信息来自命令返回值，不来自那张已被删掉的行。** 注释把理由写在删行那行上面：
+
+> No event for a removal — there is no card for a plugin that no longer exists — so the store is told directly, then the list is read once. **Forgetting here rather than only reloading means the card disappears even if the read fails.**
+
+**「显示实际回收量/残留结果」（通过）**：
+
+```ts
+const freed = formatBytes(outcome.value.bytesFreed)
+const leftovers = outcome.value.leftovers ?? []
+note.value = leftovers.length > 0 ? `${kept} ${messages.plugins.leftBehind(leftovers.length)}` : kept
+```
+
+有残留时多一句，没有时只说结果。`leftovers` 在协议里是可选的（空时缺席），所以"没有"是普通情况而不是异常。
+
+**「删除数据选项每次打开都不勾选」（通过）**：`askRemove` 第一件事就是 `removeData.value = false`（`:941`）。
+
+**「失败仍可定位该插件」（通过）**：失败时写 `removalError` 并 `return`，**没有删行**（删行在失败分支之后），所以卡片还在，错误就贴在它上面。
 
 ## 17. 下一步：继续整理页面与恢复流程
 
