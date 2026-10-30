@@ -1149,6 +1149,41 @@ ref<{ code: string, message: string, actions?: readonly SuggestedAction[] | unde
 
 **顺便说一个过程错误**：第一次用正则数这十三处的字段时，`PluginsPage.vue:846` 报"字段为空"——因为它是多行字面量，字段写在下面三行。**正则能数出行，数不出结构。** 读那一处之后才确认十三个全都是完整的三字段。
 
+### 16.36 插件包体积用错了单位，87 KB 显示成「约 0.1 MiB」（已修）
+
+16.35 判了「纯搬运的重复不改」。这一轮换一类重复查：**同一种计算写了两处**——这类里有判断，会分叉。
+
+扫 `Math.round` / `toFixed` 时看到 `PluginsPage.vue:211`：
+
+```vue
+{{ messages.plugins.preview.size.replace('{size}', (preview.sizeBytes / 1_048_576).toFixed(1)) }}
+```
+
+**同一个文件已经导入了 `formatBytes`**（`:669`），并在四处用它（`:957`、`:994`、`:996`、`:1033`）。**只有安装预览这一处自己手算。**
+
+`format.ts` 的注释恰好写的就是这件事：
+
+> ★ Extracted when the plugin page needed the same sentence as the home page's transfer bar. **Two copies would round the same number differently the first time one of them changed**, and a size is exactly the kind of value users compare across screens.
+
+**注释说要防的事，文件里就留着。**
+
+| 输入 | `formatBytes` | 这一处 |
+| --- | --- | --- |
+| 512 B | `512 B` | `0.0`（模板补 MiB） |
+| 2 KiB | `2.0 KiB` | `0.0` |
+| 87 KiB | `87.0 KiB` | **`0.1`** |
+| 5 MiB | `5.0 MiB` | `5.0` |
+
+**不是理论问题**：`synra-plugin-starter` 实测 87 KB，正是这个仓库自己的示例插件。打开安装预览，「发布大小约 0.1 MiB」。
+
+**根因是模板自带单位**：`size: 'About {size} MiB, as published'` / `'发布大小约 {size} MiB'`。模板写死了 MiB，只能往里填 MiB 数，于是永远显示不了 KiB，1 MB 以下的包一律变成 `0.x`。
+
+**改法**：调用处用 `formatBytes(preview.sizeBytes)`，两个模板去掉 `MiB`——单位由 `formatBytes` 带出来，它本来就是干这个的。
+
+**补了 `format.test.ts`**（此前 `formatBytes` 没有任何直接测试）：十一个输入覆盖 B/KiB/MiB/GiB 边界，加一条断言「512 字节不能显示成 0.0」——就是这次踩的那个形状。
+
+**门禁**：501 条测试（+11）、lint 0、check 8 项。中途有两次全量运行各有 1 条无关测试超时（`settings-page` 的语言切换、`plugin-page` 的安装草稿），单跑均过，第三次全量 501 全绿。
+
 ## 17. 下一步：继续整理页面与恢复流程
 
 | 顺序 | 工作 | 当前边界 |
