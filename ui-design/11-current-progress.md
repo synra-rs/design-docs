@@ -641,6 +641,33 @@ const currentTask = computed(() => pairing.snapshot && (pairing.active || pairin
 
 用的是 `> 0`，不是真值判断。`0` 在这里走"未知时间"分支，而不是渲染成 1970 年。**第 22 轮我在任务行上正好踩过这个坑**（`startedAtMs: 0` 被 `v-if` 吞掉），这里原本就写对了。
 
+### 16.19 `06 §2` 扫描反馈：取消要等内核说停
+
+**未扫描不放进度区（通过）**。进度区的条件是 `v-if="scanning || scanReport || scanError"`，三者都假时整块不渲染。
+
+**扫描中按钮变「停止扫描」（通过）**。`v-if="scanState"` 是停止，`v-else` 是开始；`elapsed/total/scanId` 收在 `<details>` 里，不在列表上方摆三列技术指标。
+
+**失败时不伪装成本次成功（通过）**。文案 `scanFailedKnown` 写得很准：
+
+> Showing previously known devices. **This scan did not complete.**
+> 当前显示此前已知的设备，**本次扫描未完成**。
+
+不是"扫描失败"，是"这次没完成"——旧结果还在，但它不是这次的结果。
+
+**取消要等内核确认（通过，且这段值得单独记）**。`cancelScan()` 的顺序是：
+
+1. `await devices_scan_cancel` —— 取消请求被接受
+2. 失败就 `scanError` 并**直接 return**，不改任何状态
+3. `stopAccepted = generation === scanGeneration && scanId === id` —— 只记一个标记
+4. `await refresh()` —— 重新读内核
+5. 五个条件全成立才写 `scanReport = 'stopRequested'`，其中包含 **`!devices.scanning`**
+
+**第 4、5 步是关键**：接受取消不等于窗口已退出，界面不凭"命令返回 ok"就宣布停止，而是等内核回报的 `devices.scanning` 变假。
+
+**为什么值得记**：这段的正确性全在**顺序**上。以后谁把这五步合成"取消成功就清状态"，界面就会在内核还在扫描时说已经停了——而那正是 §38 点名要避免的事。`generation` 与 `scanId` 的双重比对也是防串：慢返回的旧请求不能影响新一次扫描。
+
+`§2` 还有两处不在本仓库：扫描器本身的行为（`devices_scan_*`）与真实网络发现，属于内核。
+
 ## 17. 下一步：继续整理页面与恢复流程
 
 | 顺序 | 工作 | 当前边界 |
