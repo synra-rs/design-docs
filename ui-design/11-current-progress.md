@@ -379,9 +379,11 @@ if (props.mask && lastOutSideActiveElementRef.value && props.focusTriggerAfterCl
 
 antd 打开弹层时会记下 `document.activeElement`，关闭时**默认归还**（`focusTriggerAfterClose` 默认 true）。所以 `closeRemoval()` 不写 `.focus()` 是**对的**——手写反而会覆盖记录值。这也解释了为什么其他三处会写：它们不是 Modal，是自定义面板。
 
-**但我没能把这一步实测出来**：尝试了 Escape 后截图看 Remove 按钮有没有焦点环、Tab 与 Shift+Tab 判断落点，都没得到确定结论。BSK 的 `press` 不接受 `Shift+Tab` 组合（实际只发了 Tab），而焦点环又依赖 `:focus-visible`，鼠标点击触发的归还**不显示环**。
+**但我没能把这一步实测出来**：尝试了 Escape 后截图看 Remove 按钮有没有焦点环、Tab 判断落点，都没得到确定结论。焦点环又依赖 `:focus-visible`，鼠标点击触发的归还**不显示环**。
 
-**结论**：按代码路径判断应当正常，但没有实测证据。这条标为"代码确认、未实测"，不写成通过。
+关于组合键，本批又试了一次：`bsk_interact press` 的 `modifiers` 字段按工具说明只作用于 hover 和 wheel，`press` 实际只发了单个 Tab。要想验证 Shift+Tab，得靠别的手段。
+
+**结论**：按 antd 源码路径判断应当正常，但没有实测证据。这条标为"代码确认、未实测"，不写成通过。**这不是缺陷报告，是能力边界的记录**——下一个有真机的人可以用一次 Tab 确认它。
 
 ### 16.7 切换语言不丢草稿（实测通过）
 
