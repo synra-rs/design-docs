@@ -836,8 +836,29 @@ label 只有名称——**看起来就是缺陷**。差点写下去。再翻到�
 - **取消中重复点击**：三处守卫，扫描 `cancellingScan`（`:245`）、遗忘 `forgetting`（`:301`、`:311`、`:325`）
 - **手机软键盘、真实双设备握手、系统剪贴板**：**没有第二台真机和移动端环境，验不了**。§8 最后一行原本就写了这个边界——"纯浏览器假内核只能证明界面流程与调用参数"。
 
-## 17. 下一步：继续整理页面与恢复流程
+### 16.25 `09 §7` 词汇表：两行与实现对不上，改的是文档
 
+`09 §7` 是一张中英对照表，八行。这一轮不是找缺陷，是**把表逐行拿去和代码对**，结果两行对不上。
+
+**「取消配对」英文写的是 Unpair，代码用的是 Forget**。
+
+文档：`取消配对过程 / 取消配对 | Cancel pairing / Unpair`
+代码：`pairingCancel: 'Cancel pairing'`，`forget: 'Forget'`，命令是 `devices_forget`
+
+**这次是代码更准。** `devices_forget` 做的不只是解除配对：它同时撤销对该发送者的自动接收偏好（16.23 已核）。`Unpair` 暗示一个对等的双向解除，而实际不是对等的。英文用 `Forget` 才对。
+
+**「更多操作」是个不存在的入口**。
+
+文档：`查看详情 / 更多操作 | View details / More actions`
+代码：`devices.ts:25`、`home.ts:61`、`plugins.ts:75`、`transfers.ts:15` 四处都是 `details: 'Details'` / `'详情'`
+
+没有 "More actions"，也没有菜单。行内是一个可展开的「详情」按钮（带 chevron），展开后是 `dl` 字段加行尾操作。`crash.ts` 用 `Show details` / `Hide details` 是因为它那两句话有展开与收起两种状态，和列表行的常驻标签不同语境。
+
+**两处都改了文档，没改代码。** 理由分别是：Forget 比 Unpair 准确；Details 在界面上够用（两个字加箭头，读得懂），是文档写宽了。
+
+**其余六行对上了**：导航四词（首页/Home、设备/Devices、插件/Plugins、设置/Settings）、`openAction: 'Open'` / `'打开'`、`receivedFiles`。另外 `actions.installPlugin: '打开插件'` 里的"打开"是导航，与插件 UI 的 `Open` 不同语境，不算冲突。
+
+## 17. 下一步：继续整理页面与恢复流程
 | 顺序 | 工作 | 当前边界 |
 | --- | --- | --- |
 | 1 | 设备库只增不减（内核） | 两处缺口：`devices_snapshot` 读持久化表不过 TTL；`forget_seen_devices_beyond` 生产代码零调用。两者一起修才治本 |

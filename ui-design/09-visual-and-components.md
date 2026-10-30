@@ -82,10 +82,10 @@ warning 只用于需要关注的变化，普通“有更新”不与“新增权
 | 设备 / 已配对 / 附近设备 | Devices / Paired / Nearby | 信任与发现分组 |
 | 插件 / 已安装 / 发现 | Plugins / Installed / Discover | 管理与查找 |
 | 打开 | Open | 打开独立插件 UI，不暗示重新启用 |
-| 查看详情 / 更多操作 | View details / More actions | 对象信息与操作入口 |
+| 详情 | Details | 对象信息入口。**没有"更多操作"菜单**：行内是一个可展开的「详情」按钮（带 chevron），展开后是 `dl` 字段与行尾的操作。文案表里 `devices`/`home`/`plugins`/`transfers` 四处都是 `Details`，同一语境下 `crash` 用 `Show details` / `Hide details` 因为它有展开/收起两种状态 |
 | 任务 / 进行中 / 接收记录 | Tasks / In progress / Received files | 不承诺尚未实现的持久历史 |
 | 权限 / 调用记录 | Permissions / Call history | 授权与能力审计，不混作任务结果 |
-| 取消配对过程 / 取消配对 | Cancel pairing / Unpair | 正在握手与撤销已建立关系 |
+| 取消配对过程 / 遗忘 | Cancel pairing / Forget | 正在握手与撤销已建立关系。撤销这一侧用的是 `devices_forget`，它会一并移除对该发送者的自动接收偏好，**不是一个对等的 "unpair"**，所以英文用 Forget 而不是 Unpair |
 
 所有新增宿主文案、图标名称、tooltip、确认按钮进入现有消息目录，两语言同批完成，格式化时间复用本地化工具。
 Tooltip 不能是屏幕阅读器名称的唯一来源；aria-label 应有当前对象与动作的可理解关系，如“打开 Starter”。
