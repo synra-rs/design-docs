@@ -486,6 +486,26 @@ antd 打开弹层时会记下 `document.activeElement`，关闭时**默认归还
 
 **另外 12 处 `truncate` 的判断**（都不改，理由各不同）：`peerName`、`displayName`、`platform`、`version` 是短标识且用户可改；`SearchPalette` 的 `item.label` 是页面名，标题旁就是它的全称；`SettingsDiagnostics` 的 `seriesKey` 是图表序列的短键；`HomePage` 传输行的 `fileName` 在行内仍可读到完整值所在的那次传输。
 
+### 16.11 反查：该截断的有没有没截断，以及一处漏掉的 `title`
+
+上两条查的是"截断后拿不到完整值"，这条反过来查"有没有该约束却没约束的长内容"。
+
+**结果：没有溢出风险。** 唯一看着可疑的 `plugin.description` 是 `<p>` 里的自由文本，`<p>` 自带换行，不会撑破；其余候选（`pluginId`、`version`、`publisher`）都在已有的 `truncate`/`break` 约束下。
+
+**但反查时发现另一件事**：`HomePage` 候选行的 `deviceId` 被父级 `truncate` 截断，且**没有 `title`**。单看像是"deviceId 只是辅助信息，截了无所谓"——因为旁边有 `deviceName`。
+
+问题在 `deviceName` 的实现：
+
+```ts
+function deviceName(deviceId: string): string {
+  return devices.byId.get(deviceId)?.displayName ?? deviceId
+}
+```
+
+**设备不在 store 里时它回退成 deviceId 本身。** 也就是说，一台未登记的候选设备，那一行里**唯一的文字就是这段 UUID**，而它正好被截断。两台同名设备也只能靠这段 id 区分，同样被截断。
+
+补 `title` 就够了——截断保留（行不该被长 id 撑开），但完整值随时可取。测试断言 `title` 等于完整 deviceId。
+
 **验证方式同上一条**：假内核的 `plugins_publishers` 也固定返回 `[]`，同样刻意的空状态，所以**只有测试证据，没有截图**。测试断言指纹 span 的 class 里没有 `truncate`、且 `title` 是完整值。原来那条测试用的是 `AB12 CD34 EF56 7890`——短到截不截断都过，**测不出问题**，现在补了 class 断言。
 
 ## 17. 下一步：继续整理页面与恢复流程
