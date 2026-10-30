@@ -616,6 +616,31 @@ const currentTask = computed(() => pairing.snapshot && (pairing.active || pairin
 
 **confirming 阶段不编造按钮（通过）**。`PairingPanel` 里**没有 `confirming` 的任何特判**，阶段名只在文案表里出现，`confirming` 的说明是 "Confirming and saving authorization"。既然没有分支，就不可能临时长出一个本地确认按钮。八个阶段的文案也齐全（listening / connecting / confirming / cancelling / paired / cancelled / timedOut / failed）。
 
+### 16.18 `06 §1` 默认设备页：四类事实没有互相冒充
+
+**设备页不提供业务入口（通过）**。扫 `DevicesPage` 里 send / clipboard / transfer / share / 文件 / 发送 / 剪贴板，**零命中**。这一页只做发现、配对、连接状态与信任管理。
+
+**`paired`、`online`、`blocked` 各管各的（通过）**。`DeviceRow` 三处各用各的字段：
+
+- `card.online ? 在线 : 离线` —— 和配对与否无关
+- `v-if="!card.paired"` 才画配对按钮
+- `v-if="card.paired"` 才画已配对区的「遗忘」
+
+一个离线设备仍然显示它已配对，没有因为离线就被说成"配对失效"。
+
+**`blocked` 只有摘要，没有虚构命令（通过）**。`blocked` 为真时只渲染一个 warning 标签。`DeviceRow` 里**没有 unblock / 解除阻止**这类按钮——设计文档明确说"不凭字段存在就新增命令"，实现也没有加。
+
+**详情字段完整且不截断（通过）**。展开后是 `dl`：名称、`deviceId`（`break-all`，不截断）、`address`（仅 `v-if="card.address"` 时出现）、最后发现时间。
+
+**一处值得记的正确写法**：
+
+```vue
+<time v-if="card.lastSeenMs > 0" :datetime="...">{{ formatDateTime(card.lastSeenMs) }}</time>
+<span v-else>{{ messages.devices.unknownTime }}</span>
+```
+
+用的是 `> 0`，不是真值判断。`0` 在这里走"未知时间"分支，而不是渲染成 1970 年。**第 22 轮我在任务行上正好踩过这个坑**（`startedAtMs: 0` 被 `v-if` 吞掉），这里原本就写对了。
+
 ## 17. 下一步：继续整理页面与恢复流程
 
 | 顺序 | 工作 | 当前边界 |
