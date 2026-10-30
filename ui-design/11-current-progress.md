@@ -1184,6 +1184,19 @@ ref<{ code: string, message: string, actions?: readonly SuggestedAction[] | unde
 
 **门禁**：501 条测试（+11）、lint 0、check 8 项。中途有两次全量运行各有 1 条无关测试超时（`settings-page` 的语言切换、`plugin-page` 的安装草稿），单跑均过，第三次全量 501 全绿。
 
+### 16.37 模板写死单位这件事，只有体积那一处
+
+16.36 的根因是**模板自带单位**（`'About {size} MiB'`），调用处只好往固定单位里填数。顺着这个形状把整个文案目录扫了一遍：`{占位符}` 后面紧跟单位、或文案里写死 `ms`/`秒`/`B`/`MiB` 的。
+
+**只有一处命中**：`plugins.ts:79` 的 `elapsed: (ms: number) => \`${ms} ms\``。**这个不是问题**——毫秒没有量级变化，不会像字节那样在 KiB 和 MiB 之间跳，单位固定是对的。
+
+**顺手核了时间格式化，两件事都是对的**：
+
+- `formatDateTime` / `formatTime` 集中在 `locale-format.ts`，十六处调用点全部走这两个函数，没有第二份手写的时间拼接。
+- `locale.test.ts` 已经覆盖它们（`reformats existing dates when the language changes`，用 `computed(() => formatTime(at, true))` 验证语言切换后重算）。**所以时间这一块既有单一实现也有测试**，和体积那处修之前的状况正好相反。
+
+**这一轮没有改动。** 16.36 那处修完之后，这一类（模板定死单位导致量级失真）在这个仓库里没有第二例。
+
 ## 17. 下一步：继续整理页面与恢复流程
 
 | 顺序 | 工作 | 当前边界 |
