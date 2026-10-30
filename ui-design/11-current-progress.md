@@ -286,7 +286,7 @@ F 的验收里有一句“测量后决定虚拟化/分页”。补上这个结�
 `16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.48`
 ——覆盖 `03 §4/§5/§6`、`04 §4.3/§5/§6`、`06` **全章**、`07 §2/§5.1/§5.2/§5.3/§6/§8/§9/§10`、`08` 各节、`09 §7/§8`、命令契约与假内核一致性、`NoticeHost`、`healthLabel`。
 
-**唯一未满足的一条**：`07 §5.1`「注册表未配置时链接设置」——见 16.48，实现前需要先定形态。
+**唯一未满足的一条**：`07 §5.1`「注册表未配置时链接设置」——见 16.48，**已按用户选定的形态实现**（`synra-app` `fa049e6`）。
 
 **C. 自己推翻自己的（过程记录，比结论更该读）**
 
@@ -1609,7 +1609,47 @@ const outcome = await installFrom(kernel, from)
 
 **这一条与前面几节的差别值得写明**：`§5.2`/`§5.3` 那两次我判"形式不同但目的达到"；**这次目的没达到**——用户看到"没有注册表"却不知道去哪儿配。**缺的不是措辞，是那一步操作。**
 
-**没有当场修**，理由：加这个入口要决定它长什么样（`ErrorNotice` 里加动作？还是在安装区单独一行？），而 `ErrorNotice` 的 `actions` 是六个固定标签，加一个"前往设置"要改文案表和一个组件——**比前几次的改动大，值得先问再做**。
+**当时没有当场修**，理由写在纸上更该留：加这个入口要决定它长什么样（`ErrorNotice` 里加动作？还是在安装区单独一行？）——**这是个产品形态问题，我不该替用户定。所以问了。**
+
+**用户选了"在错误提示里加按钮"，已实现**（`synra-app` `fa049e6`）：
+
+```ts
+if (!report) {
+  if (failure) {
+    error.value = isMissingRegistry(failure)
+      ? { ...failure, actions: [{ kind: 'openSettings', section: 'plugins' } as const] }
+      : failure
+  }
+  return
+}
+```
+
+配上 `ErrorNotice` 里**早就存在**的映射：
+
+```ts
+case 'openSettings': return '/settings'
+```
+
+**所以这次改动只是把内核没给的那个动作补上，渲染路径一行没动。** `messages.actions.openSettings` 也早就有（`'Open settings'`），文案表同样没改。
+
+**判断依据是内核那句话**，因为 `ErrorCode::Unsupported` 与另外几种拒绝共用，码本身分不出来：
+
+```ts
+function isMissingRegistry(failure): boolean {
+  return failure.message.includes('no registry is configured')
+}
+```
+
+**匹配散文是脆的，这一点写进了函数注释**：如果内核哪天给它单独的错误码，删掉字符串、改成 `switch` 那个码。
+
+**两条测试，而且都验过能失败**：
+
+| 测试 | 断言 | 破坏实现后 |
+| --- | --- | --- |
+| 拒绝文本含 `no registry is configured` | `actions` 有 `openSettings` | 红 |
+| 拒绝文本是别的（同 `unsupported` 码） | `actions` 为 `undefined` | 红 |
+
+第二条是关键：**它挡住了"看到 `unsupported` 就给设置链接"这种图省事的写法。**
 
 ## 17. 下一步：继续整理页面与恢复流程
 
