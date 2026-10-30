@@ -283,8 +283,8 @@ F 的验收里有一句“测量后决定虚拟化/分页”。补上这个结�
 
 **B. 核对通过、没有改动的**
 
-`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.49`
-——覆盖 `03 §4/§5/§6`、`04 §4.3/§5/§6`、`06` **全章**、`07 §2/§5.1/§5.2/§5.3/§6/§8/§9/§10`、`08` 各节、`09 §7/§8`、命令契约与假内核一致性、`NoticeHost`、`healthLabel`。
+`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.50`
+——覆盖 `03 §4/§5/§6`、`04 §4.3/§5/§6`、`06` **全章**、`07 §2/§4(并发)/§5.1/§5.2/§5.3/§6/§8/§9/§10`、`08` 各节、`09 §7/§8`、命令契约与假内核一致性、`NoticeHost`、`healthLabel`。
 
 **唯一未满足的一条**：`07 §5.1`「注册表未配置时链接设置」——见 16.48，**已按用户选定的形态实现**（`synra-app` `fa049e6`）。
 
@@ -1673,6 +1673,32 @@ function isMissingRegistry(failure): boolean {
 - **没有任何东西守着内核那一端。** 有人把 `no registry is configured` 改成 `no registry is set`，两边的测试都还是绿的，只有用户会发现按钮没了。
 
 **留给后来者的只有两处提示**：`isMissingRegistry` 的注释写了"如果内核哪天给它单独的错误码，删掉字符串、改成 switch"，以及本节。**这比有一个会红的测试弱，但比假装有守卫强。**
+
+### 16.50 `07 §4` 的 busy：一个插件一把锁，不是整张表一把
+
+`§4` 两句关于并发的话，是这一节唯一能直接照做的地方：
+
+> busy 绑定 pluginId 与动作，**不能检查一个插件时禁用全部列表**，也不能同时发两个互斥的更新/移除请求。
+
+**一个插件一把锁（通过）**。`usePluginOperations` 只有 27 行：
+
+```ts
+const busy = reactive(new Map<string, PluginOperation>())
+async function run<T>(id, operation, command) {
+  if (!alive || busy.has(id)) return undefined
+  busy.set(id, operation)
+  try { return alive ? await command() : undefined }
+  finally { busy.delete(id) }
+}
+```
+
+**键是 `pluginId`，值是动作名**，所以两句话同时成立：别的插件不受影响（键不同），同一个插件只能跑一个（`has(id)`）。
+
+**界面上每一处判断都带着 `plugin.pluginId`**——`operations.busy` 的 `has`/`get` 在这个文件里出现 **14 次**，逐条看过，没有一处是全局标志（其中 13 处在模板的 `:disabled`/`:loading`，1 处在 `removalBusy` 这个 computed 里，语义相同）。
+
+**两条防线，不是一条**。按钮本身带着 `:disabled="operations.busy.has(plugin.pluginId)"`，点不到；`run` 里的 `has(id)` 是第二道。**所以双击不会静默失败——第二下根本没打到 `run`。** `run` 的守卫防的是别处漏了禁用属性时的情况。
+
+**`alive` 那一半也值得记**：页面销毁后 `alive = false`，`run` 开头直接返回，`command` 即使已经发出，结果也不会写进一个已拆掉的组件（`return alive ? outcome : undefined`）。
 
 ## 17. 下一步：继续整理页面与恢复流程
 
