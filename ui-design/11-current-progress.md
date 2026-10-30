@@ -997,6 +997,23 @@ pub health: String,
 
 **顺便记一次搜索翻车**：为了找 `'overreaching'` 在哪定义，先用 `Get-ChildItem -Recurse` 扫了两个仓库，两次都超过两分钟被移到后台，两次手动停掉。换成 `grep` 工具（ripgrep）后一次命中。**全盘递归 `Get-ChildItem` 在这两个仓库上是不可用的手段**，哪怕加了 `-Include`。
 
+### 16.31 动作文案这条路没有守卫（已补）
+
+16.28 补了错误码的覆盖测试，这一轮照着同一条路查下一个：**内核的 `SuggestedAction` 变体，和 `messages.actions` 的文案键。**
+
+**六对六，当下是对的**：`openSettings`、`requestCapability`、`installPlugin`、`connectDevice`、`retry`、`viewLogs`。
+
+**但没有任何东西盯着它们。** `ErrorNotice` 三个分支都在读 `messages.actions[action.kind]`——路由按钮、retry 按钮、纯文本方向。内核长到第七个变体那天，这个表达式是 `undefined`，**界面上会出现一个没有字的按钮，就长在一段解释错误的文字旁边**。而 `actions` 表没有兜底，`buildLocale` 只保证中英对齐，不保证这张表跟着内核走。
+
+**补了两条**：六个 kind 逐个断言有非空标签；再加一条断言 `Object.keys(actions)` 与那六个**完全相等**——反向也堵住，免得表里躺着一个内核发不出来的标签，看着像支持。
+
+**顺带记下两处"降级"为什么不算缺陷**：
+
+- `viewLogs` 与 `requestCapability` 走 `ErrorNotice` 的 `default` 分支，渲染成灰色文字而不是按钮。注释写了理由——"a direction rather than a button that would do nothing"。查了一下**这两个入口在界面里确实存在**：插件页的管理展开里有权限操作，日志在设置诊断里。所以给方向而非假按钮是对的。
+- `ADropdown`／`RowActions` 不存在同理（16.26）。
+
+**门禁**：490 条测试（+7）、lint 0、check 8 项。
+
 ## 17. 下一步：继续整理页面与恢复流程
 
 | 顺序 | 工作 | 当前边界 |
