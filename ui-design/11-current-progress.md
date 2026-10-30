@@ -285,7 +285,7 @@ F 的验收里有一句“测量后决定虚拟化/分页”。补上这个结�
 
 **B. 核对通过、没有改动的**
 
-`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.62`
+`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.63`
 ——覆盖 `03 §4/§5/§6`、`04 §4.3/§5/§6`、`06` **全章**、`07 §1/§2/§3/§4/§5.1/§5.2/§5.3/§6/§8/§9/§10`、`08` 各节、`09 §7/§8`、命令契约与假内核一致性、`NoticeHost`、`healthLabel`。
 
 **`07` 至此整章核完**，只剩 16.53 那一条未做到。
@@ -2117,6 +2117,42 @@ errors.ts:50   unsupported: 'This version cannot do that yet.'
 **一条测试跟着改**：`credential-panel` 里断言 `messages.kernelErrors['error.identityHistoryMissing']`，改成 `messages.errors.not_paired`（那个 case 的 `code` 就是 `not_paired`）。
 
 **门禁**：510 测试、lint 0、check 8 项。
+
+### 16.63 本地那份 `ErrorCode` 是个假联合类型
+
+16.62 删了 `kernelErrors`。照同一条路继续查 `errors.ts` 里剩下的东西，第三个导出是一个**手写的 `ErrorCode`**：
+
+```ts
+export type ErrorCode
+  = | 'capability_denied' | 'device_offline' | 'invalid_argument'
+    | 'not_found' | 'plugin_faulted' | 'unauthorized'
+    | string            // ← 这一行让上面六个字面量变成装饰
+```
+
+**`| string` 把整个联合类型塌成 `string`。** 那六个名字看上去像约束，实际一个值都拦不住——写 `'随便什么'` 都能过。**一个自称收窄却不收窄的类型，比没有类型更糟：它告诉读的人"这里查过了"。**
+
+**而协议侧本来就有真的那份**（`synra-js/packages/protocol/src/generated/wire.ts:99`）：22 个 code，没有 `| string`，是真正会拦的联合类型。**而且 app 里别的文件早就在用它**（`client-test-helpers.ts:11` 就 `import type { ErrorCode } from '@synra/protocol'`）。
+
+**改法**：删掉本地定义，改成再导出。
+
+```ts
+export type { ErrorCode } from '@synra/protocol'
+```
+
+**换成真类型之后，有两件事浮出来：**
+
+**一、协议里的 22 个 code 和本地那六个对不上。** 差的三个是 `not_found`、`plugin_faulted`、`unauthorized`——**它们在 Rust 的 `ErrorCode` 里根本不存在**（`crates/synra-protocol` 搜 `NotFound`/`PluginFaulted`/`Unauthorized` 全是 0），`wire.ts` 里也没有。**是三条写给不存在的 code 的文案，内核永远发不出来。** 按新前提直接删了（中英两侧）。
+
+**二、两条测试拿它们当夹具。** 换掉时我没有改测试的意图，只换成一个真实存在的 code：
+
+| 测试 | 原来 | 换成 | 为什么可以换 |
+| --- | --- | --- | --- |
+| `home-page`：意图失败要说清原因 | `plugin_faulted` | `plugin_not_installed` | 测的是"code 有句子就显示句子"，不测具体是哪个 code |
+| `settings-page`：保存失败时语言不变 | `unauthorized` | `capability_denied` | 测的是"失败后界面停住"，同上 |
+
+**验证类型真的生效了**：换完之后 `pnpm run check` 立刻报出这两处测试引用了不存在的属性——**旧类型不会报，因为 `| string` 让它们合法。** 这是那份假类型一直在掩盖的东西。
+
+**门禁**：510 测试、lint 0、check 8 项。4 个文件，-18 行。
 
 ## 18. 不作为首批前提的增强
 
