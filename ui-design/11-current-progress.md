@@ -1343,7 +1343,32 @@ isCapabilityDenied: (value): value is ... => isSynraErrorValue(value) && value.c
 
 **「先展示当前结果：已授予、已拒绝」（通过）**。两个状态各有一行（`PluginsPage:494`、`:502`），文案 `Granted` / `Refused`，不是合并成一句"部分授权"。
 
-**没找到的两条**：「没有变化时不显示永远可点的重复授权大按钮」和「允许后等待真实结果更新」。前者需要判断"有没有变化"的代码路径，后者要看授权完成后的刷新——这两条都得顺着按钮的 `@click` 读下去才有结论。**这一轮停在这里，没有往下追。**
+**「没有变化时不显示永远可点的重复授权大按钮」（通过）**。这个按钮不是常驻的：
+
+```vue
+v-if="plugin.state === 'awaiting_consent' || permissionChanged(plugin)"
+```
+
+`permissionChanged` 比的是「当前选择」与「已授予」：
+
+```ts
+return !sameDecision(selection[plugin.pluginId] ?? plugin.granted, plugin.granted)
+```
+
+没动过 → 两边相同 → 按钮不出现。
+
+**「允许后等待真实结果更新」（通过）**。`consent` 用的是内核回的 `outcome.value`，不是点击时传进去的那份：
+
+```ts
+pluginsStore.upsert(outcome.value)
+selection[outcome.value.pluginId] = [...outcome.value.granted]
+```
+
+`toggle` 的注释把这个原则写得更直白：
+
+> Replacing the card locally as well would be a second description of the same change, and **the two would disagree the first time the kernel answered something other than what the click assumed**.
+
+**`§6` 六条至此全部核完，无缺陷。**
 
 ## 17. 下一步：继续整理页面与恢复流程
 
