@@ -907,6 +907,42 @@ if (typeof translated !== typeof value)
 
 **为什么值得记**：我花了十几分钟写脚本，去验证一件构建函数每次运行都会验证的事。**在写检查工具之前，先看看项目里是不是已经有一个。** 32 轮那次是反例（扫描器坏了没察觉），这次是另一个反例（根本不需要新扫描器）。
 
+### 16.28 `04 §6`：十四个内核错误码原来只会说「That did not work.」（已修）
+
+`04 §6` 那张状态表的"失败"一行写着：
+
+> 原位原因＋可执行恢复入口，保留草稿 | `code/message/actions`，**不能只剩 Something went wrong**
+
+这一轮去核对。`ErrorNotice` 是这样找句子的：
+
+```ts
+messages.kernelErrors[props.message] ?? messages.errors[props.code] ?? messages.errors.unknown
+```
+
+**message key → code → 兜底**。兜底是 `unknown: 'That did not work.'`。
+
+**把内核的错误码全集拉出来对了一遍**。`synra_protocol::ErrorCode` 有 22 个变体，`#[serde(rename_all = "snake_case")]`，序列化成 `plugin_not_installed`、`not_paired` 这种。前端 `errors` 表当时只有 8 个键，其中 3 个（`not_found`、`plugin_faulted`、`unauthorized`）还是前端自己造的码。**实际匹配得上的只有 4 个。**
+
+**十四种失败都落到「That did not work.」**，其中三种人天天能遇到：
+
+| 用户遇到的情况 | 之前看到的 | 现在 |
+| --- | --- | --- |
+| 那台设备没装这个插件 | That did not work. | That device does not have this plugin. |
+| 两台设备还没配对 | That did not work. | These devices are not paired yet. |
+| 文件太大，发不过去 | That did not work. | That is too large to send this way. |
+
+**这三种都是用户自己能处理的**——装插件、先配对、换小文件——但界面一个字也没说。
+
+**补了 8 个键**（中英各一）：`plugin_not_installed`、`not_paired`、`transport_not_open`、`transfer_failed`、`integrity_mismatch`、`payload_too_large`、`rate_limited`、`timeout`。
+
+**故意没补的一批**：插件沙箱 trapping、fuel 耗尽、协议版本不匹配、出站 host/IP/scheme 被拒。这些是这个屏幕前的人**改不了**的，为它们编一句建议比不说更糟。它们继续走兜底。
+
+**加了一条测试把覆盖面钉住**。11 个可操作码逐个断言有句子；第 12 条断言**它们都不等于 `unknown` 的文案**——因为错误第一次发生时的形态就是"补了个键但句子还是兜底那句"。
+
+**测试当场抓到我漏了一个**：`timeout` 在 `kernelErrors` 里（`'error.timeout'`），但 `errors` 表里没有 `timeout` 这个 code。也就是说，一个带 `ErrorCode::Timeout` 但不带 `error.timeout` message 的拒绝，仍然会说"没成功"。补上，中文"操作等待超时，已停止。"
+
+**门禁**：483 条测试（+12）、lint 0、check 8 项。
+
 ## 17. 下一步：继续整理页面与恢复流程
 
 | 顺序 | 工作 | 当前边界 |
