@@ -972,6 +972,31 @@ if (arities.size === 0)
 
 **这一轮没有产出修改。** 产出是一个判断：这套「清单对清单」的检查在这个仓库里不是空白，命令这一侧已经做得很完整，只有文案那一侧漏了（16.28 补的）。
 
+### 16.30 `healthLabel` 的类型是 `string`——追到源头发现是对的
+
+16.29 的判据是「手抄的清单会漂，同源的不会」。顺着它查了一个可疑处：`plugins.ts` 里的
+
+```ts
+healthLabel: (health: string): string => health === 'overreaching' ? ... : health === 'degraded' ? ... : health === 'faulted' ? ... : '运行正常'
+```
+
+**参数是 `string`，最后一个是兜底**。第一反应是"收紧成联合类型，内核加第五个值就会编译报错"。
+
+**追到源头，源头就是 `string`**。`PluginHealthDto`（`crates/synra-ipc/src/dto/plugin.rs:90`）：
+
+```rust
+/// Where it sits on the escalation ladder. `snake_case`.
+pub health: String,
+```
+
+内核自己把它声明成字符串，不是 `enum Health`。所以前端没有联合类型可以引用，**兜底分支是忠实的写法，不是疏漏**。
+
+（`Health` 枚举是有的——`synra-plugin-host` 的 `Good`/`Overreaching`/`Degraded`/`Faulted`——但它在这一层被拍平成了字符串。）
+
+**这一处不改。** 但值得记一句：**这个字段没有任何编译期提醒机制**，前端三个分支加一个兜底，将来内核加值会静默显示成"运行正常"。今天四值恰好覆盖，明天不一定。要修得改内核 DTO 类型，属于跨仓库改动，不在这一批。
+
+**顺便记一次搜索翻车**：为了找 `'overreaching'` 在哪定义，先用 `Get-ChildItem -Recurse` 扫了两个仓库，两次都超过两分钟被移到后台，两次手动停掉。换成 `grep` 工具（ripgrep）后一次命中。**全盘递归 `Get-ChildItem` 在这两个仓库上是不可用的手段**，哪怕加了 `-Include`。
+
 ## 17. 下一步：继续整理页面与恢复流程
 
 | 顺序 | 工作 | 当前边界 |
