@@ -591,6 +591,31 @@ function deviceName(deviceId: string): string {
 
 **§6 Tooltip 不夺焦点（通过）**。全项目没有用 `ATooltip` 组件，只用原生 `title` 属性——原生 tooltip 不参与焦点。
 
+### 16.17 `06 §5` 配对流程：四条都成立
+
+`06` 之前只在 `§7 性能` 里被顺带提过，整章是第一次读。§5 那张八阶段表里可以代码核对的有四条：
+
+**任务存在与否不看 Modal 开关（通过）**。这是 §88 的原话，也是最容易走样的地方：
+
+```ts
+const currentTask = computed(() => pairing.snapshot && (pairing.active || pairing.snapshot.requestId !== dismissedRequest.value) ? pairing.snapshot : null)
+```
+
+判据是 `pairing.snapshot`、`pairing.active`、`dismissedRequest`——**都是 store 与任务本身的状态**。`props.visible` 只出现在四处的轮询条件里（`!disposed && props.visible !== false`），管的是"要不要继续读"，不决定"任务还在不在"。这正是该有的分工：关掉视图不停任务。
+
+**关闭流程后仍有入口（通过）**。`DevicesPage:19` 的配对按钮文案随 `pairing.active` 切换成 `pairingResume`（继续配对），这就是 §86 要的紧凑入口。
+
+**两种取消的文案分得开（通过）**：
+
+| 场景 | 动作 | 取消 |
+| --- | --- | --- |
+| 结束进行中的流程 | `Cancel pairing` / 取消配对过程 | — |
+| 移除已建立的配对 | `Forget` / 遗忘 | `保留配对`（keep） |
+
+`forgetHelp` 还说明影响：需要重新配对、对该发送者的自动接受也会移除。文案没说"取消"，说的是"遗忘"——**两个动作在字面上就不会混**。
+
+**confirming 阶段不编造按钮（通过）**。`PairingPanel` 里**没有 `confirming` 的任何特判**，阶段名只在文案表里出现，`confirming` 的说明是 "Confirming and saving authorization"。既然没有分支，就不可能临时长出一个本地确认按钮。八个阶段的文案也齐全（listening / connecting / confirming / cancelling / paired / cancelled / timedOut / failed）。
+
 ## 17. 下一步：继续整理页面与恢复流程
 
 | 顺序 | 工作 | 当前边界 |
