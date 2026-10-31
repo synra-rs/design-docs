@@ -285,7 +285,7 @@ F 的验收里有一句“测量后决定虚拟化/分页”。补上这个结�
 
 **B. 核对通过、没有改动的**
 
-`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.103`
+`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.104`
 ——覆盖 `03 §4/§5/§6`、`04 §4.3/§5/§6`、`06` **全章**、`07 §1/§2/§3/§4/§5.1/§5.2/§5.3/§6/§8/§9/§10`、`08` 各节、`09 §7/§8`、命令契约与假内核一致性、`NoticeHost`、`healthLabel`。
 
 **`07` 至此整章核完**，只剩 16.53 那一条未做到。
@@ -3646,6 +3646,78 @@ overlay-class-name="[&_.ant-btn]:min-h-11 md:[&_.ant-btn]:min-h-8"
 **没改**，理由：**规范里没有这一条要求**（查过 `ui-design` 全部文档），**这是代码自己的选择，不是规范驱动的**；而且 **`role="region"` 也让读屏能直接跳到这块内容**，是它本来的目的。**我判断不出哪个更重要，就不动它。**
 
 **如果以后有人觉得地标太多，可以换成 `role="group"`** —— 同样能命名、能跳转，**但不进地标列表。** 这条留在这里作参考。
+
+**门禁**：593 测试、lint 0、check 9 项。
+
+### 16.104 安装成功了，读屏一句话都不说
+
+16.103 查的是**键盘**，这一轮查**播报** —— 操作完成之后，读屏用户知不知道。
+
+### 怎么发现的
+
+**先数一遍各页面有多少个 `role="status"` / `role="alert"`**：
+
+| 页面 | status | alert |
+| --- | --- | --- |
+| `DevicesPage` | 2 | 0 |
+| `SettingsPage` | 1 | 0 |
+| **`PluginsPage`** | **0** | **0** |
+| `HomePage` | 0 | 0 |
+
+**插件页一个都没有。** 但它有 25 个按钮、8 处 `ErrorNotice`。
+
+### 失败有声音，成功没有
+
+`completeInstall()` 是两种安装来源共用的收尾：
+
+```ts
+note.value = [messages.plugins.installedSwitchedOff, ...(report.warnings ?? [])].join(' ')
+...
+await nextTick()
+installToggle.value?.$el.focus()
+await load()
+```
+
+**焦点被移回安装按钮** —— 这是对的，读屏会读出按钮名字。**但它读的是按钮，不是「装好了」。**
+
+模板里：
+
+```html
+<AAlert v-if="note" type="success" :message="note" closable @close="note = undefined" />
+```
+
+**一个没有 `role` 的 `AAlert`。** 视觉上是一行绿色提示，**读屏什么也不会说。**
+
+**而失败走 `ErrorNotice`** —— 那是 `role="alert"`。**所以同一页里：失败会打断你播报，成功一声不吭。**
+
+### 改法
+
+```html
+<AAlert v-if="note" type="success" :message="note" role="status" closable @close="note = undefined" />
+```
+
+**`status` 不打断当前朗读，只是在合适的时候说出来** —— 这正是「做完了一件事」该用的角色（`alert` 留给失败）。
+
+### 其余 `AAlert` 为什么没动
+
+**插件页 7 个、设置页 1 个 `AAlert`，逐一看过**：
+
+- `pendingPublisher` 的 `info` —— 静态提示，**不是「刚刚发生了什么」**
+- `targetPluginId` 的 `info` —— 同上
+- `plugin.stateReason` 的 `warning` —— 常驻状态说明
+- 其余同理
+
+**只有 `note` 是操作结果的播报。** **`role="status"` 用错场景比不用更吵** —— 一个每次渲染都播报的静态提示，会让读屏变成噪声源。
+
+### 测试
+
+**加在已有用例 `preserves a refused install draft and restores focus after a successful retry` 里** —— 它本来就跑到安装成功那一行，接着断言同一次渲染：
+
+```ts
+expect(wrapper.get('[role="status"]').text()).toContain(messages.plugins.installedSwitchedOff)
+```
+
+**验过能失败**：去掉 `role="status"`，一条红。
 
 **门禁**：593 测试、lint 0、check 9 项。
 
