@@ -285,7 +285,7 @@ F 的验收里有一句“测量后决定虚拟化/分页”。补上这个结�
 
 **B. 核对通过、没有改动的**
 
-`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.94`
+`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.95`
 ——覆盖 `03 §4/§5/§6`、`04 §4.3/§5/§6`、`06` **全章**、`07 §1/§2/§3/§4/§5.1/§5.2/§5.3/§6/§8/§9/§10`、`08` 各节、`09 §7/§8`、命令契约与假内核一致性、`NoticeHost`、`healthLabel`。
 
 **`07` 至此整章核完**，只剩 16.53 那一条未做到。
@@ -3292,6 +3292,46 @@ async function togglePairing(): Promise<void> {
 **验过能失败**：去掉 `replace` 那两行，一条红。
 
 **门禁**：592 测试、lint 0、check 8 项。
+
+### 16.95 设置页也没清 `?category=`，三个页面齐了
+
+16.94 修了设备页的「传进去不清掉」。**按同一问题查另外两个读取 query 的页面。**
+
+`PluginsPage` 有 `leaveTarget()`，**是对的**。`SettingsPage` 没有。
+
+### 症状同一套
+
+**在 `/settings?category=security` 上手动点「通用」→ 去别的页面 → 返回** —— **回到「安全」。**
+
+**用户手动做的选择，被一个更早的 URL 参数覆盖了。**
+
+### 改法
+
+```ts
+function selectCategory(value: unknown): void {
+  if (!categories.value.some(item => item.value === value))
+    return
+  category.value = value as Category
+  if (route.query.category !== undefined) {
+    const { category: _category, ...query } = route.query
+    void router.replace({ path: route.path, query, hash: route.hash })
+  }
+}
+```
+
+**三点说明**：
+
+- **只在真的有 query 时才 `replace`** —— 否则每次点分类都产生一次路由记录，返回键会变得很难用
+- **`void` 而不是 `await`** —— 列已经切了，URL 跟上只是副作用，**不该让点击等路由**
+- **和 16.94 的设备页不同，这里不需要等 `replace` 完成再改状态** —— 那边是因为 `showPairing` 会被 watch 重开，这边 `category` 没人重设
+
+### 测试
+
+一条：从 `/settings?category=security` 进入 → 切到「通用」→ 断言 query 里的 `category` 没了。
+
+**验过能失败**：把清理那段短路，得到 **`expected 'security' to be undefined`**。
+
+**门禁**：593 测试、lint 0、check 8 项。
 
 ## 18. 不作为首批前提的增强
 
