@@ -285,7 +285,7 @@ F 的验收里有一句“测量后决定虚拟化/分页”。补上这个结�
 
 **B. 核对通过、没有改动的**
 
-`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.110`
+`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.111`
 ——覆盖 `03 §4/§5/§6`、`04 §4.3/§5/§6`、`06` **全章**、`07 §1/§2/§3/§4/§5.1/§5.2/§5.3/§6/§8/§9/§10`、`08` 各节、`09 §7/§8`、命令契约与假内核一致性、`NoticeHost`、`healthLabel`。
 
 **`07` 至此整章核完**，只剩 16.53 那一条未做到。
@@ -4002,6 +4002,67 @@ const renderExpandIcon = panelProps => {
 **它直接改本地状态，不写 URL** —— 和 16.95 的 `selectCategory` 不一样（那个要清 `?category=`）。
 
 **但这里本来就不写 URL，所以没有要清的东西**，而且 `§6` 那条「步骤跟随任务而非每次进入页面」**正好要求它不要留下痕迹**。**是对的。**
+
+**门禁**：593 测试、lint 0、check 9 项。
+
+### 16.111 两段从来没被渲染的文案
+
+16.110 对完 `aria-label` 之后，**这一轮换方向查冗余**（用户的要求里就有"冗余代码直接删除"）。
+
+### 四道冗余检查，前三道都干净
+
+| 查什么 | 结果 |
+| --- | --- |
+| 有没有没人引用的 `.vue` | **0** |
+| 126 个导出有没有只用不导、或只导不用 | **0** |
+| 有没有注释掉的代码块 | **0** |
+
+**这个代码库的冗余度确实低。**
+
+### 第四道找到了
+
+**`09 §6` 第一条**：
+
+> 已连接＋设备已就绪 → **已连接** ｜ 重复的信息只留一次
+
+**`home.ts` 里**：
+
+```ts
+transferring: { headline: 'Transferring', detail: 'A transfer is in progress.' },
+connected: { headline: 'Connected', detail: 'The device is available.' },
+```
+
+**而渲染只有一处**（`HomePage`）：
+
+```html
+<p v-if="wire.state === 'none' || wire.state === 'offline'">{{ state.detail }}</p>
+```
+
+**`connected` 和 `transferring` 的 `detail` 从来不会被渲染。** —— 而且 `connected` 那句 `The device is available.` **正是 `§6` 要删掉的"设备已就绪"那一半。**
+
+### 改法
+
+**四语言（en + zh）各删两行**，并在 `home.ts` 上写清楚为什么这两个没有：
+
+```ts
+/**
+ * ★ `detail` only where it is shown. … `connected` and `transferring` used to carry one too, and neither was ever
+ * rendered: `09 §6` had already decided the pair "connected + device ready" collapses to "connected", so the
+ * detail was the half it deleted.
+ */
+```
+
+**顺带把守卫收紧**：`v-if` 原来写 `wire.state === 'none' || 'offline'` —— **那是把「哪两个状态有 detail」抄了第二遍**。
+
+```html
+<p v-if="'detail' in state">
+```
+
+**判断依据改成属性本身，两处不会再有分歧。** —— 而且这不是美化：**删掉 detail 后 TS 立刻报 `Property 'detail' does not exist`**，`'detail' in state` 正是它能窄化的写法。
+
+### 这条链怎么合上的
+
+**删掉两行文案 → TS 报错 → 报错指出 v-if 与实际数据不一致 → 改成属性判断。** **如果我一直依赖那个手写的状态列表，这处不一致就看不见。**
 
 **门禁**：593 测试、lint 0、check 9 项。
 
