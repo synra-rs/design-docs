@@ -285,7 +285,7 @@ F 的验收里有一句“测量后决定虚拟化/分页”。补上这个结�
 
 **B. 核对通过、没有改动的**
 
-`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.107`
+`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.108`
 ——覆盖 `03 §4/§5/§6`、`04 §4.3/§5/§6`、`06` **全章**、`07 §1/§2/§3/§4/§5.1/§5.2/§5.3/§6/§8/§9/§10`、`08` 各节、`09 §7/§8`、命令契约与假内核一致性、`NoticeHost`、`healthLabel`。
 
 **`07` 至此整章核完**，只剩 16.53 那一条未做到。
@@ -3851,6 +3851,73 @@ detailsFor: (name: string): string => `Show details for ${name}`,
 ### 一处没有改的
 
 `observe` 里还有 `button "扫 描"`、`button "配 对"` —— **字中间有空格。** 查过：中文文案是好的（`'配对'`），**空格是 Ant Design 对两个汉字的自动字距**，属于视觉排版，**`observe` 把渲染后的样子读进去了。不是缺陷，没动。**
+
+**门禁**：593 测试、lint 0、check 9 项。
+
+### 16.108 折叠箭头把图标名念成了标题的一部分
+
+16.107 用 `bsk_inspect` 的 `observe` 拿到插件页的树，其中两行是：
+
+```
+@e15 button "right 权限与管理"
+@e19 button "right 权限与管理"
+```
+
+**中文标题前面多了一个英文方向词。**
+
+### 拿到真实 DOM 才看明白
+
+`html` 动作读这个按钮：
+
+```html
+<div role="button" aria-expanded="false">
+  <div class="ant-collapse-expand-icon">
+    <span role="img" aria-label="right" class="anticon anticon-right ant-collapse-arrow">
+      <svg aria-hidden="true">…</svg>
+    </span>
+  </div>
+  <span class="ant-collapse-header-text">权限与管理</span>
+</div>
+```
+
+**`svg` 自己藏好了**（`aria-hidden`），**外层 `span` 却带着 `role="img"` 和 `aria-label="right"`** —— 那是 `@ant-design/icons-vue` 给每个图标统一生成的。
+
+**`role="img"` 的 label 会顶替内容进入名称计算**，于是整颗按钮叫「right 权限与管理」。
+
+### 改法：换成自己的箭头
+
+`ACollapse.Panel` 支持 `expandIcon`，**但它必须在 `ACollapse` 上，不在 Panel 上** —— 这一点我读源码才确认：
+
+```js
+// Collapse.js
+const renderExpandIcon = panelProps => {
+  const { expandIcon = slots.expandIcon } = props
+  const icon = expandIcon ? expandIcon(panelProps) : createVNode(RightOutlined, …)
+```
+
+**箭头由 Collapse 层构建一次再传给各 Panel，所以写在 Panel 上的 `#expandIcon` 永远不会被读到。**
+
+```html
+<ACollapse …>
+  <template #expandIcon="panel">
+    <span
+      :class="(panel as { isActive?: boolean }).isActive ? 'i-carbon-chevron-down' : 'i-carbon-chevron-right'"
+      aria-hidden="true"
+    />
+  </template>
+```
+
+**箭头本就是装饰**：按钮的 `aria-expanded` 已经播报了开合，箭头再说一遍只会重复，而且重复的是它的实现名。
+
+**类型断言那一半**：`ACollapse` 的插槽参数类型是 `Partial<PropTypes>`，**没有声明 `isActive`**，直接解构会 TS2339；运行时它确实有（`renderExpandIcon` 传的是 `panelProps`）。
+
+### 一次走错的路，记在这里
+
+**我先在 `synra-js` 的 `@synra/theme/antd/index.ts` 里写了一段 CSS**，想用 `aria-hidden: true` 属性选择器解决。
+
+**那是无效 CSS** —— CSS 不能设置 ARIA 属性。**当场撤掉了**，该仓库工作区保持干净。
+
+**这个文件确实允许"表达不了的用一小段 CSS"**（`.ant-menu-inline` 那条边就是先例），**但它只处理外观，不处理语义。**
 
 **门禁**：593 测试、lint 0、check 9 项。
 
