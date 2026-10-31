@@ -285,7 +285,7 @@ F 的验收里有一句“测量后决定虚拟化/分页”。补上这个结�
 
 **B. 核对通过、没有改动的**
 
-`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.130`
+`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.131`
 ——覆盖 `03 §4/§5/§6`、`04 §4.3/§5/§6`、`06` **全章**、`07 §1/§2/§3/§4/§5.1/§5.2/§5.3/§6/§8/§9/§10`、`08` 各节、`09 §7/§8`、命令契约与假内核一致性、`NoticeHost`、`healthLabel`。
 
 **`07` 至此整章核完**，只剩 16.53 那一条未做到。
@@ -4959,6 +4959,47 @@ expected '<div class="min-w-0 stack gap-5" data…' to contain 'aria-label="Log 
 ```
 
 **删掉属性就红，恢复就绿。604 项。**
+
+**门禁**：604 前端测试、lint 0、check 11 项。
+
+### 16.131 `select-names` 扩成 `control-names`
+
+16.130 刚给日志行数框补了名字。**同一个函数顺手把 `AInputNumber` 也管上 —— 叫 `select-names` 已经不准确。**
+
+### 从写死一个标签改成一张表
+
+```ts
+const controls = [
+  { tag: 'ASelect', pattern: /<ASelect\b[^>]*>/g },
+  { tag: 'AInputNumber', pattern: /<AInputNumber\b[^>]*>/g }
+] as const
+```
+
+**下一类控件只要往这张表里加一行。** —— 名字也一并变成 `control-names`，**因为报错信息里的标签名来自这张表，不该再写「select」。**
+
+### 输出
+
+```
+· control-names: 6 ASelect, 2 AInputNumber are named
+```
+
+**两个数分开报** —— 只报一个总数，某一类归零也看不出来。
+
+### 验过两条都能失败
+
+**这一次试的是 `AInputNumber` 那一条**（`ASelect` 那一条 16.129 验过）：
+
+```
+✗ control-names: src\components\settings\SettingsDiagnostics.vue:155 draws an `AInputNumber` with no `aria-label`, no `id` and no enclosing label
+```
+
+**恢复后 11 项全绿。**
+
+### 提交
+
+| 仓库 | 提交 | 状态 |
+|---|---|---|
+| synra-rust-app | `c14af76` `test: guard every select and number box is named` | ✅ 已推送 |
 
 **门禁**：604 前端测试、lint 0、check 11 项。
 
