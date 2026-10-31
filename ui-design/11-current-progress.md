@@ -285,7 +285,7 @@ F 的验收里有一句“测量后决定虚拟化/分页”。补上这个结�
 
 **B. 核对通过、没有改动的**
 
-`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.100`
+`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.101`
 ——覆盖 `03 §4/§5/§6`、`04 §4.3/§5/§6`、`06` **全章**、`07 §1/§2/§3/§4/§5.1/§5.2/§5.3/§6/§8/§9/§10`、`08` 各节、`09 §7/§8`、命令契约与假内核一致性、`NoticeHost`、`healthLabel`。
 
 **`07` 至此整章核完**，只剩 16.53 那一条未做到。
@@ -3520,6 +3520,47 @@ function selectCategory(value: unknown): void {
 **没有加在 `main` 上。** 试过，但 `main` 包着 `RouterView`，**它的规则会和 `PageHeader` 自己的 `md:min-h-8` 打架**：`main` 的 `[&_.ant-btn]:min-h-11` 作用到页头按钮，而页头本来的意思是桌面 32px。
 
 **改成在两条横幅自己的根元素上加**：两处 `class="mb-4"` 各自补上那对 utility。**作用范围就这两个组件，不波及别人。**
+
+**门禁**：593 测试、lint 0、check 9 项。
+
+### 16.101 传送到 `body` 的对话框，页面规则也够不着
+
+16.100 补了 shell 层两条横幅。**这一轮回头验证那条推断**：我当时写「`SettingsDiagnostics`、`CredentialPanel` 在设置页内，已覆盖」。
+
+**验证方法：`get-container` 是谁写了、谁没写。**
+
+| 文件 | `get-container="false"` |
+| --- | --- |
+| `DevicesPage` / `PluginSync` / `PluginsPage` | **有** |
+| **`SettingsPage`** / **`CredentialPanel`** / **`SettingsDiagnostics`** / `SearchPalette` | **没有** |
+
+`PluginsPage` 的注释把这件事说得很清楚：
+
+> `get-container="false"` keeps it inside this component **instead of teleporting to `body`**
+
+### 所以那个推断是错的
+
+**没写 `get-container` 的对话框会被传送到 `body`，脱离页面 `<section>` 的子树** —— **`[&_.ant-btn]:min-h-11` 是后代选择器，够不着。**
+
+**有按钮的三个**：`SettingsPage` 的「离开确认」3 颗、`CredentialPanel` 的修复确认 3 颗、`SettingsDiagnostics` 的清除崩溃报告 2 颗。**全是 24px。**
+
+**其中「离开确认」最要紧** —— 它问的是「保留修改吗」，**三个选项里有一个是「放弃并离开」。**
+
+### 改法
+
+**没有改成加 `get-container="false"`。** 那三处的理由不是可测试性（`PluginsPage` 是为了让测试点到复选框），**为了样式去改渲染位置，是把一个原因换成另一个原因。**
+
+**用 Ant Design 自己提供的 `wrap-class-name`** —— 它落在对话框的包裹层上，**footer 里的按钮正是它的后代**：
+
+```html
+<AModal ... wrap-class-name="[&_.ant-btn]:min-h-11 md:[&_.ant-btn]:min-h-8">
+```
+
+**三处各一句话，不动结构。**
+
+### `SearchPalette` 为什么没改
+
+**它一个 `AButton` 都没有**（查过）—— 结果项是 `<button role="option">`，不是组件库的按钮，**自带 `min-h-11`（16.80 改的）。**
 
 **门禁**：593 测试、lint 0、check 9 项。
 
