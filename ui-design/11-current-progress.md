@@ -285,7 +285,7 @@ F 的验收里有一句“测量后决定虚拟化/分页”。补上这个结�
 
 **B. 核对通过、没有改动的**
 
-`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.93`
+`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.94`
 ——覆盖 `03 §4/§5/§6`、`04 §4.3/§5/§6`、`06` **全章**、`07 §1/§2/§3/§4/§5.1/§5.2/§5.3/§6/§8/§9/§10`、`08` 各节、`09 §7/§8`、命令契约与假内核一致性、`NoticeHost`、`healthLabel`。
 
 **`07` 至此整章核完**，只剩 16.53 那一条未做到。
@@ -3244,6 +3244,54 @@ expected undefined to be 'peer-1'
 **`to: \`/settings?category=${section}\`` 没做编码**，但 `SETTINGS_SECTIONS` 是固定枚举、值是简单标识符，**编码与不编码结果相同**。**不在固定枚举上假想一个不存在的风险。**
 
 **门禁**：591 测试、lint 0、check 8 项。
+
+### 16.94 配对面板关了，URL 里还留着设备
+
+前几轮把 `?device=` 从「没人传」修到「两个调用方都传」。**这一轮往回收一步看：传进去之后，有没有清。**
+
+`PluginsPage` 有：
+
+```ts
+async function leaveTarget(): Promise<void> {
+  const { plugin: _plugin, ...query } = route.query
+  await router.replace({ path: route.path, query, hash: route.hash })
+```
+
+**`DevicesPage` 没有对应的东西。** 面板收起后，`?device=` 还在地址栏里。
+
+### 具体症状
+
+**在 `/devices?device=xxx` 上收起面板 → 去别的页面 → 按返回** —— **面板又开了。**
+
+**而 `selectedDeviceId` 在内存里已经清掉过一次**，重新进入时是从 URL 又读了一遍。**地址栏在替用户记住一个他已经取消的意图。**
+
+### 改法
+
+模板里的 `showPairing = !showPairing` 换成函数：
+
+```ts
+async function togglePairing(): Promise<void> {
+  if (showPairing.value) {
+    const { device: _device, ...query } = route.query
+    await router.replace({ path: route.path, query, hash: route.hash })
+    showPairing.value = false
+    return
+  }
+  showPairing.value = true
+}
+```
+
+**和 `leaveTarget` 一样，保留 query 里的其它键，只摘掉 `device`。**
+
+### 测试里踩的两处
+
+**第一，`showPairing` 先清还是先 `replace`。** 先清后被 `pairing.active` 的 watch 重开过，**改成先 `replace` 再清**。
+
+**第二，`isVisible()` 在 jsdom 里要求元素真的挂在文档上。** 没挂 `attachTo: document.body` 时，`v-show` 的 `display: none` 算不出来，**断言一直是 `true`，看不出区别。** 那条已有的配对测试（16.68）早就挂着，我这次一开始没挂。
+
+**验过能失败**：去掉 `replace` 那两行，一条红。
+
+**门禁**：592 测试、lint 0、check 8 项。
 
 ## 18. 不作为首批前提的增强
 
