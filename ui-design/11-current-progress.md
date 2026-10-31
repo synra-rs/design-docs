@@ -285,7 +285,7 @@ F 的验收里有一句“测量后决定虚拟化/分页”。补上这个结�
 
 **B. 核对通过、没有改动的**
 
-`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.138`
+`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.139`
 ——覆盖 `03 §4/§5/§6`、`04 §4.3/§5/§6`、`06` **全章**、`07 §1/§2/§3/§4/§5.1/§5.2/§5.3/§6/§8/§9/§10`、`08` 各节、`09 §7/§8`、命令契约与假内核一致性、`NoticeHost`、`healthLabel`。
 
 **`07` 至此整章核完**，只剩 16.53 那一条未做到。
@@ -5289,6 +5289,78 @@ if (open.value) void nextTick(() => field.value?.focus())
 | synra-rust-app | `85e2f30` `docs: name where the touch floor comes from` | ✅ 已推送 |
 
 **门禁**：604 前端测试、lint 0、check 12 项。
+
+### 16.139 搜索入口与插件行 —— 用户说「这都什么？这好看吗」
+
+前十六轮查的是「读得出、点得到」。**这一轮用户看着截图问了一句更直接的话：这个灰色方块是什么？**
+
+### 他指的是搜索入口
+
+```html
+class="ms-auto min-h-11 row shrink-0 items-center gap-1 rounded-control px-1.5 py-1 text-ink-dim"
+```
+
+**一个放大镜、一个斜杠、一点点内边距。没有背景、没有边框、没有悬停。** —— 看着像「一个图标旁边有个符号」，不像**能输入的搜索框**。
+
+### 改法是把它做成一个「字段」
+
+```html
+border border-line bg-raised px-2.5 rounded-control  ← 有边界、有底色
+group-hover:text-primary                            ← 放大镜在悬停时亮起来
+<span>{{ messages.search.placeholder }}</span>       ← 有文字，说明这是搜什么
+<kbd class="rounded-control border bg-surface">/</kbd>
+```
+
+**同时改短了占位文案**：原来「搜索插件、设置项和设备」11 个字，在 208px 的侧栏里**必然截断成「搜索插件、设置项…」**。改成「搜索」 —— **「搜什么」留给打开后的面板，那里本来就有 `scope` 那句。**
+
+### 插件行：用户进一步定了方向
+
+**问了他两个问题，答案：保持列表（不加卡片）、插件页先做样板。**
+
+**改动是补上缺的中间态** —— `R26` 要列表不假，`09 §44` 警告每项加容器会抢注意力也不假，**但「列表」不等于「没有行」**：
+
+| 改动 | 为什么 |
+| --- | --- |
+| `py-3` + `rounded-surface` + `@hover:bg-raised` | **行有了身体；悬停能读成「这一行」** |
+| `-mx-3` 负边距 | **文字仍贴页面对齐**，只有悬停底色向外溢 |
+| 标题 `font-medium` → `font-semibold` | **插件名是这一行的主语** |
+| **删掉 `AList` 的分隔线** | **两个插件属同一组**，`09 §44` 说分隔线只区分真实组/区域 |
+| **开关移到最右一列** | 原来夹在标题和状态之间，**读状态要跳过开关**；且位置随「审查权限/重试」出现与否而漂移 |
+
+**开关移到最后还让读屏顺序自洽**（已用无障碍树核实）：**这是什么 → 它什么状态 → 我能做什么 → 我要不要它跑。**
+
+### 顺带的圆角审计：四处在梯子外
+
+**规范只有 8 / 12 / pill 三档，而裸 `rounded` 是 4px。**
+
+| 位置 | 本来该是 |
+| --- | --- |
+| `PairingPanel` 面板 | `rounded-surface` |
+| `TransferPrompt` 浮层 | `rounded-surface` |
+| 搜索入口的 `kbd` | `rounded-control`（原来比它所在的那个框更方） |
+| `HomePage` 文字按钮 | **删掉** —— `border-0` + `bg-transparent` + `px-0`，圆角没有东西可裁 |
+
+### 守卫 `checkCornerLadder`
+
+**扫裸 `rounded`，先剥掉注释再扫**（第一版把注释里那句「not bare `rounded`」判成了违规），**保留换行以便行号仍然准确。**
+
+```
+改回 rounded → ✗ corner-ladder: src\components\PairingPanel.vue:23 uses bare `rounded` (4px) …
+```
+
+**13 项全绿。**
+
+### 提交
+
+| 仓库 | 提交 | 状态 |
+|---|---|---|
+| synra-rust-app | `24ebe04` `fix: give the search entry a field, not an icon` | ✅ |
+| synra-rust-app | `ab3f06a` `feat: give plugin rows a body and a scan line` | ✅ |
+| synra-rust-app | `2ba5f3e` `fix: put every corner on the ladder` | ✅ |
+
+**门禁**：604 前端测试、lint 0、**check 13 项**（原 12 项）。
+
+**还剩三页没套这套样板** —— 首页、设备、设置。
 
 ## 18. 不作为首批前提的增强
 
