@@ -285,7 +285,7 @@ F 的验收里有一句“测量后决定虚拟化/分页”。补上这个结�
 
 **B. 核对通过、没有改动的**
 
-`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.121`
+`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.122`
 ——覆盖 `03 §4/§5/§6`、`04 §4.3/§5/§6`、`06` **全章**、`07 §1/§2/§3/§4/§5.1/§5.2/§5.3/§6/§8/§9/§10`、`08` 各节、`09 §7/§8`、命令契约与假内核一致性、`NoticeHost`、`healthLabel`。
 
 **`07` 至此整章核完**，只剩 16.53 那一条未做到。
@@ -4533,6 +4533,52 @@ navigation "设置分类"
 | synra-rust-app | `f0de92a` `fix: name both page menus` | ✅ 已推送 |
 
 **门禁**：601 前端测试、lint 0、check 9 项。
+
+### 16.122 搜索排序框没有名字，那句文案也没人用
+
+16.121 修完两个菜单后，**这一轮把同一把尺子量到每个表单控件上：`AInput` / `ASelect` / `ACheckbox` / `ASwitch` / `ATextarea`，逐个看有没有名字。**
+
+### 结论
+
+| 控件 | 名字从哪来 |
+| --- | --- |
+| `SettingsPage` 的 4 个 `ASwitch` | `aria-label` |
+| `PairingPanel` 的 3 个 `ATextarea` | 外面包着 `<label>` |
+| `TransferPrompt` 的 `ACheckbox` | 里面的可见文字 |
+| 插件页搜索框 | `aria-label`（用的是 placeholder） |
+| **插件页排序框** | **没有** |
+
+**只剩一个。**
+
+### 而且它那句文案没人读
+
+```html
+<ASelect v-model:value="searchSort" :options="sortOptions" class="w-fit" />
+```
+
+`messages.plugins.catalog.sort`（`'Order'`）**在 `src/` 里一次都没被引用** —— **文案写好了，控件没接。**
+
+**这两个症状是同一个原因**：加这个控件时漏了 `aria-label`，那句文案就悬空了。
+
+### 写入新测试时踩到的三个坑
+
+**① `v-show` 的隐藏区块里什么都不渲染。** 排序框在 `catalog-panel` 里，而那个 `<section v-show="pluginCategory === 'discover'">` 默认不可见。**第一版测试拿到空的 `<section>`，`undefined`。**
+
+**② 必须先切到 discover。** 用 `findAllComponents({ name: 'ASegmented' })[0].vm.$emit('update:value', 'discover')` —— **注意不能对 `wrapper.get('[data-testid=...]').vm` 取值，DOM 包装器没有 `vm`。**
+
+**③ `jsdom` 里那个 `[role="combobox"]` 是搜索框。** 面板里只有一个 combobox，**是 `AInput` 渲染的那个**；antd 的 `ASelect` 在这个环境没有把 `role="combobox"` 放出来。**按 role 抓会抓到错的元素** —— 改成断言面板的 HTML 里含 `aria-label="Order"`。
+
+### 验证
+
+**删掉 `:aria-label`** →
+
+```
+expected '<section class="min-w-0 stack gap-3" …' to contain 'aria-label="Order"'
+```
+
+**恢复后 602 项全绿。**
+
+**门禁**：602 前端测试、lint 0、check 9 项。
 
 ## 18. 不作为首批前提的增强
 
