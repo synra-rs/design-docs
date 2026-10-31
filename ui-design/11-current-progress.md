@@ -285,7 +285,7 @@ F 的验收里有一句“测量后决定虚拟化/分页”。补上这个结�
 
 **B. 核对通过、没有改动的**
 
-`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.129`
+`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.130`
 ——覆盖 `03 §4/§5/§6`、`04 §4.3/§5/§6`、`06` **全章**、`07 §1/§2/§3/§4/§5.1/§5.2/§5.3/§6/§8/§9/§10`、`08` 各节、`09 §7/§8`、命令契约与假内核一致性、`NoticeHost`、`healthLabel`。
 
 **`07` 至此整章核完**，只剩 16.53 那一条未做到。
@@ -4918,6 +4918,49 @@ async function checkDialogNames(): Promise<void> {
 | synra-rust-app | `88b8114` `test: guard that every dialog is named` | ✅ 已推送 |
 
 **门禁**：603 前端测试、lint 0、**check 10 项**（原 9 项）。
+
+### 16.130 日志行数框没有名字，旁边的字也没连上
+
+16.129 立了 `select-names` 守卫。**这一轮用同一把尺子量 `AInput` / `ACheckbox` / `ASwitch` / `ATextarea` / `AInputNumber`。**
+
+### 一个真的
+
+```html
+<span class="text-sm">{{ messages.settings.diagnostics.lines }}</span>
+<AInputNumber :value="exportLines" :min="1" :max="10000" :precision="0" />
+```
+
+**「日志行数」是 `<span>`，数字框没有任何属性。** —— 屏幕上并排，**读屏是两个不相干的节点：一句「日志行数」，一个无名的调节框。**
+
+**这比 16.122 那个排序框更隐蔽** —— 排序框旁边什么都没有，**这个旁边有字，只是字和控件之间没有语法关系。**
+
+### 其余三个都是误报
+
+| 控件 | 为什么报 |
+| --- | --- |
+| `AInput`（插件搜索） | **多行属性，我的正则截断在 `aria-label` 之前** |
+| `ACheckbox` × 6 | **文字在标签里**（`<ACheckbox>文字</ACheckbox>`），原生命名 |
+| `ATextarea` × 3 | **外面包着 `<label>`** |
+
+**第 1 条又是 16.127 那个教训的第四次** —— 用一行的视野看多行结构。
+
+### 改法与验证
+
+```html
+<AInputNumber … :aria-label="messages.settings.diagnostics.lines" />
+```
+
+**和旁边那行 `<span>` 用同一个键** —— 两处不可能叫不同的名字。
+
+**守卫写在一个坑里：** `AInputNumber` 的**组件根节点上拿不到这个属性**（不像 `ASelect` 会传下去）。**第一版断言 `findAllComponents().attributes('aria-label')` 永远 `undefined`，改与不改一样。** 改成断言**渲染出的 markup**：
+
+```
+expected '<div class="min-w-0 stack gap-5" data…' to contain 'aria-label="Log lines"'
+```
+
+**删掉属性就红，恢复就绿。604 项。**
+
+**门禁**：604 前端测试、lint 0、check 11 项。
 
 ## 18. 不作为首批前提的增强
 
