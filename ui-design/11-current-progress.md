@@ -285,7 +285,7 @@ F 的验收里有一句“测量后决定虚拟化/分页”。补上这个结�
 
 **B. 核对通过、没有改动的**
 
-`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.117`
+`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.118`
 ——覆盖 `03 §4/§5/§6`、`04 §4.3/§5/§6`、`06` **全章**、`07 §1/§2/§3/§4/§5.1/§5.2/§5.3/§6/§8/§9/§10`、`08` 各节、`09 §7/§8`、命令契约与假内核一致性、`NoticeHost`、`healthLabel`。
 
 **`07` 至此整章核完**，只剩 16.53 那一条未做到。
@@ -4338,6 +4338,49 @@ AssertionError: … to include 'opacity-40'
 **全量 598 项**（原 595，多了这三条）。
 
 **门禁**：598 前端测试、lint 0、check 9 项；388 Rust 单元测试。
+
+### 16.118 崩溃提示的时间窗，只测了一侧
+
+16.117 补连线形状之后，**这一轮继续用「注释说了什么、测试有没有盯着」的尺子，扫 `CrashNotice`。**
+
+### 注释点了名，测试没有
+
+```ts
+function recentReports(reports: readonly CrashReport[]): readonly CrashReport[] {
+  const cutoff = Date.now() - RECENT_MS
+  // A report from the future means the clock moved backwards; treating it as recent is the safe direction
+  // (the same choice `CrashReport::is_recent` makes).
+  return reports.filter(report => report.atMs >= cutoff)
+}
+```
+
+**只有下界，没有上界** —— 这是有意的，注释还把理由写清了（时钟回拨时，未来的报告要算作近期，否则会把最该看的那条藏起来）。
+
+**而测试只测了老的一侧**：`RECENT`（0 分钟前）和 `OLD`（6 分钟前，超出 5 分钟窗口）。**「未来时间戳」这个方向一条都没有。**
+
+### 补法
+
+```ts
+mocks.call.mockResolvedValueOnce(report([{ ...RECENT, atMs: Date.now() + 60 * 60 * 1000 }]))
+```
+
+**一小时之后的报告，仍然要出现在提示里。**
+
+**验过能失败**：加上上界 `&& report.atMs <= Date.now()` →
+
+```
+AssertionError: expected '' to contain 'Synra ended unexpectedly last time.'
+```
+
+**——提示整块消失了，因为唯一的一条报告被过滤掉了。这正是注释警告的那个后果。**
+
+### 我自己制造又修掉的一个错
+
+**这次编辑前我误操作了一次**：本想插入新测试，结果只删掉了一个换行，把 `it('stays silent…', async () => {` 和下一行的 `mocks.call…` 连成了一行。`lint` 报了三条（`brace-style`、`no-multi-spaces`、`max-statements-per-line`）。
+
+**改回来了，`lint` 恢复 0。**
+
+**门禁**：599 前端测试、lint 0、check 9 项；388 Rust 单元测试。
 
 ## 18. 不作为首批前提的增强
 
