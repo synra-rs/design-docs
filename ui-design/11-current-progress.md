@@ -285,7 +285,7 @@ F 的验收里有一句“测量后决定虚拟化/分页”。补上这个结�
 
 **B. 核对通过、没有改动的**
 
-`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.104`
+`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.105`
 ——覆盖 `03 §4/§5/§6`、`04 §4.3/§5/§6`、`06` **全章**、`07 §1/§2/§3/§4/§5.1/§5.2/§5.3/§6/§8/§9/§10`、`08` 各节、`09 §7/§8`、命令契约与假内核一致性、`NoticeHost`、`healthLabel`。
 
 **`07` 至此整章核完**，只剩 16.53 那一条未做到。
@@ -3718,6 +3718,47 @@ expect(wrapper.get('[role="status"]').text()).toContain(messages.plugins.install
 ```
 
 **验过能失败**：去掉 `role="status"`，一条红。
+
+**门禁**：593 测试、lint 0、check 9 项。
+
+### 16.105 配对、遗忘、安装三处完成播报，只有一处缺 —— 这一轮没有改动
+
+16.104 补了安装成功的 `role="status"`。**这一轮把「做完一件事之后有没有声音」在其它路径上查完。**
+
+### 三处，两条路
+
+**配对成功**（`PairingPanel`）：
+
+```html
+<div v-if="currentTask" class="stack gap-3" role="status">
+  <p>{{ messages.devices.pairingPeer(taskName) }}</p>
+  <p ref="taskStatus" tabindex="-1">{{ messages.devices.pairingPhases[currentTask.phase] }}</p>
+```
+
+**`pairingPhases` 的最后一项就是 `paired: 'Paired'`** —— **整个状态块在一个 `role="status"` 里，阶段一变就播报。** 而且 `taskStatus` 有 `tabindex="-1"`，**可以让焦点也落过去。** 这处是对的，**而且比安装那处做得更全。**
+
+**遗忘设备**（`DevicesPage`）：
+
+```ts
+devices.remove(target.deviceId)
+notice.value = messages.devices.forgotten(target.displayName)
+```
+
+`notice` 渲染在 `<p role="status">` 里（`L34`）。**有。**
+
+**安装成功**（上一轮修的）—— 本来没有，已补。
+
+### 为什么配对那处不用改
+
+**配对是这一组里流程最长的一个**：等待、连接、确认，可能要几十秒。**它每一阶段都在播报，不只是最后。** —— 因为整块文案在 `role="status"` 里，`currentTask.phase` 变一次，读屏读一次。
+
+**这不是巧合，是这一处从一开始就按「状态机」写的**；而安装那处是「一个结果变量」，**所以只有它漏了播报的角色。**
+
+### 一个我没动、但值得记的细节
+
+**`L31` 那块 `role="status"` 同时包含设备名和阶段文字。** 阶段变化时，读屏会读**整块**（「正在导入回复的设备名……连接中」），**不是只读阶段那几个字。**
+
+**这是 `role="status"` 的正常行为，不算错。** —— 但如果以后发现播报太长，**可以把 `aria-atomic` 留给阶段那一行**（`TransferPrompt` 就是这么写的：`role="status" aria-live="polite" aria-atomic="true"`）。**现在没有必要改。**
 
 **门禁**：593 测试、lint 0、check 9 项。
 
