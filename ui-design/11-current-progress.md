@@ -285,7 +285,7 @@ F 的验收里有一句“测量后决定虚拟化/分页”。补上这个结�
 
 **B. 核对通过、没有改动的**
 
-`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.90`
+`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.91`
 ——覆盖 `03 §4/§5/§6`、`04 §4.3/§5/§6`、`06` **全章**、`07 §1/§2/§3/§4/§5.1/§5.2/§5.3/§6/§8/§9/§10`、`08` 各节、`09 §7/§8`、命令契约与假内核一致性、`NoticeHost`、`healthLabel`。
 
 **`07` 至此整章核完**，只剩 16.53 那一条未做到。
@@ -3074,6 +3074,76 @@ expected undefined to be 'a b&c'
 **我先写了 `action.plugin_id`** —— Rust 侧是 `plugin_id`，**但线上序列化是 camelCase `pluginId`**（`wire.ts:145`）。**照 Rust 字段名写，`check` 会报错。**
 
 **门禁**：588 测试（+4）、lint 0、check 8 项。
+
+### 16.91 `connectDevice` 现在也带上设备了
+
+16.90 修了 `installPlugin`，当时**故意没有动 `connectDevice`**，理由是「`DevicesPage` 不读任何 query，只在这一侧加就是什么也不改变的链接」。
+
+**这一轮把接收那一端补上，然后两边一起接。**
+
+### 接收端本来就有能力
+
+`DevicesPage.vue` 早就有一个函数：
+
+```ts
+function pair(deviceId: string): void {
+  if (pairing.active || pairing.busy) return
+  selectedDeviceId.value = deviceId
+  showPairing.value = true
+}
+```
+
+**选中设备、打开配对面板——正是「连接这台设备」要的。** 缺的只是一个「从外部给它一个 id」的入口。
+
+### 加上入口
+
+```ts
+const requestedDeviceId = computed(() => typeof route.query.device === 'string' ? route.query.device.trim() : '')
+watch([requestedDeviceId, () => devices.cards], ([deviceId]) => {
+  if (deviceId && devices.get(deviceId))
+    pair(deviceId)
+}, { immediate: true })
+```
+
+**两处判断都有理由**：
+
+- **`devices.get(deviceId)` 存在才调 `pair()`** —— 让 `pair()` 选中一个列表里没有的设备，面板会打开成空的
+- **`immediate: true`** —— 从别的页面直接跳进来时，没有第二次「id 变化」
+
+**`ErrorNotice` 那侧改成 `` `/devices?device=${encodeURIComponent(action.deviceId)}` ``。**
+
+### 这一段花的时间最多的地方，是测试跑不起来
+
+**新加的测试一直红，面板不打开。** 依次排掉了几个可能：
+
+| 猜的方向 | 结果 |
+| --- | --- |
+| 设备没在快照里 | **不是** —— 打印出来 `CARDS 2`、`get()` 有值 |
+| `pairing.active` 挡住了 | **不是** —— `active` 还要求 `phase` 属于四个进行中的状态 |
+| `watch` 依赖 `cards.length` 不触发 | **改了也没用** |
+| **`route.query` 是空的** | **是这里** |
+
+**打印 `route.query` 得到 `{}`，打印 `router.currentRoute.value.fullPath` 得到 `/`。**
+
+**`createMemoryHistory` 的第一次 `push` 是异步的**：不 `await`，页面挂载时读到的还是初始位置。
+
+**改法**：`mountDevices` 变成 `async`，内部 `await router.push(...)`，**23 处调用一起加 `await`**。
+
+### 顺带撞上的三个编译问题
+
+1. **重复导入 `DevicesPage`** —— 文件里原本有 `const DevicesPage = (await import('./DevicesPage.vue')).default`（在 `vi.mock` 之后，**顺序是有意的**），我又加了一行静态 `import`
+2. **`attachTo: undefined`** —— `exactOptionalPropertyTypes` 下不合法，改成有值才传
+3. **`no-use-before-define`** —— 辅助函数在 `DevicesPage` 定义之前引用它，**整块移到定义之后**
+
+### 测试
+
+两条：**带 `?device=` 时配对面板打开**、**id 不在列表里时保持关闭**。
+
+**验过能失败**：把 `pair()` 那行短路，一条红。
+
+**中途选错了设备**：`DEVICES[0]` 是已配对的 Pixel 8，**不能用它验证「打开配对」** —— 改用 `DEVICES[1]`。
+
+**门禁**：590 测试（+2）、lint 0、check 8 项。
 
 ## 18. 不作为首批前提的增强
 
