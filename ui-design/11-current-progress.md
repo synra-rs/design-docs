@@ -285,7 +285,7 @@ F 的验收里有一句“测量后决定虚拟化/分页”。补上这个结�
 
 **B. 核对通过、没有改动的**
 
-`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.66`
+`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.67`
 ——覆盖 `03 §4/§5/§6`、`04 §4.3/§5/§6`、`06` **全章**、`07 §1/§2/§3/§4/§5.1/§5.2/§5.3/§6/§8/§9/§10`、`08` 各节、`09 §7/§8`、命令契约与假内核一致性、`NoticeHost`、`healthLabel`。
 
 **`07` 至此整章核完**，只剩 16.53 那一条未做到。
@@ -2229,6 +2229,32 @@ PROBE_EMITS_DECLARED=undefined
 **两条都验过能失败**：清理那条把 `commandError.value = answer.error` 换成 `void 0`；读失败那条把 `reload` 的 `Promise.all([refresh(), refreshDevices()])` 换成空操作。
 
 **门禁**：512 测试、lint 0、check 8 项。
+
+### 16.67 搜索快捷键那条守卫，终于有测试了
+
+16.66 之后继续照"覆盖面最薄的组件"找。**这次看 `SearchPalette` 的 `onGlobalKeydown`：**
+
+```ts
+if (event.metaKey || event.ctrlKey || event.altKey) return
+if (event.isComposing) return              // 输入法合成中
+if (isTyping(event.target)) return         // 输入框里
+if (document.querySelector('.ant-modal-root:not([style*="display: none"]) .ant-modal-wrap:not([style*="display: none"])') && !open.value)
+  return
+```
+
+**前三条都有测试**（修饰键那条在 16.35 的记录里、输入框那条是 `does not take a slash typed into a field`）。**第四条一行测试都没有。**
+
+**它的意义**：别处开着模态框时，按 `/` 不该把搜索框从模态框底下翻出来。**而且它是四条里唯一靠 DOM 选择器判断的**——前三条读事件对象，这条读页面结构，**最容易随框架升级悄悄失效**。
+
+**补了一条**，构造一个不带 `display: none` 的 `.ant-modal-root > .ant-modal-wrap`，然后按 `/`，断言搜索框没出来。
+
+**验过能失败**：把那一行换成 `if (false)`，测试红。
+
+**顺带记一个边界，写进测试注释里**：**这条守卫只认内联 `display: none`**。如果 antd 改用 class 或 `hidden` 属性来隐藏模态框，守卫会失效，而**测试也会跟着失效**（因为测试也是按同样的结构构造的）。
+
+**这不是本轮能修的**：改成 `:not(.ant-modal-hidden)` 之类会依赖一个 antd 没承诺的内部 class，同样脆。**记在这里，让下一个改 antd 版本的人知道要看这里。**
+
+**门禁**：513 测试、lint 0、check 8 项。
 
 ## 18. 不作为首批前提的增强
 
