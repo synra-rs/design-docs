@@ -285,7 +285,7 @@ F 的验收里有一句“测量后决定虚拟化/分页”。补上这个结�
 
 **B. 核对通过、没有改动的**
 
-`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.131`
+`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.132`
 ——覆盖 `03 §4/§5/§6`、`04 §4.3/§5/§6`、`06` **全章**、`07 §1/§2/§3/§4/§5.1/§5.2/§5.3/§6/§8/§9/§10`、`08` 各节、`09 §7/§8`、命令契约与假内核一致性、`NoticeHost`、`healthLabel`。
 
 **`07` 至此整章核完**，只剩 16.53 那一条未做到。
@@ -5000,6 +5000,66 @@ const controls = [
 | 仓库 | 提交 | 状态 |
 |---|---|---|
 | synra-rust-app | `c14af76` `test: guard every select and number box is named` | ✅ 已推送 |
+
+**门禁**：604 前端测试、lint 0、check 11 项。
+
+### 16.132 传输进度条只说了「这是进度」，没说多少
+
+16.131 把控件命名规则合并成一张表。**这一轮看另一类：有值、但值没说出口的元素。**
+
+### 全仓只有一个 `AProgress`
+
+```html
+<AProgress class="flex-1" :percent="percentOf(transfer)" size="small" />
+<span class="text-xs text-ink-dim">{{ progressLabel(transfer) }}</span>
+```
+
+**旁边那个 span 有「5 B of 10 B」。** —— 屏幕上一眼读完，**读屏是两件事：一个进度条，一个数字。**
+
+### 而进度条本身连数字都没有
+
+`ant-design-vue` 的 `progress.js`：
+
+```js
+_createVNode("div", _objectSpread(_objectSpread({
+  "role": "progressbar"
+}, restAttrs), {}, { … }), [progress])
+```
+
+**只有 `role="progressbar"`，没有任何 `aria-valuenow`。** —— **`restAttrs` 在那个 `role` 之后展开，所以传进去的 `aria-*` 会落在同一个节点上，这是唯一的口子。**
+
+### 更刺眼的是旁边那句注释
+
+```html
+★ The bar and the sentence are two views of one number: "50%" is what a progress element announces …
+```
+
+**「进度元素播报 50%」—— 它没有播报任何数字。** 这行注释描述的是一件代码从未做过的事。**写测试时我给 `expect(wrapper.text()).toContain('50%')` 加了断言，那条断言过了 —— 因为 `50%` 来自 `progressLabel` 里的那个百分号，不是进度条。**
+
+### 改法
+
+```html
+<AProgress
+  role="progressbar"
+  :aria-valuenow="percentOf(transfer)"
+  aria-valuemin="0"
+  aria-valuemax="100"
+  :aria-valuetext="progressLabel(transfer)"
+  …
+/>
+```
+
+**四个属性都走 `restAttrs`** —— **`aria-valuetext` 用同一句「5 B of 10 B」，所以数字和它旁边的字不可能对不上。**
+
+### 守卫
+
+在原有测试里补四条，**断言渲染出来的 `[role="progressbar"]` 上的属性**：
+
+```
+删掉 :aria-valuenow → expected undefined to be '50'
+```
+
+**604 项全绿。**
 
 **门禁**：604 前端测试、lint 0、check 11 项。
 
