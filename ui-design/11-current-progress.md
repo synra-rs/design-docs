@@ -285,7 +285,7 @@ F 的验收里有一句“测量后决定虚拟化/分页”。补上这个结�
 
 **B. 核对通过、没有改动的**
 
-`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.115`
+`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.116`
 ——覆盖 `03 §4/§5/§6`、`04 §4.3/§5/§6`、`06` **全章**、`07 §1/§2/§3/§4/§5.1/§5.2/§5.3/§6/§8/§9/§10`、`08` 各节、`09 §7/§8`、命令契约与假内核一致性、`NoticeHost`、`healthLabel`。
 
 **`07` 至此整章核完**，只剩 16.53 那一条未做到。
@@ -4244,6 +4244,52 @@ impl SendOutcome {
 **`life_state` 走的是后一条**（改枚举要动 `PluginRow` 的入参形状，代价比一份测试大）。
 
 **门禁**：593 前端测试、lint 0、check 9 项；388 Rust 单元测试。
+
+### 16.116 颜色测试少覆盖了两个状态
+
+16.115 立了一条规则：**字符串字面量清单**要么有穷举 `match` 管着，要么钉在测试里。**这一轮拿它扫前端。**
+
+### 找到的清单
+
+`HomePage` 的 `intentStateColor`：
+
+```ts
+if (state === 'succeeded') return 'success'
+if (state === 'failed' || state === 'timedOut' || state === 'refused') return 'error'
+if (state === 'noHandler') return 'warning'
+if (state === 'matching' || state === 'choosing' || state === 'confirming' || state === 'dispatching')
+  return 'processing'
+return 'default'      // ← 只有 cancelled 应该走到这里
+```
+
+**覆盖 9 个状态，第 10 个 `cancelled` 落在 `default`。** 注释说明这是有意的 —— 「什么都不再发生」，灰色是对的。
+
+**而它的测试 `it.each` 只有 8 项**：`matching` / `choosing` / `confirming` / `dispatching` / `succeeded` / `noHandler` / `failed` / `cancelled`。
+
+**`timedOut` 和 `refused` 不在里面。**
+
+### 这意味着什么
+
+**代码把它们归到 `error`，但没有任何断言盯着这两个归属。** 有人把它们从 `error` 那条 `if` 里删掉（比如以为「超时不算错」），**测试全绿，而界面上超时和拒绝会变成灰色 —— 和 `cancelled` 同色**，而注释刚说过「灰色只代表什么都不再发生」。
+
+### 改法
+
+**补两条，凑成和 `received.states` 同一份十项清单：**
+
+```ts
+['timedOut', 'error'],
+['refused', 'error'],
+```
+
+**验过能失败**：把 `timedOut` 从 `error` 那条 `if` 里摘掉 →
+
+```
+AssertionError: expected 'default' to be 'error'
+```
+
+**恢复后 10 项全绿，全量 595 项**（原 593，多了这两条）。
+
+**门禁**：595 前端测试、lint 0、check 9 项；388 Rust 单元测试。
 
 ## 18. 不作为首批前提的增强
 
