@@ -285,7 +285,7 @@ F 的验收里有一句“测量后决定虚拟化/分页”。补上这个结�
 
 **B. 核对通过、没有改动的**
 
-`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.92`
+`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.93`
 ——覆盖 `03 §4/§5/§6`、`04 §4.3/§5/§6`、`06` **全章**、`07 §1/§2/§3/§4/§5.1/§5.2/§5.3/§6/§8/§9/§10`、`08` 各节、`09 §7/§8`、命令契约与假内核一致性、`NoticeHost`、`healthLabel`。
 
 **`07` 至此整章核完**，只剩 16.53 那一条未做到。
@@ -3192,6 +3192,56 @@ case 'openSettings': return `/settings?category=${encodeURIComponent(action.sect
 一条：`openSettings` 带 `section: 'security'`，点按钮后路由是 `/settings` 且 `query.category === 'security'`。
 
 **验过能失败**：改回 `'/settings'`，得到 **`expected undefined to be 'security'`**。
+
+**门禁**：591 测试、lint 0、check 8 项。
+
+### 16.93 搜索里搜到设备，点进去还是列表
+
+16.90—16.92 把 `ErrorNotice` 的三个动作都接上了。**这一轮顺着同一个形态往下走：还有哪儿是「调用方有数据、被调用方有能力、中间没传」。**
+
+按这个查了所有 `router.push`，六处。**四处本来就对**：
+
+- `ErrorNotice` —— 刚修完
+- `NoticeHost` —— **早就写了 `?plugin=`**
+- `SearchPalette` 的插件项 —— **也写了 `encodeURIComponent`**
+- `HomePage` 空状态的「管理设备」—— **没有具体设备，不带参数是对的**
+
+**问题在第五处**：搜索面板的设备项。
+
+```ts
+...devices.cards.map(card => ({
+  id: `device:${card.deviceId}`,
+  label: card.displayName,
+  to: '/devices'          // ← deviceId 就在手边
+})),
+```
+
+**搜索出「Studio laptop」，点它，落到设备列表顶部。**
+
+**而上一轮（16.91）刚给设备页加了 `?device=` 支持。** 也就是说：**这个调用方在功能做好的第二天仍然没有用上它** —— 两个调用方修改时间不同，中间的空档就变成了新的不一致。
+
+### 它为什么没被测出来
+
+`search-palette.mount.test.ts` 里有一条：
+
+```ts
+it('takes a device to the devices page', async () => {
+  ...
+  expect(router.currentRoute.value.path).toBe('/devices')
+})
+```
+
+**只断言了 `path`。** 带不带 query，这条测试都会绿。
+
+**补一句 `query.device` 就够**，不用新写测试。**验过能失败**：
+
+```
+expected undefined to be 'peer-1'
+```
+
+### 顺带核了一处，没改
+
+**`to: \`/settings?category=${section}\`` 没做编码**，但 `SETTINGS_SECTIONS` 是固定枚举、值是简单标识符，**编码与不编码结果相同**。**不在固定枚举上假想一个不存在的风险。**
 
 **门禁**：591 测试、lint 0、check 8 项。
 
