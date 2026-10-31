@@ -285,7 +285,7 @@ F 的验收里有一句“测量后决定虚拟化/分页”。补上这个结�
 
 **B. 核对通过、没有改动的**
 
-`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.128`
+`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.129`
 ——覆盖 `03 §4/§5/§6`、`04 §4.3/§5/§6`、`06` **全章**、`07 §1/§2/§3/§4/§5.1/§5.2/§5.3/§6/§8/§9/§10`、`08` 各节、`09 §7/§8`、命令契约与假内核一致性、`NoticeHost`、`healthLabel`。
 
 **`07` 至此整章核完**，只剩 16.53 那一条未做到。
@@ -4869,6 +4869,55 @@ APopconfirm  1 处（HomePage:78）
 **三项都核过，没有一处要改。** —— 但第一条顺带确认了一件旧账：**`APopconfirm` 那两个按钮的触控下限还在。** 16.99 说这类应用点「靠记忆」，**记忆现在还在。**
 
 **门禁**：603 前端测试、lint 0、check 9 项。
+
+### 16.129 把「对话框必须有名字」变成第 10 项守卫
+
+16.127 那次核查是手工做的 —— **八处都对，但那是「我查过一遍」，不是「以后错不了」。** 这一轮把它固化。
+
+### 新守卫 `checkDialogNames`
+
+```ts
+async function checkDialogNames(): Promise<void> {
+  const files = await sources(join(here, 'src'))
+  …
+  let index = text.indexOf('<AModal')
+  while (index !== -1) {
+    const close = text.indexOf('>', index)
+    const tag = text.slice(index, close === -1 ? undefined : close)
+    counted += 1
+    if (!/:title=|:wrap-props=/.test(tag)) { … }
+    index = text.indexOf('<AModal', index + 1)
+  }
+  notes.push(`dialog-names: ${counted.toString()} dialog(s) are named`)
+}
+```
+
+**它读的是整个开标签（从 `<AModal` 到第一个 `>`），不是若干行** —— **16.127 那三次误判直接写进了注释，免得下一个人再用手工办法查。**
+
+### 两条命名途径都认
+
+- **`:title`** —— 有标题栏的对话框，`vc-dialog` 用 `aria-labelledby` 接上
+- **`:wrap-props=`** —— 不要标题栏的那种（搜索面板），`aria-label` 直接落在 `role="dialog"` 上
+
+**只认一条就会把另一半报成失败。** 两条都认，才对得上 `Dialog.js` 里那两个位置。
+
+### 验过能失败
+
+**删掉 `SearchPalette` 的 `:wrap-props`：**
+
+```
+✗ dialog-names: src\components\SearchPalette.vue:23 opens a dialog with neither `:title` nor `:wrap-props=`
+```
+
+**恢复后：`✓ shapes agree (10 checks)`，`· dialog-names: 8 dialog(s) are named`。**
+
+### 提交
+
+| 仓库 | 提交 | 状态 |
+|---|---|---|
+| synra-rust-app | `88b8114` `test: guard that every dialog is named` | ✅ 已推送 |
+
+**门禁**：603 前端测试、lint 0、**check 10 项**（原 9 项）。
 
 ## 18. 不作为首批前提的增强
 
