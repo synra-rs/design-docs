@@ -285,7 +285,7 @@ F 的验收里有一句“测量后决定虚拟化/分页”。补上这个结�
 
 **B. 核对通过、没有改动的**
 
-`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.91`
+`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.92`
 ——覆盖 `03 §4/§5/§6`、`04 §4.3/§5/§6`、`06` **全章**、`07 §1/§2/§3/§4/§5.1/§5.2/§5.3/§6/§8/§9/§10`、`08` 各节、`09 §7/§8`、命令契约与假内核一致性、`NoticeHost`、`healthLabel`。
 
 **`07` 至此整章核完**，只剩 16.53 那一条未做到。
@@ -3144,6 +3144,56 @@ watch([requestedDeviceId, () => devices.cards], ([deviceId]) => {
 **中途选错了设备**：`DEVICES[0]` 是已配对的 Pixel 8，**不能用它验证「打开配对」** —— 改用 `DEVICES[1]`。
 
 **门禁**：590 测试（+2）、lint 0、check 8 项。
+
+### 16.92 第三个动作也丢参数，三个丢完了
+
+16.90 修了 `installPlugin`，16.91 修了 `connectDevice`。**`to()` 有三个分支，剩下那个是 `openSettings`。**
+
+```ts
+case 'openSettings': return '/settings'
+```
+
+**而 `OpenSettings` 是带 `section` 的**（`error.rs:392`，注释写「Section key, stable across versions」）。
+
+**接收端也早就有了**：
+
+```ts
+function categoryFromQuery(): Category | undefined {
+  const asked = route.query.category
+  return categories.value.find(item => item.value === asked)?.value
+}
+```
+
+**`find()` 只认已知分类，未知的返回 `undefined`，随后直接 `return`** —— **所以「传原值、未知则落到第一列」是安全写法，不需要在这一侧校验。**
+
+### 改法
+
+```ts
+case 'openSettings': return `/settings?category=${encodeURIComponent(action.section)}`
+```
+
+**和另外两个一样：传内核给的值，让接收端决定认不认。**
+
+### 这次内核也不会发它
+
+**`OpenSettings` 在内核里同样只有定义和 serde 测试**（`error.rs:434`）。**和 `ViewLogs` 一样，是协议里声明了、还没人发的能力。**
+
+**但这里的处理不一样**：
+
+| | `ViewLogs` | `OpenSettings` |
+| --- | --- | --- |
+| 接收端 | **没有**（没日志视图、没读日志的命令） | **有**（`?category=` 已实现） |
+| 这一轮怎么办 | **不改**，只记录 | **接上参数** |
+
+**区别在于「两端都缺」和「只缺一半」。** 前者要建功能，后者是接线。
+
+### 测试
+
+一条：`openSettings` 带 `section: 'security'`，点按钮后路由是 `/settings` 且 `query.category === 'security'`。
+
+**验过能失败**：改回 `'/settings'`，得到 **`expected undefined to be 'security'`**。
+
+**门禁**：591 测试、lint 0、check 8 项。
 
 ## 18. 不作为首批前提的增强
 
