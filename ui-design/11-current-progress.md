@@ -285,7 +285,7 @@ F 的验收里有一句“测量后决定虚拟化/分页”。补上这个结�
 
 **B. 核对通过、没有改动的**
 
-`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.120`
+`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.121`
 ——覆盖 `03 §4/§5/§6`、`04 §4.3/§5/§6`、`06` **全章**、`07 §1/§2/§3/§4/§5.1/§5.2/§5.3/§6/§8/§9/§10`、`08` 各节、`09 §7/§8`、命令契约与假内核一致性、`NoticeHost`、`healthLabel`。
 
 **`07` 至此整章核完**，只剩 16.53 那一条未做到。
@@ -4467,6 +4467,72 @@ AssertionError: expected '' to contain 'Synra ended unexpectedly last time.'
 | synra-rust-app | `cd0dfb0` `fix: name collapse panels without the arrow word` | ✅ 已推送 |
 
 **门禁**：600 前端测试、lint 0、check 9 项。
+
+### 16.121 两个菜单都没有名字，另有一个孤立的标签
+
+16.120 修箭头时，`observe` 的树里还有一行没解释：
+
+```
+@e7 button "设置分类"
+navigation "设置分类"
+  @e8 menuitem "通用" …
+```
+
+**一个按钮和一个区域用了同一个名字。**
+
+### 那个"按钮"是个没有归属的 `<label>`
+
+```html
+<label for="settings-category" class="sr-only">设置分类</label>
+<ASelect id="settings-category" class="w-full lg:hidden" … />
+<AMenu class="hidden lg:block" … >
+```
+
+**`label` 和 `ASelect` 是一对，只在窄屏存在** —— `ASelect` 带着 `lg:hidden`，**但 `label` 没有。** 宽屏下 `select` 被隐藏，**`label` 就成了一个指不到东西、却仍被读出来的可点击元素。**
+
+**这不是"多余"，是错位。**
+
+### 两个菜单都空着名字
+
+`AMenu` 渲染成 `<ul role="menu">`，**没有 `aria-label` 时就是一个无名菜单。** 侧栏那四个链接（首页/设备/插件/设置）**从一个无名菜单里冒出来**，读屏用户不知道它们是"这个窗口的四个页面"。
+
+**`App.vue` 的侧栏和设置页的分类菜单，两处都是这样。**
+
+### 改法
+
+| 位置 | 改动 |
+| --- | --- |
+| `label` | 加 `lg:hidden`，跟着它那一对一起隐藏 |
+| `App.vue` 的 `AMenu` | `:aria-label="messages.app.navigation"`（新增，`'Pages'` / `'页面导航'`） |
+| 设置页的 `AMenu` | `:aria-label="messages.settings.navigation"`（这个键本来就在） |
+
+**名字放在 `messages.app` 而不是 `nav.ts`** —— `nav.ts` 被 `uno.config.ts` 拿去做 `safelist`，**往那个对象里加一个字符串键会污染遍历页面的循环。**
+
+### 验证
+
+```
+menu "页面导航"
+  @e2 menuitem "首页" …
+navigation "设置分类"
+  menu "设置分类"
+    @e7 menuitem "通用" …
+```
+
+**`button "设置分类"` 消失了，两个菜单都有名字。**
+
+### 守卫
+
+`app-locale.mount.test.ts` 加一条：找到有 `menuitem` 的那个 `[role="menu"]`，断言 `aria-label` 等于 `messages.app.navigation`。
+
+**验过能失败** —— 删掉 `:aria-label` → `expected undefined to be 'Pages'`。
+
+### 提交
+
+| 仓库 | 提交 | 状态 |
+|---|---|---|
+| synra-rust-app | `f0de92a` `fix: name both page menus` | ✅ 已推送 |
+
+**门禁**：601 前端测试、lint 0、check 9 项。
 
 ## 18. 不作为首批前提的增强
 
