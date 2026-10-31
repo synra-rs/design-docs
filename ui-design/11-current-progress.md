@@ -285,7 +285,7 @@ F 的验收里有一句“测量后决定虚拟化/分页”。补上这个结�
 
 **B. 核对通过、没有改动的**
 
-`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.89`
+`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.90`
 ——覆盖 `03 §4/§5/§6`、`04 §4.3/§5/§6`、`06` **全章**、`07 §1/§2/§3/§4/§5.1/§5.2/§5.3/§6/§8/§9/§10`、`08` 各节、`09 §7/§8`、命令契约与假内核一致性、`NoticeHost`、`healthLabel`。
 
 **`07` 至此整章核完**，只剩 16.53 那一条未做到。
@@ -3016,6 +3016,64 @@ expected [ '', 'Try again', 'Cancel', 'Remove' ] to not include 'Try again'
 **不改代码。** 这条记在这里，是为了下次有人（包括我）再看到"定义没人用"时，**先问一句：是代码没写，还是协议在等代码？**
 
 **门禁**：无改动，工作区干净。
+
+### 16.90 「去装这个插件」的按钮，把人送到列表顶上
+
+`ErrorNotice` 把所有错误里的建议动作渲染成按钮。指向哪个页面由 `to()` 决定：
+
+```ts
+case 'installPlugin': return '/plugins'
+```
+
+**而 `installPlugin` 是带 `pluginId` 的**（`wire.ts:145`）。
+
+### 真正的问题
+
+`PluginsPage` 早就支持定位了：
+
+```ts
+const targetPluginId = computed(() => typeof route.query.plugin === 'string' ? route.query.plugin.trim() : '')
+```
+
+**它读 `?plugin=`，会显示那一行、给标题、没找到时还会说明。** 而 `ErrorNotice` 从来没传过这个参数。
+
+**于是内核说「装这个插件」，点了按钮落到插件列表最上面，剩下的靠用户自己翻。**
+
+**能力两端都有，中间那一段没接。**
+
+### 改法
+
+```ts
+case 'installPlugin': return `/plugins?plugin=${encodeURIComponent(action.pluginId)}`
+```
+
+**`encodeURIComponent` 是必须的**：带作用域的 id 形如 `@acme/hello`，斜杠在 query 里会被当成路径分隔。
+
+### `connectDevice` 为什么不同步改
+
+**`DevicesPage` 不读任何 query**（查过：没有 `useRoute` 调用）。**只在这一侧加 `?device=` 是个什么也不改变的链接**——所以留原样，并在注释里写明原因。
+
+### 顺带补上 `ErrorNotice` 的第一份挂载测试
+
+**它撑着四个页面的全部错误显示，却一直没有专属测试文件。** 新建 4 条：
+
+- 插件 id 真的进到 query
+- 带空格和 `&` 的 id 经过编码后仍能原样读回
+- `requestCapability` 是文字不是按钮（**没有页面可去，就不能给一个点了没反应的按钮**）
+- 没有动作时不渲染那一行
+
+**验过能失败**：把 `to()` 改回 `'/plugins'`，两条红：
+
+```
+expected undefined to be '@acme/hello'
+expected undefined to be 'a b&c'
+```
+
+### 过程中差点写错的字段名
+
+**我先写了 `action.plugin_id`** —— Rust 侧是 `plugin_id`，**但线上序列化是 camelCase `pluginId`**（`wire.ts:145`）。**照 Rust 字段名写，`check` 会报错。**
+
+**门禁**：588 测试（+4）、lint 0、check 8 项。
 
 ## 18. 不作为首批前提的增强
 
