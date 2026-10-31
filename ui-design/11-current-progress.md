@@ -285,7 +285,7 @@ F 的验收里有一句“测量后决定虚拟化/分页”。补上这个结�
 
 **B. 核对通过、没有改动的**
 
-`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.97`
+`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.98`
 ——覆盖 `03 §4/§5/§6`、`04 §4.3/§5/§6`、`06` **全章**、`07 §1/§2/§3/§4/§5.1/§5.2/§5.3/§6/§8/§9/§10`、`08` 各节、`09 §7/§8`、命令契约与假内核一致性、`NoticeHost`、`healthLabel`。
 
 **`07` 至此整章核完**，只剩 16.53 那一条未做到。
@@ -3413,6 +3413,57 @@ function selectCategory(value: unknown): void {
 **这是纯样式，现有测试都不查计算样式。** 上一轮同样的改动也没加测试——**`min-h-11` 的存在由容器类名保证，而容器类名没有测试覆盖，这是这个项目当前的空白，不是这一轮引入的。**
 
 **门禁**：593 测试、lint 0、check 8 项。
+
+### 16.98 把「别忘写那条规则」变成一条检查
+
+16.97 修了三个页面缺 44px 规则的问题。**但它能被发现，是因为我恰好做了「把同类元素排成一列」这件事。下一次加页面，同样的事还会发生。**
+
+**这一轮考虑的是：怎么让它不再靠人记得。**
+
+### 先试了两条路，都不行
+
+**一、在 `uno.config.ts` 里加 shortcut。** 打开文件，第一段注释写着：
+
+> Everything the interface is allowed to say about colour, type, spacing, radius, motion and z-order lives in `@synra/theme` — this file only says *which tier of preflight* to emit
+
+**紧接着还有一句专门针对我这个想法**：
+
+> ★ This file deliberately does **not** enable `presetAttributify` or `transformerDirectives` (R5): **a shortcut that exists by default is harder to bypass than a rule that has to be remembered.**
+
+**作者已经想过这条路，并且拒绝了。**
+
+**二、让 `size="small"` 的按钮全局就是 44px。** 那会连页头一起改，**而页头那批本来就有自己的 32px 回落** —— 等于把一处特例变成全局特例。
+
+### 改成守卫
+
+项目已经有 `scripts/check-shapes.ts`（`pnpm run check` 的第二半），**里面八条检查，都是「某处该有的东西有没有」。**
+
+加第九条 `checkPageButtons()`：
+
+- **只看 `src/pages` 下有 `<section>` 且有 `<AButton>` 的文件** —— 四个页面
+- **要求根 `<section>` 带 `[&_.ant-btn]:min-h-11`**
+- **不要求每个文件都带** —— `SettingsRow`、`PageHeader`、`DeviceRow` 自己抬自己那批，**它们嵌在页面里，要求它们等于要求两次**
+
+**结果**：
+
+```
+· page-buttons: 4 page(s) raise their body buttons
+✓ shapes agree (9 checks)
+```
+
+**验过能抓到**：删掉首页那条规则，得到
+
+```
+✗ page-buttons: src\pages\HomePage.vue draws buttons but its section does not carry `[&_.ant-btn]:min-h-11`
+```
+
+### 这条检查的边界
+
+**它只保证「规则在」，不保证「规则有效」。** 规则被写成一个拼错的类名、或者被后面一条 CSS 覆盖，它看不见。**那需要读计算样式，而这是 jsdom 给不了的。**
+
+**写下来，是因为「有检查」容易让人以为「这一类问题没了」。**
+
+**门禁**：593 测试、lint 0、check 9 项。
 
 ## 18. 不作为首批前提的增强
 
