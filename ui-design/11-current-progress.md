@@ -285,7 +285,7 @@ F 的验收里有一句“测量后决定虚拟化/分页”。补上这个结�
 
 **B. 核对通过、没有改动的**
 
-`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.139`
+`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.140`
 ——覆盖 `03 §4/§5/§6`、`04 §4.3/§5/§6`、`06` **全章**、`07 §1/§2/§3/§4/§5.1/§5.2/§5.3/§6/§8/§9/§10`、`08` 各节、`09 §7/§8`、命令契约与假内核一致性、`NoticeHost`、`healthLabel`。
 
 **`07` 至此整章核完**，只剩 16.53 那一条未做到。
@@ -5361,6 +5361,71 @@ group-hover:text-primary                            ← 放大镜在悬停时亮
 **门禁**：604 前端测试、lint 0、**check 13 项**（原 12 项）。
 
 **还剩三页没套这套样板** —— 首页、设备、设置。
+
+### 16.140 那个灰块，是浏览器的默认按钮
+
+用户第三次说「还是有浮雕感」。**前三次我都改错了地方。**
+
+### 我改错的三个方向
+
+| 我以为是 | 实际 |
+| --- | --- |
+| `focusable` 的常驻焦点环 | 它确实在加环，**但不是那个灰底** |
+| `ring-1` 没生效 | **方向完全错了** |
+| 主题里 `!important` 的玻璃样式 | 那是**浮层**的，与此无关 |
+
+**每次都在改「我加的类」，没有先问一句：这个灰块是谁画的？**
+
+### 答案是 user agent 样式表
+
+**每个 `<button>` 天生带：**
+
+```css
+background-color: buttonface;
+border: 1px solid buttonborder;
+```
+
+**类名里不写背景 ≠ 没有背景。** —— **浏览器给的默认底还在，只是它不属于任何一层我可以覆盖的类。**
+
+**`border-0` + `bg-transparent` 才是把它变成 ghost 的那一刀。**
+
+### 而同一个坑还有第二处
+
+**搜索面板的每一个选项都是原生 `<button role="option">`，同样没有重置** —— **整个结果列表曾经是灰色按钮块。**
+
+**这是那次修复真正的收获：不是修了一个按钮，是发现了「原生 button 从未被系统性地重置过」这件事。**
+
+### 改法
+
+```html
+<!-- 搜索入口 -->
+class="… rounded-pill border-0 bg-transparent px-2.5 …
+       hover:bg-raised hover:text-ink
+       focus-visible:ring-1 focus-visible:ring-primary"
+```
+
+**顺带补上用户要的那几样：** `ATooltip` 里放「快捷键」加一个 `<code>` 包住的 `/`；`rounded-pill` 而不是方角（44 × 44 的近方角在这个尺寸就是「按钮」的形状来源）；`min-h-11 md:min-h-8` 保住 44px 触控。
+
+### 守卫 `checkNativeButtons`（第 14 项）
+
+**扫所有原生 `<button>`，要求同时有 `border-0` 和 `bg-transparent`。**
+
+**第一版误报两处** —— 我的正则从注释里的 `<button>` 字样开始匹配。**剥掉注释再扫，误报消失**（`3 native <button>s clear the user agent look`）。
+
+**验过能红** —— 拿掉 `bg-transparent`：
+
+```
+✗ native-buttons: src\App.vue:72 draws a native `<button>` without `bg-transparent` — the user agent's tile and frame show through
+```
+
+### 提交
+
+| 仓库 | 提交 | 状态 |
+|---|---|---|
+| synra-rust-app | `e428a1b` `fix: make the search entry a real ghost icon` | ✅ |
+| synra-rust-app | `c436aca` `fix: clear the user agent look on every button` | ✅ |
+
+**门禁**：604 前端测试、lint 0、**check 14 项**（原 13 项）。
 
 ## 18. 不作为首批前提的增强
 
