@@ -2374,6 +2374,44 @@ probeStatus: (status: string) => status === 'ok' ? 'OK' : status === 'warn' ? 'W
 
 **这个模式没有第三个实例。** 再往下找就得换一种错法。
 
+### 16.71 崩溃提示导出诊断后，只说了文件在哪
+
+这一轮的起点不是扫代码，是**换了一种看法**：先建立能力地图，再找「同一件事有两处实现、其中一处漏了」的地方。
+
+**结果发现了一处真的。**
+
+`diag_export` 返回三样东西：
+
+```ts
+export interface DiagExportResult {
+  readonly path: string          // 写出的文件
+  readonly included: readonly string[]   // 它包含的章节
+  readonly excluded: readonly string[]   // 被略过的章节与原因
+}
+```
+
+**两个入口用同一个命令，只用了一半：**
+
+| 入口 | 显示 |
+| --- | --- |
+| 设置 → 诊断（`SettingsDiagnostics.vue:158-160`） | 路径 + 「已包含」+「未包含」 |
+| 崩溃提示（`CrashNotice.vue`） | **只有路径** |
+
+**这份文件是写给别的人看的**——用户遇到崩溃、导出诊断、发给支持的人。**包里少了审计日志，收件人看不出来**，只看到一个路径和一串 `included`/`excluded` 字段被丢掉。
+
+**改法**：`CrashNotice` 存下 `included`/`excluded` 并渲染，文案新增 `bundleIncluded` / `bundleExcluded` 两条（两语言同批）。
+
+**测试**：
+
+- 有包含、有排除时，两行都出现；
+- 排除为空时，**不画一个「未包含：」后面跟空白的行**。
+
+**为什么旧的测试没发现**：L92 那条用的是 `included: [] / excluded: []`——**两个空数组**，所以不管渲染不渲染，屏幕上都一样。**空值让断言失去了分辨能力**，这是这几周第三次遇到同一类问题（第一次是只测一种语言，第二次是测试构造和实现同构）。
+
+**验过能失败**：把 `v-if="bundleSections"` 换成 `v-if="false"`，两条红。
+
+**门禁**：536 测试、lint 0、check 8 项。
+
 ## 18. 不作为首批前提的增强
 
 **这一节原来把四件事并列写成一句「都按实际收益决定」，但四件的状态各不相同**（16.61 核实）：
