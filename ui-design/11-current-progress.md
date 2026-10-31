@@ -285,7 +285,7 @@ F 的验收里有一句“测量后决定虚拟化/分页”。补上这个结�
 
 **B. 核对通过、没有改动的**
 
-`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.116`
+`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.117`
 ——覆盖 `03 §4/§5/§6`、`04 §4.3/§5/§6`、`06` **全章**、`07 §1/§2/§3/§4/§5.1/§5.2/§5.3/§6/§8/§9/§10`、`08` 各节、`09 §7/§8`、命令契约与假内核一致性、`NoticeHost`、`healthLabel`。
 
 **`07` 至此整章核完**，只剩 16.53 那一条未做到。
@@ -4290,6 +4290,54 @@ AssertionError: expected 'default' to be 'error'
 **恢复后 10 项全绿，全量 595 项**（原 593，多了这两条）。
 
 **门禁**：595 前端测试、lint 0、check 9 项；388 Rust 单元测试。
+
+### 16.117 首页那条连线，四种形状一个测试都没有
+
+16.116 补完颜色测试后，**这一轮查同一张卡上的另一处：`wireWidth` 和 `wireLive`。** 它们决定那条连线画多长、亮不亮，**两个函数都没有任何测试调用。**
+
+### 规范写得很清楚
+
+`R23` 落在这个组件上的注释是：
+
+> The four states are distinct as **shapes**, not only as colours: nothing paired is a short stub, a paired line is a line that reaches across, and a live line also glows. **A greyscale screenshot still tells them apart.**
+
+对照实现：
+
+```ts
+switch (wire.value.state) {
+  case 'transferring': return 'w-1/2'
+  case 'connected':    return 'w-full'
+  case 'offline':      return 'w-full opacity-40'
+  default:             return 'w-1/12'
+}
+const wireLive = computed(() => state === 'connected' || state === 'transferring')
+```
+
+**`offline` 和 `connected` 都是 `w-full`，只差 `opacity-40`。** —— 把 `offline` 那条 `opacity-40` 删掉，**两者就完全一样了**，而没有任何测试会红。
+
+### 写测试时踩的两个坑
+
+**① 设备不在命令里。** 我先写 `answer({ devices_snapshot: … })`，跑出来是 `w-1/12`（`none`）。查 `HomePage` 的 `load()` —— **它只问 `intent_list` / `transfer_list` / `transfer_received` 三个，设备来自 store。** 改成 `useDevicesStore().applySnapshot(...)`。
+
+**② `w-full opacity-40` 是两个类。** `classes()` 返回数组，`toContain('w-full opacity-40')` 永远是假。改成分开断言。
+
+### 最终三条
+
+```ts
+it('draws a connected wire as the full, lit line')          // w-full + glow
+it('draws an offline wire dimmer than a connected one')     // w-full + opacity-40, no glow
+it('draws nothing paired as a short stub')                  // w-1/12, no glow
+```
+
+**验过能失败**：把 `offline` 的返回值改成 `'w-full'` →
+
+```
+AssertionError: … to include 'opacity-40'
+```
+
+**全量 598 项**（原 595，多了这三条）。
+
+**门禁**：598 前端测试、lint 0、check 9 项；388 Rust 单元测试。
 
 ## 18. 不作为首批前提的增强
 
