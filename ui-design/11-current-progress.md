@@ -285,7 +285,7 @@ F 的验收里有一句“测量后决定虚拟化/分页”。补上这个结�
 
 **B. 核对通过、没有改动的**
 
-`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.112`
+`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.114`
 ——覆盖 `03 §4/§5/§6`、`04 §4.3/§5/§6`、`06` **全章**、`07 §1/§2/§3/§4/§5.1/§5.2/§5.3/§6/§8/§9/§10`、`08` 各节、`09 §7/§8`、命令契约与假内核一致性、`NoticeHost`、`healthLabel`。
 
 **`07` 至此整章核完**，只剩 16.53 那一条未做到。
@@ -4101,6 +4101,96 @@ readonly state: string
 **而且它是对的**：新增一个状态时，界面显示 `someNewState` 而不是空白 —— **难看，但比空白诚实。**
 
 **门禁**：593 测试、lint 0、check 9 项。
+
+### 16.113 六处动态索引逐个对来源 —— 都齐，但齐的方式值得记
+
+16.112 说清了「静态搜不到」不能证明没人用。**这一轮把全部动态索引点列出来，逐个对来源。**
+
+**全仓六处：**
+
+| 位置 | 索引键 |
+| --- | --- |
+| `ErrorNotice` ×2 | `messages.actions[action.kind]` |
+| `PairingPanel` | `devices.pairingPhases[currentTask.phase]` |
+| `SearchPalette` | `settings.categories[section]` |
+| `PluginsPage` | `plugins.states[plugin.state]` |
+| `HomePage` ×2 | `wire.states[…]` / `received.states[…]` |
+
+### 逐处对到来源
+
+- **`plugins.states`**：**六个键，对着 `src-tauri/src/commands/plugins.rs` 的 `life_state()` 六个 `return` 值数过**（`disabled` / `awaiting_consent` / `unreadable` / `faulted` / `active` / `unavailable`），**中英两侧都在**
+- **`actions`**：**六个键，与协议 `SuggestedAction` 的六个变体一致**
+- **`settings.categories`**：**五个键，与 `SettingsPage` 里 `['general','security','plugins','diagnostics','about']` 一致**
+- **`pairingPhases` / 两处 `wire.states`**：16.112 刚核过
+
+**一处不缺。**
+
+### 但"齐"是靠三份手写清单互相看着
+
+**`plugins.states` 这件事，同一组状态名在三个地方各写了一遍：**
+
+```
+① plugins.rs 的 life_state()  ——六个 return，Rust 的真相
+② home.ts / plugins.ts 的键      ——前端六行
+③ messages-plugins.test.ts 的 it.each(['active', …, 'unavailable'])
+```
+
+**第 ③ 处是守卫，而且它是这三份里最完整的一份** —— `it.each` 逐个断言「有标签且不等于原始名」。**Rust 侧反而只有两道断言**（`faulted` / `active`），**没有把六个都钉住。**
+
+**所以现在的状态是**：**前端测试最严，Rust 测试最松，中间那六行没人管**。 —— **新增一个状态时，第 ③ 处不会变红**（它只检查它列出的六个），**第 ① 处也可能不红**（没断言全覆盖），**结果就是 16.112 说的那个 `?? plugin.state` 兜底把英文名显示给用户。**
+
+**没改。** —— 把 Rust 侧补成六个 `assert_eq!` 是可行的，**但那属于内核仓库的测试补强，不在这一轮的范围里**；而**把前端 `it.each` 换成从 `life_state` 读出来，需要 Rust→TS 的导出通道，那是个设计决定，不是修一个缺**。**记在这里，下次谁碰 `life_state` 就知道链子松在哪。**
+
+**门禁**：593 测试、lint 0、check 9 项。
+
+### 16.114 把 `life_state` 的六个词钉在内核侧
+
+16.113 记下一个松处：**`life_state()` 的六个 `return` 值，Rust 测试只钉了两个（`faulted` / `active`）。** **这一轮把那道链补上。**
+
+### 补的是什么
+
+```rust
+#[test]
+fn life_state_returns_exactly_these_words() {
+    …
+    assert_eq!(super::life_state(&off, true, false, true, false), "disabled");
+    assert_eq!(super::life_state(&untrusted, true, false, true, false), "awaiting_consent");
+    assert_eq!(super::life_state(&plugin, true, false, false, false), "unreadable");
+    assert_eq!(super::life_state(&plugin, true, true, true, false), "faulted");
+    assert_eq!(super::life_state(&plugin, true, false, true, false), "active");
+    assert_eq!(super::life_state(&plugin, false, false, true, false), "unavailable");
+}
+```
+
+**六个参数组合各走一个分支**，靠 `PluginRow { ..plugin.clone() }` 只改需要改的那一个字段。
+
+### 它补的是哪一环
+
+**这条链原来有三份清单**（16.113）：
+
+```
+① life_state() 的六个 return        ← Rust 真相
+② plugins.ts 的六行键               ← 前端文案
+③ messages-plugins.test.ts 的 it.each ← 前端守卫
+```
+
+**③ 只能证明「它列出的六个存在」，不能证明「一共只有六个」。** **① 位置新增一个 `return`，②③ 都不会红** —— 结果就是界面上出现英文标识符。
+
+**现在 ① 和 ③ 各有一份六项清单，两边都钉住了。** 加一个 `return` 而不加断言 → 新词没有任何断言覆盖；加断言而不加 `return` → 测试失败。**动一边必须动另一边。**
+
+### 验过能失败
+
+把 `"unavailable"` 改成 `"unavailable2"`：
+
+```
+left: "unavailable2"
+right: "unavailable"
+test result: FAILED. 0 passed; 1 failed
+```
+
+**恢复后 `cargo test --lib` 388 项全绿**（原来 387，多了这一个）。
+
+**门禁**：593 前端测试、lint 0、check 9 项；388 Rust 单元测试。
 
 ## 18. 不作为首批前提的增强
 
