@@ -285,7 +285,7 @@ F 的验收里有一句“测量后决定虚拟化/分页”。补上这个结�
 
 **B. 核对通过、没有改动的**
 
-`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.165`
+`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.166`
 ——覆盖 `03 §4/§5/§6`、`04 §4.3/§5/§6`、`06` **全章**、`07 §1/§2/§3/§4/§5.1/§5.2/§5.3/§6/§8/§9/§10`、`08` 各节、`09 §7/§8`、命令契约与假内核一致性、`NoticeHost`、`healthLabel`。
 
 **`07` 至此整章核完**，只剩 16.53 那一条未做到。
@@ -6608,6 +6608,70 @@ startup: {
 | synra-rust-app | `0f5afb1` `docs: move the cancel note to the transfers it describes` | ✅ 已推送 |
 
 **门禁**：621 前端测试、lint 0、check 0。
+
+### 16.166 拒绝的原因一直在 `params` 里，界面从来不显示
+
+**配对报 `Something in the request was not valid.`，用户看不出哪里不合法 —— 那句话不是原因，是一个不合法分类的名称。**
+
+`invalid_argument` 的文案在 `messages/errors.ts:24` 是写死的兜底句。**而这个 code 罩住所有不同的原因：设备 id 解析失败、请求 id 解析失败、配对服务没初始化、数据库出错、配对服务自己的拒绝 —— 后端在 `commands/pairing.rs` 的五个分支里，每个都把真正的原因写进了 `params`：**
+
+| 分支 | 写入了什么 |
+| --- | --- |
+| `device()` 失败 | `{"reason": "<IdError 原文>"}` |
+| `pairing_cancel` 的 id 解析失败 | `{"reason": "<IdError 原文>"}` |
+| `refusal()` | `{"detail": "<PairingServiceError 原文>"}` |
+| `pairing_connect` 找不到路由 | `{"reason": "the selected device has no discovery route"}` |
+| `service()` 失败 | `{"detail": "<拿不到配对服务的原因>"}` |
+
+**一路查下来，数据是全的：`IpcError` 带 `params`，`client.ts` 把它原样交给调用方，store 也存着。断在两处 —— **
+
+### 断点一：`failureOf` 只搬三个字段
+
+```
+return { code: error.code, message: error.message, actions: error.actions }
+```
+
+**`params` 在这里被丢掉了。** 插件那边的失败因此永远只剩 code。
+
+### 断点二：`ErrorNotice` 只渲染 `headline` 和 `actions`
+
+```
+const headline = computed(() => errorSentence(props.code))
+```
+
+**即便 `params` 一路送到了组件手里，模板里也没有一处读它。**
+
+### 修法
+
+新增 `messages/failure-detail.ts`，`detailOf(params)` 只读 `detail` 与 `reason` 两个键 —— **其余是机器数据（命令名、原始 id），打印出来就是把错误面变回内部信息堆（R34）。**
+
+两处接上：
+
+- **`ErrorNotice`** 新增 `:params` 与 `:detail` 两个可选属性，`detail` 显示在标题下、动作之前 —— **它解释那些动作**（"检查邀请"这句话，在知道是设备 id 没解析之后才读得懂）。
+- **`actions.ts`** 的 `Failure` 新增 `detail`，`failureOf` 用它填上。
+
+**调用点补 `:params`：** `PairingPanel` 两处、`DevicesPage` 三处、`CredentialPanel` 一处。
+
+**`PairingPanel` 的第三处（`currentTask.errorCode`）没法补 —— `PairingSnapshot` 只有 `errorCode`，没有 `errorParams`。** 试过加，类型检查立刻挡住了，回退。**这条要靠以后让快照带上参数。**
+
+### 测试
+
+6 条：`detail` 渲染、`reason` 也认、两个都有时优先 `detail`、命令名这类数据不渲染、空串不渲染、已提取的 `detail` 直接用。
+
+**变异验证**：把 `v-if="detail"` 改成 `v-if="false"`，**4 条精确失败，另 2 条（"不该渲染"的那两条）照常通过** —— 它们测的是反面。
+
+### 顺带清掉一处误提交
+
+`src-tauri/check.log`（我诊断构建时写的日志）被 `git add -A` 带进了上一个提交。**已删除并单独提交。**
+
+### 提交
+
+| 仓库 | 提交 | 状态 |
+| --- | --- | --- |
+| synra-rust-app | `070ed43` `fix: show what the kernel said a request got wrong` | ✅ 已推送 |
+| synra-rust-app | `56a114c` `chore: drop a build log committed by mistake` | ✅ 已推送 |
+
+**门禁**：**627** 前端测试（+6）、lint 0、check 0、shapes 15 项。
 
 ## 18. 不作为首批前提的增强
 
