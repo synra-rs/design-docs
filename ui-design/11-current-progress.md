@@ -285,7 +285,7 @@ F 的验收里有一句“测量后决定虚拟化/分页”。补上这个结�
 
 **B. 核对通过、没有改动的**
 
-`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.152`
+`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.153`
 ——覆盖 `03 §4/§5/§6`、`04 §4.3/§5/§6`、`06` **全章**、`07 §1/§2/§3/§4/§5.1/§5.2/§5.3/§6/§8/§9/§10`、`08` 各节、`09 §7/§8`、命令契约与假内核一致性、`NoticeHost`、`healthLabel`。
 
 **`07` 至此整章核完**，只剩 16.53 那一条未做到。
@@ -5900,6 +5900,53 @@ src 下每个 .vue，只要渲染 <AButton>，
 | synra-rust-app | `b4c19af` `test: read the touch floor on every file that draws` | ✅ 已推送 |
 
 **门禁**：607 前端测试、lint 0、check 14 项（扫描面 4 → 15 个文件）。
+
+### 16.153 触控断点守卫少看了一半
+
+**同一类问题在下一条守卫上又出现了一次：它在报绿色，但只看了两条查询里的一条。**
+
+`checkTouchBreakpoints` 原来这样匹配：
+
+```regex
+@media \(max-width: (\d+)px\), \(pointer: coarse\)
+```
+
+**两个条件必须按这个顺序、按这个写法出现。** 而 `TransferPrompt` 写的是：
+
+```css
+@media (pointer: coarse), (max-width: 639px) {
+```
+
+**顺序相反。于是它被静默跳过，守卫报的是「the one scoped touch query」，而实际有两条。**
+
+**当时那个值是 639，所以没有造成损害** —— 但如果有人把 `TransferPrompt` 改成 `767px`，**守卫什么也不会说。**
+
+### 改成按条件认，不按顺序认
+
+```regex
+@media [^{}]* (?:max-width: (\d+)px | pointer: coarse) [^{}]* \{
+```
+
+**匹配到之后再用 `includes` 确认两个条件都在**，缺少任一就跳过 —— **这样 `@media (max-width: 900px)` 这类普通响应式查询不会被误判成触控查询。**
+
+### 变异验证
+
+把 `TransferPrompt` 的 639 改成 767：
+
+```
+· touch-breakpoints: 2 scoped touch queries end at 639px
+✗ touch-breakpoints: src\components\TransferPrompt.vue:17 raises touch targets from 767px
+```
+
+**旧守卫对这个改动完全无感；新守卫精确命中。** 恢复后 14 项全绿。
+
+### 提交
+
+| 仓库 | 提交 | 状态 |
+|---|---|---|
+| synra-rust-app | `66ba7fc` `test: read touch queries in either order` | ✅ 已推送 |
+
+**门禁**：607 前端测试、lint 0、check 14 项。
 
 ## 18. 不作为首批前提的增强
 
