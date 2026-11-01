@@ -285,7 +285,7 @@ F 的验收里有一句“测量后决定虚拟化/分页”。补上这个结�
 
 **B. 核对通过、没有改动的**
 
-`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.163`
+`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.164`
 ——覆盖 `03 §4/§5/§6`、`04 §4.3/§5/§6`、`06` **全章**、`07 §1/§2/§3/§4/§5.1/§5.2/§5.3/§6/§8/§9/§10`、`08` 各节、`09 §7/§8`、命令契约与假内核一致性、`NoticeHost`、`healthLabel`。
 
 **`07` 至此整章核完**，只剩 16.53 那一条未做到。
@@ -6522,6 +6522,50 @@ lint 抓到 `\s*\(?\s*` 里两个 `\s*` 会互相吞字符 —— **改成一个
 | synra-rust-app | `c843143` `fix: name the permission group after its heading` | ✅ 已推送 |
 
 **门禁**：**621** 前端测试（+4）、lint 0、check 0、shapes 15 项。
+
+### 16.164 一句注释挂错了函数，是我自己弄的
+
+**这轮本来打算收尾，但回看了一下 `16.163` 的提交差异 —— 发现自己干了件蠢事。**
+
+`c843143` 的改动里，`requestedLabelId` 被插在了 `stateColour` 的文档注释和它本身之间：
+
+```
+/**
+ * The lifecycle state's tag colour.
+ * ...
+ * colour is redundancy rather than the state itself.
+ */
+/**
+ * The `id` of the "required permissions" label ...
+ */
+function requestedLabelId(pluginId: string): string { ... }
+
+function stateColour(state: string): 'success' | 'error' | 'warning' | 'default' {
+```
+
+**两个注释块紧挨着，而 `stateColour` 现在裸着 —— 它上面那段长得像它的注释，描述的是它，却贴着别人的函数。**
+
+**测试没失败，lint 没报错，`check` 没报错。** 一句挂错位置的注释，四道门禁都看不见。
+
+### 修法
+
+把 `requestedLabelId` 挪到 `stateColour` 之后。**现在两个函数各带各的注释。**
+
+### 为什么会犯
+
+**我用 PowerShell 的 `replace` 插入代码，`replace` 只知道"在 `function stateColour` 之前插入"，不知道那上面还有一段注释属于它。**
+
+**这是第 152 轮以来一直存在的风险**：用文本替换改结构化的东西，改完语法对、测试过，但结构已经错了。
+
+**lint 能看缩进，`vue-tsc` 能看类型，没有一个能看"这段注释在说下面那个函数吗"。**
+
+### 提交
+
+| 仓库 | 提交 | 状态 |
+|---|---|---|
+| synra-rust-app | `a33481d` `docs: give each helper back its own note` | ✅ 已推送 |
+
+**门禁**：621 前端测试、lint 0、check 0、shapes 15 项。
 
 ## 18. 不作为首批前提的增强
 
