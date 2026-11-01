@@ -285,7 +285,7 @@ F 的验收里有一句“测量后决定虚拟化/分页”。补上这个结�
 
 **B. 核对通过、没有改动的**
 
-`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.158`
+`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.159`
 ——覆盖 `03 §4/§5/§6`、`04 §4.3/§5/§6`、`06` **全章**、`07 §1/§2/§3/§4/§5.1/§5.2/§5.3/§6/§8/§9/§10`、`08` 各节、`09 §7/§8`、命令契约与假内核一致性、`NoticeHost`、`healthLabel`。
 
 **`07` 至此整章核完**，只剩 16.53 那一条未做到。
@@ -6228,6 +6228,63 @@ AssertionError: the rail avatar names nothing: expected undefined to be 'This de
 | synra-rust-app | `9374b20` `fix: name the device in the icon rail` | ✅ 已推送 |
 
 **门禁**：**608** 前端测试（+1）、lint 0、check 14 项。
+
+### 16.159 可聚焦区域的名字，一直没人守
+
+**这轮本来在查别的东西，撞上了这条线。**
+
+`16.158` 修完图标栏之后我停下来，因为连续六轮都在证伪自己。**但 `tabindex` 这一项从没被系统查过** —— 全树 6 处，我逐个看了：
+
+| 位置 | 是什么 | 名字从哪来 |
+| --- | --- | --- |
+| `App.vue:187` `<main tabindex="0">` | 滚动容器 | `aria-label` ✅ |
+| `TransferPrompt:33` `<section tabindex="-1">` | 传输请求面板 | `aria-labelledby` ✅ |
+| `PairingPanel:44` `<p tabindex="-1">` | 状态文字 | 自身文本 ✅ |
+| `DevicesPage:90` `<h2 tabindex="-1">` | 区块标题 | 自身文本 ✅ |
+| `PluginsPage:311` `<span tabindex="-1">` | 目标插件名 | 自身文本 ✅ |
+| `SettingsPage:66` `<h2 tabindex="-1">` | 分类名 | 自身文本 ✅ |
+
+**6 处全对。但这 6 处是我一个个手动查的，没有守卫。**
+
+**而 `App.vue` 自己记着这个教训的实测结果：**
+
+> the region came out as `main "首页 设备连接 已连接 This device Pixel 8 …"` — a screen reader greeting the user with the first dozen words of whatever page was open
+
+**这正是 `checkControlNames` 和 `checkDialogNames` 已经在防的东西** —— 但那条防御线只覆盖控件和对话框，**漏掉了"容器本身可聚焦"这一类。**
+
+### 新守卫：`focusable-names`
+
+```
+tabindex 为正数或 0  且  元素是 section/main/aside/nav 或带 role  且  没有 aria-label
+                          → 失败
+```
+
+**两条刻意保留的排除：**
+
+- **`tabindex="-1"` 不要求名字。** 它是脚本聚焦的*目标*，不是 tab 序里的一站；树里那 4 处标题和段落都靠自身文本命名，**要求它们加属性就是假失败。**
+- **不是区域的元素不要求名字。** 一个可聚焦的 `<span>` 如果只是滚动容器，它和标题一样靠内容命名。
+
+**计数是 1** —— 全树只有 `App.vue` 的 `<main>` 同时满足"正数 tabindex + 区域"。**样本少，但这一条正是 `16.x` 里出过事的那一条。**
+
+### 变异验证
+
+删掉 `<main>` 的 `aria-label`：
+
+```
+✗ focusable-names: src\App.vue:187 makes a region focusable with no `aria-label` or `aria-labelledby`
+```
+
+**精确命中。** 恢复后 15 项全绿。
+
+**顺带修了 lint 抓到的一处**：`/aria-label|aria-labelledby/` 是冗余分支 —— **短的是长的前缀**，只留 `/aria-label/`。
+
+### 提交
+
+| 仓库 | 提交 | 状态 |
+|---|---|---|
+| synra-rust-app | `e645421` `test: name every focusable region` | ✅ 已推送 |
+
+**门禁**：608 前端测试、lint 0、**check 15 项**（从 14 加到 15）。
 
 ## 18. 不作为首批前提的增强
 
