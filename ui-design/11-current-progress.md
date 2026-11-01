@@ -6847,3 +6847,26 @@ enum Link {
 - **配对记录此前已无写入方**。删掉身份层时，写入 `paired_devices` 的责任被一并带走，只剩读取方 —— 设备列表永远显示「未配对」，`Forget` 永远不出现。修法是在握手完成处写：拨号侧在 `dial` 成功后（`transfers.rs::record_pairing`），接受侧在 `adopt` 之前（`listener.rs::record_accept`），两侧都用 `Negotiated` 里对方自报的 `device_id` / `display_name` / `platform` / `agreed`。为此给 `Dialled` 加了 `negotiated()` 与 `address()` 两个只读访问器。
 - **每次握手都会重写一次**，所以「忘记」只删本机这一行，挡不住对端再次出现。真正的拉黑需要独立黑名单表，属于 MVP 之外。
 - **契约从 60 条降到 50 条，注册 50 条**：`devices_connect` / `devices_disconnect` 从未有过实现，也不会有 —— 链路只在有东西要送的时候打开，裸 connect 是一个没有载荷的拨号。连带删掉 `NOT_YET_REGISTERED` 的「故意缺席」条目、`client.test.ts` 的示例命令、README 的计数。
+
+### 16.169 还剩一个明文令牌，以及它为什么还没删
+
+`LinkToken` 是握手时随 `Hello` 发过去、存进 `paired_devices.link_token` 的一个 32 字节共享秘密，用来回答「这是不是上次那台设备」。现在它**什么都保护不了**：链路是明文，库是明文，而且接受侧永远回 `PairingState::Unknown` —— 这个判断从来没有生效过。它属于该删的那一类。
+
+**尝试过一次，回滚了。** 删除范围比预估大：除了协议与拨号/接受签名，它还伸进了**会话表**——`sessions/record.rs::link_token()` 每次建立会话都把这枚令牌复制进会话记录，`registry/table.rs` 拿它做 `find_by_token` 比对。改到一半时工作区不可编译，剩余步数不足以完成并跑完门禁，于是 `git checkout -- .` 回到绿色状态。**宁可这一轮零产出，也不留半成品。**
+
+**下一轮的一次性清单**（按依赖顺序，改完一次编译到底）：
+
+| 文件 | 动作 |
+| --- | --- |
+| `synra-protocol/handshake.rs` | 删 `LinkToken`、`PairingState`、`Hello.token`、`HelloAck.pairing`；`next_step` 的 `RePair` 分支塌缩为 `Established`；相关测试删除 |
+| `synra-core/peer/link.rs` | `dial`/`accept`/`accept_stream`/`accept_on` 去掉 `token` 与 `read_token` 形参 |
+| `synra-core/peer/host.rs` | `hello_ack(nonce, sequence)` |
+| `synra-core/peer/negotiate.rs` | `Negotiated.pairing` 去掉 |
+| `synra-core/sessions/record.rs` | 删 `link_token` 字段与访问器 |
+| `synra-core/sessions/registry/table.rs` | 删字段、`find_by_token` 与令牌比对 |
+| `synra-core/host/{connections,kernel}.rs` | 去掉 `LinkToken` 形参 |
+| `synra-core/inbound.rs` | 删第 602 行那段「令牌对不上」的分支 |
+| `synra-store/sqlite/pairing.rs` | 删 `link_token` 列与 `link_token_for()`；迁移里去掉该列 |
+| `synra-app/transfers.rs`、daemon | `Paired` 少一个字段 |
+
+删除之后，握手里只剩 `device_id`、`display_name`、`platform`、`app_version`、`features`、`requires`、`nonce`、`sequence`、`endpoints`。**一个字节的秘密都不剩。**
