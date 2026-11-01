@@ -6720,6 +6720,20 @@ const headline = computed(() => errorSentence(props.code))
 **全量 `cargo test --workspace` 没有跑完**：两次尝试都超过十分钟仍未结束，第二次还撞上 `LNK1104`——上一次被中止的测试进程还占着
 `synra_daemon-*.exe`，杀掉后才继续。**结论按定向测试算：`cargo test -p synra-core --lib pairing` 34 项全过。**
 
+#### 但正是这次“没跑完”，查出了一个会让监听器假死的错误（`f69db42`）
+
+全量测试卡在 `a_peer_that_connects_and_says_nothing_is_bounded_by_the_deadline` 上一动不动，三十分钟没动一行。
+
+**原因在 `offers_pairing`**：它用 `peek` 从 ClientHello 里认 ALPN，而 `peek` 在**阻塞** socket 上要等到第一个字节才返回。
+一个连上却什么都不发的对端，就让监听线程永远停在 `peek` 里 —— **整个监听器不再接受任何连接**，包括正常的那些。
+在真机上这表现为「某次扫端口、某个半开连接之后，这台设备再也连不进来」。
+
+**修法**：`peek` 前后各设一次 `set_read_timeout`（250 ms）。「什么都没说」于是变成「没有声明配对协议」，这正是它的含义；
+其后的业务握手照旧守自己的 deadline。修完那条例句从卡死变成 **15.76 秒跑完 273 项**。
+
+**全量最终结果**：**72 个测试套件、3682 个用例、0 失败**（`cargo test --workspace --no-fail-fast`）。
+唯一要注意的是：跑之前得先确认没有残留的 `synra_daemon-*.exe` 进程，否则 `link.exe` 会以 `LNK1104` 拒绝写文件 —— 那不是测试失败。
+
 **未验证的一条**：这条链路没有在两台真机上跑过。最可能出问题的是监听器用 `peek` 从 ClientHello 里认 ALPN——
 TLS 分片理论上可能让首包读不到完整的 ALPN 名，那时表现为「请求发出去了，对方毫无反应」。
 
