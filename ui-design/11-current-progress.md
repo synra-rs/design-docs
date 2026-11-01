@@ -6841,3 +6841,9 @@ enum Link {
 **门禁**：`cargo check --workspace --all-targets` 0 错；`synra-core` 741 测试通过；`pnpm run check` 通过（类型 + 15 条结构守卫）；`pnpm test` 568 通过。命令总数 60 → 52，注册 50，被调用 39。
 
 **提交**：`4e4a30f`（ADR 与三份文档的废弃横幅）→ `659b8f1`（−9413 行，库首次可编译）→ `1f3746f` → `a8bd415` → `12db180`（−5024 行，存储与协议）→ `6b65596`（应用 Rust）→ `6ccfa3f` + `4b7e2bb`（界面与 IPC 契约）。
+
+**后续三处收尾（同一次重构内完成，不留悬空）**：
+
+- **配对记录此前已无写入方**。删掉身份层时，写入 `paired_devices` 的责任被一并带走，只剩读取方 —— 设备列表永远显示「未配对」，`Forget` 永远不出现。修法是在握手完成处写：拨号侧在 `dial` 成功后（`transfers.rs::record_pairing`），接受侧在 `adopt` 之前（`listener.rs::record_accept`），两侧都用 `Negotiated` 里对方自报的 `device_id` / `display_name` / `platform` / `agreed`。为此给 `Dialled` 加了 `negotiated()` 与 `address()` 两个只读访问器。
+- **每次握手都会重写一次**，所以「忘记」只删本机这一行，挡不住对端再次出现。真正的拉黑需要独立黑名单表，属于 MVP 之外。
+- **契约从 60 条降到 50 条，注册 50 条**：`devices_connect` / `devices_disconnect` 从未有过实现，也不会有 —— 链路只在有东西要送的时候打开，裸 connect 是一个没有载荷的拨号。连带删掉 `NOT_YET_REGISTERED` 的「故意缺席」条目、`client.test.ts` 的示例命令、README 的计数。
