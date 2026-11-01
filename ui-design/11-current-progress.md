@@ -285,7 +285,7 @@ F 的验收里有一句“测量后决定虚拟化/分页”。补上这个结�
 
 **B. 核对通过、没有改动的**
 
-`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.161`
+`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.162`
 ——覆盖 `03 §4/§5/§6`、`04 §4.3/§5/§6`、`06` **全章**、`07 §1/§2/§3/§4/§5.1/§5.2/§5.3/§6/§8/§9/§10`、`08` 各节、`09 §7/§8`、命令契约与假内核一致性、`NoticeHost`、`healthLabel`。
 
 **`07` 至此整章核完**，只剩 16.53 那一条未做到。
@@ -6394,6 +6394,71 @@ routes 由 PAGES 生成 → 路由不会多出一条侧栏没有的
 | synra-rust-app | `b6803c6` `test: keep the nav and the routes in step` | ✅ 已推送 |
 
 **门禁**：**617** 前端测试（+5）、lint 0、check 0、shapes 15 项。
+
+### 16.162 测试替身隔离，只防了一个名字
+
+`channel.ts` 的注释记着一件真事：
+
+> It was `export const` in `fake-kernel.ts`, and **production code imported it from there**: `DevicesPage.vue` and the injected plugin facade both did.
+
+**这条线已经修了** —— 常量搬进 `channel.ts`，`checkFakeIsQuarantined` 守着不让生产代码再碰 `fake-kernel`。
+
+**但守卫只认一个名字：**
+
+```js
+if (/(?:from|import)\s*\(?['"][^'"]*fake-kernel['"]/.test(text))
+```
+
+### 仓库里有五个测试替身
+
+| 文件 | 干什么 |
+| --- | --- |
+| `fake-kernel.ts` | 内核替身 |
+| `fake-kernel-fixtures.ts` | 它的固定数据 |
+| `client-test-helpers.ts` | 客户端测试辅助 |
+| `dispatcher-test-helpers.ts` | 派发器测试辅助 |
+| `injection-test-helpers.ts` | 注入面测试辅助 |
+
+**后四个今天没被生产代码导入。** 但**从 `client-test-helpers` 里拿一个常量，和当初从 `fake-kernel` 里拿 `KERNEL_EVENT_CHANNEL` 是完全一样的错误** —— 一份测试辅助里的值，不该成为界面依赖的事实。
+
+**守卫守的是发生过的那一次，不是那条规则。**
+
+### 改成按类别
+
+```js
+const fixture = /test-helpers|fake-kernel|fixtures/
+```
+
+**逐个 `from` / `import` 的说明符去匹配，命中就报，并把这个说明符写进消息**（原来只说"imports the fake kernel"，现在说清楚是哪一条）。
+
+**两处有意的例外：**
+
+- **`kernel.ts`** —— 它天生就是选择替身与被替身的那一层
+- **`fake-kernel.ts` 自己** —— 它必须组合自己的 fixtures；**那是隔离区内部，不是穿过隔离区**
+
+### 变异验证
+
+在 `DevicesPage.vue` 里加一行 `import { something } from '../ipc/client-test-helpers'`：
+
+```
+✗ fake-quarantine: pages/DevicesPage.vue imports `../ipc/client-test-helpers`; only kernel.ts may choose the fake
+```
+
+**旧守卫对这个改动一声不响** —— 名字里没有 `fake-kernel`。
+
+**恢复后 15 项全绿。**
+
+### 顺带修的正则
+
+lint 抓到 `\s*\(?\s*` 里两个 `\s*` 会互相吞字符 —— **改成一个**。
+
+### 提交
+
+| 仓库 | 提交 | 状态 |
+|---|---|---|
+| synra-rust-app | `ec9f07b` `test: quarantine every fixture, not one name` | ✅ 已推送 |
+
+**门禁**：617 前端测试、lint 0、check 0、shapes 15 项。
 
 ## 18. 不作为首批前提的增强
 
