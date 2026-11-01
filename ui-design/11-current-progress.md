@@ -285,7 +285,7 @@ F 的验收里有一句“测量后决定虚拟化/分页”。补上这个结�
 
 **B. 核对通过、没有改动的**
 
-`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.151`
+`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.152`
 ——覆盖 `03 §4/§5/§6`、`04 §4.3/§5/§6`、`06` **全章**、`07 §1/§2/§3/§4/§5.1/§5.2/§5.3/§6/§8/§9/§10`、`08` 各节、`09 §7/§8`、命令契约与假内核一致性、`NoticeHost`、`healthLabel`。
 
 **`07` 至此整章核完**，只剩 16.53 那一条未做到。
@@ -5850,6 +5850,56 @@ inkDim / glassBase  —— 只有次要文字
 | synra-rust-app | `1d77baa` `fix: give the error notice a finger-sized action` | ✅ 已推送 |
 
 **门禁**：607 前端测试（+1）、lint 0、check 14 项。
+
+### 16.152 守卫只看了「页面」，漏掉了所有「组件」
+
+**`16.151` 修了 `ErrorNotice` 的 24px 按钮。这一轮问的是更该问的：为什么守卫没抓到？**
+
+`checkPageButtons` 的注释写得很清楚：
+
+> The check is on the page root, not on every file: `SettingsRow`, `PageHeader` and the row components raise their own buttons and are nested inside a page, so requiring the utility on each of them would demand it twice.
+
+**这个推理在它写下的那天是对的。** 页面确实把所有子组件都包住了。
+
+**`ErrorNotice` 是反例。** 它画在 `AAlert` 里，`AAlert` 坐在 `SettingsFeedback` 里，**这两层都不带底线**；而它被 20 处调用，大多数在设置页之外。
+
+**所以守卫报绿色，而界面上有两个 24px 的按钮。**
+
+### 规则改成：谁画按钮，谁证明底线
+
+```
+src 下每个 .vue，只要渲染 <AButton>，
+就必须能自己举证 —— 工具类 `[&_.ant-btn]:min-h-11`，
+或自己 scoped CSS 里的 `min-height: 44px`。
+```
+
+**为什么接受两种形式**：`PairingPanel` 和 `TransferPrompt` 用 scoped CSS，因为它们的按钮颜色也写在那里，工具类够不到 `:deep()`。**两种都是底线，没有哪一种是"正确的"那种。**
+
+**扫描面从 4 个页面变成 15 个文件。**
+
+### 变异验证
+
+把 `ErrorNotice` 的底线删掉再跑：
+
+```
+✗ page-buttons: src\components\ErrorNotice.vue draws buttons but shows no touch floor
+```
+
+**精确命中，其余 14 项不动。** 恢复后 14 项全绿。
+
+### 新规则报出了一处，我选择补而不是豁免
+
+`SettingsFeedback` 被报了出来。它**当前**确实在 `SettingsPage` 根 `<section>` 内，那里有底线 —— 严格说是误报。
+
+**但它依赖的是四层之外的调用方。** 这正是 `ErrorNotice` 出事的那个模式。所以给它自己补上底线，**并在注释里写明为什么冗余仍要写** —— 组件不该靠"我碰巧被谁装着"来满足硬性要求。
+
+### 提交
+
+| 仓库 | 提交 | 状态 |
+|---|---|---|
+| synra-rust-app | `b4c19af` `test: read the touch floor on every file that draws` | ✅ 已推送 |
+
+**门禁**：607 前端测试、lint 0、check 14 项（扫描面 4 → 15 个文件）。
 
 ## 18. 不作为首批前提的增强
 
