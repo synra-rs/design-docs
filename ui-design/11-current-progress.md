@@ -6870,3 +6870,22 @@ enum Link {
 | `synra-app/transfers.rs`、daemon | `Paired` 少一个字段 |
 
 删除之后，握手里只剩 `device_id`、`display_name`、`platform`、`app_version`、`features`、`requires`、`nonce`、`sequence`、`endpoints`。**一个字节的秘密都不剩。**
+
+**已完成（第 28 轮）。** 一次性做完，一次编译到底：
+
+| 文件 | 删除内容 |
+| --- | --- |
+| `synra-protocol/handshake.rs` | `LinkToken`、`PairingState`、`Hello.token`、`HelloAck.pairing`；`next_step` 的 `RePair` 分支塌缩为 `Established` |
+| `synra-protocol/session.rs` | `PairResponse.link_token` 与 `issued_token()`；`accepted()` 不再收令牌 |
+| `synra-core/peer/*` | `dial`/`accept`/`accept_stream`/`accept_on` 的 `token` 与 `read_token` 形参；`Negotiated.pairing` |
+| `synra-core/sessions/*` | `PeerSession.link_token` 与访问器；`registry::open` 的令牌参数；`record_frame_in` 的令牌比对；`RegistryError::TokenMismatch` |
+| `synra-core/host/*`、`inbound.rs` | 令牌形参；`pairing_state_for()` 整个函数 |
+| `synra-store` | `Paired.link_token`、`link_token` 列、`link_token_for()`、迁移 6；后续迁移重新编号 |
+| `synra-daemon` | `pairing.rs` 整个模块（只剩一行转发） |
+| `synra-app` | 所有夹具里的 `link_token` 字段；「令牌不进诊断包」那条测试 |
+
+**一处值得记的连带影响**：删掉迁移 6 后，迁移版本必须等于「位置 + 1」，于是 7 以后全部重编号；`sqlite::tests` 里那条按 `version == 11` 找剪贴板改名迁移的测试随之改成 `== 10`。**如果没跑测试，这个错会一直静默到某台设备升级时。**
+
+删除后的握手只有：`device_id`、`display_name`、`platform`、`app_version`、`features`、`requires`、`nonce`、`sequence`、`endpoints`。**协议里不再有一个字节的秘密。**
+
+门禁：`cargo check --workspace --all-targets` 0 错；`cargo test --workspace` 全过；`pnpm run check` 0；`pnpm test` 567 通过。应用侧 `cargo test` 375 过、1 失败 —— 失败的是 `plugin_ui::native_acl` 里加载 Tauri 窗口图标的用例（`0x80070714`，本机资源问题），与本次改动无关，未修。
