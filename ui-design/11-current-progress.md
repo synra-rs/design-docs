@@ -6889,3 +6889,13 @@ enum Link {
 删除后的握手只有：`device_id`、`display_name`、`platform`、`app_version`、`features`、`requires`、`nonce`、`sequence`、`endpoints`。**协议里不再有一个字节的秘密。**
 
 门禁：`cargo check --workspace --all-targets` 0 错；`cargo test --workspace` 全过；`pnpm run check` 0；`pnpm test` 567 通过。应用侧 `cargo test` 375 过、1 失败 —— 失败的是 `plugin_ui::native_acl` 里加载 Tauri 窗口图标的用例（`0x80070714`，本机资源问题），与本次改动无关，未修。
+
+**补充（第 31 轮）：连消息族和事件名也删了。**
+
+上一轮留下的 `PairRequest` / `PairResponse` / `PairRefusal` 三个类型、两个构造函数、`Decision::Pairing` 变体、监听器里的应答分支，以及三个事件名（`device.pairing.request` / `.response` / `.unpair`）和内置事件 `_synra.pairing.changed`，全部删除。
+
+**为什么这次敢动事件目录**：上一轮的顾虑是「插件可能引用这些事件名」。查过之后，插件没有任何理由收到或发出配对事件——配对是内核自己在握手后写一行记录，没有插件参与。留在目录里只会让守护进程在收到它时找不到应答方。
+
+删除后协议里再没有 `pair*` 的任何符号。`inbound.rs` 的 `is_kernel` 少三个分支，`Inbound` 少一个内置变体。
+
+门禁：`cargo check --workspace --all-targets` 0 错；`cargo test --workspace` 全过；`pnpm run check` 0；`pnpm test` 567 通过。应用侧仍是 375 过 / 1 失败（Tauri 图标，环境问题）。
