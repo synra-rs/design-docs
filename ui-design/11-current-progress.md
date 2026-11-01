@@ -6675,6 +6675,8 @@ const headline = computed(() => errorSentence(props.code))
 
 ### 16.167 首配不再搬证书：两台设备各显示同一个六位数码
 
+> ⚠️ **本节已被 16.168 取代**：六位数码、配对面板与设备身份在 ADR-025 之后全部删除。以下保留为决策过程记录，不是当前行为。
+
 **`06 §3`–`§5` 与代码不符已到必须处理的程度。** 文档写的是「A 点配对 → 先弹一次本机确认 → 等待」，
 代码里 A 只是弹个面板；而协议层其实**根本没有发起端** —— `synra-net` 的 `PairingChannel` 要求先持有对方证书，
 `PairingChannel::connect(socket, local, peer, …)` 的注释写着证书必须「已经通过带外 UI 流程核实过」。
@@ -6812,3 +6814,30 @@ enum Link {
 **持久完成历史仍需独立查询、终态与关联契约**，当前的示例"已完成"不代表该能力已经实现。
 
 所有后续阶段继续定向迭代、阶段门禁、签名英文 subject 提交；不发版、不打标签、不部署。
+
+### 16.168 MVP 不带传输加密：证书、密钥、配对面板全部删除
+
+**方向由用户定**：这是一个未发布的应用，MVP 只需要跑通「TCP 底层通讯 + 上层插件」。设备身份、证书、密钥库在这个阶段不换来任何用户能感知的能力，只换来一套必须维护的信任链。ADR-025 记录了三种选项与选择明文 TCP 的理由，以及随之放弃的三条保证（机密性、完整性、身份认证）。
+
+**删掉的东西，按层**：
+
+| 层 | 内容 |
+| --- | --- |
+| 传输 | `synra-net/authentication/` 整个模块：rustls mTLS、证书生成、`DeviceCredentials`、配对通道、确认交换（14 文件） |
+| 内核 | `peer_trust/`、`device_credentials/`、`pairing/`、`peer/authenticated/`、`peer/pairing.rs` |
+| 存储 | `secrets/`（含 Windows 凭据后端与 keyring 依赖）、`peer_trust`/`credential_repair`/`credentials` 三个模块、迁移 18–22 的五张表 |
+| 协议 | `synra-control` 的 `Request::Pairing`/`Credentials`、`Kernel` 的两个方法；`synra-ipc` 契约里的 `Domain::Pairing` 与八条命令 |
+| 守护进程 | `runtime/{credentials,pairing}.rs`、`serve/network.rs`、`Runtime::pairing` 字段 |
+| 界面 | `stores/{pairing,credentials}.ts`、`PairingPanel(.*)`、`CredentialPanel`、设备页的配对按钮与对话框、设置页的凭据面板 |
+
+**换上的**：仓库里原本就有的明文链路 `peer::dial` / `peer::accept_stream` → `PeerLink::new`。它一直在，注释也一直写着「不做身份证明、不是生产回退」——MVP 要的正是它。
+
+**「配对」现在的全部含义**：连上、报上名字、把对方记进 `paired_devices`。`PairingState` 只剩「记过 / 没记过」，`pairing_request` 到达即回 `accepted`，没有码要比、没有人要问。界面上**没有「配对」按钮**：给一台设备发文件，它自然就连上并记住对方。
+
+**顺带消失的隐患**：ALPN 嗅探（含那次 `peek` 卡死监听器的 bug）、频道绑定、批准代次、密钥库的平台分支——它们存在的唯一理由都是 TLS 握手。
+
+**如实记录的失误**：清理测试时有一版脚本按函数名前缀匹配，误删 `identity_get` / `identity_set_display_name`（它们是设备 id 与显示名，与加密无关），已 `git checkout` 还原后按完整名重删；另一版脚本按签名行定界，把函数体留在原地，改成按 4 空格缩进的 `}` 定界才删干净。**两次都是「删一段代码、留下半句」，都由 `pnpm test` 当场抓出。**
+
+**门禁**：`cargo check --workspace --all-targets` 0 错；`synra-core` 741 测试通过；`pnpm run check` 通过（类型 + 15 条结构守卫）；`pnpm test` 568 通过。命令总数 60 → 52，注册 50，被调用 39。
+
+**提交**：`4e4a30f`（ADR 与三份文档的废弃横幅）→ `659b8f1`（−9413 行，库首次可编译）→ `1f3746f` → `a8bd415` → `12db180`（−5024 行，存储与协议）→ `6b65596`（应用 Rust）→ `6ccfa3f` + `4b7e2bb`（界面与 IPC 契约）。
