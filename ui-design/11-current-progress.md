@@ -285,7 +285,7 @@ F 的验收里有一句“测量后决定虚拟化/分页”。补上这个结�
 
 **B. 核对通过、没有改动的**
 
-`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.154`
+`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.155`
 ——覆盖 `03 §4/§5/§6`、`04 §4.3/§5/§6`、`06` **全章**、`07 §1/§2/§3/§4/§5.1/§5.2/§5.3/§6/§8/§9/§10`、`08` 各节、`09 §7/§8`、命令契约与假内核一致性、`NoticeHost`、`healthLabel`。
 
 **`07` 至此整章核完**，只剩 16.53 那一条未做到。
@@ -5996,6 +5996,80 @@ mb-4 border border-line rounded-lg bg-raised px-4 py-3 text-sm
 | synra-rust-app | `233750b` `fix: put the offline banner corner on the ladder` | ✅ 已推送 |
 
 **门禁**：607 前端测试、lint 0、check 14 项。
+
+### 16.155 控件的名字守卫只查两种控件，而正则本身也读不完整
+
+**这轮在 `checkControlNames` 上同时撞到两件事。**
+
+### 一、只列了 `ASelect` 和 `AInputNumber`
+
+`AInput` 5 处、`ATextarea` 3 处**从未被检查**。
+
+**扫出来一处真缺陷**：`PluginsPage` 的插件搜索框
+
+```
+<AInput ref="filterInput" v-model:value="query" :placeholder="..." allow-clear />
+```
+
+**只有 `placeholder`，没有 `aria-label`。**
+
+**`placeholder` 不是名字** —— 读屏软件未必播报它，而它一有输入就消失，**正好在用户最需要知道「这是什么框」的时候。**
+
+对照 `SearchPalette` 的同名输入框：**`placeholder` 和 `aria-label` 两个都有**，差别就在这里。
+
+### 二、正则读到 `>` 就停，而属性值里就有 `>`
+
+```regex
+/<AInput\b[^>]*>/g
+```
+
+`PluginsPage:317` 的标签是：
+
+```
+<AInput v-if="plugins.length > 0 && !targetPluginId" ... :aria-label="..." />
+```
+
+**`v-if` 里的 `>` 让匹配在那里就结束了** —— 实际取到的片段是 `<AInput v-if="plugins.length >`，后面的 `aria-label` 根本不在里面。
+
+**所以修完之后守卫还在报警，报的是同一个位置。** 这不是修改没生效，**是守卫读不到那一行。**
+
+改成把引号内的内容整体跳过：
+
+```regex
+/<AInput\b(?:"[^"]*"|'[^']*'|[^>"'])*>/g
+```
+
+**四个控件全部换用这个写法**，因为 `ASelect`、`AInputNumber` 也可能带比较运算的属性值。
+
+### 三、为什么 `ASwitch` / `ACheckbox` 仍然不查
+
+**它们靠内容或 `<label>` 命名，而单看开标签判断不了。**
+
+- `TransferPrompt` 的 `ACheckbox` 内部写着 `{{ messages.transfers.prompt.always }}`
+- `PairingPanel` 的两个 `ATextarea` 各自被 `<label>` 包住
+- `SettingsDiagnostics` 的 `ACheckbox` 内部都有文字
+
+**给它们要求一个属性，就是假失败。** 所以只把 `AInput` / `ATextarea` 加进来 —— **这两个必须靠属性或外围 `<label>` 命名，而 `ATextarea` 的三处都在 `<label>` 里。**
+
+**守卫现在也把「被 `<label>` 包住」认作合规**，用最近一次 `<label` 与 `</label>` 的位置比较。
+
+### 变异验证
+
+删掉新加的 `aria-label`：
+
+```
+✗ control-names: src\pages\PluginsPage.vue:317 draws an `AInput` with no `aria-label`, no `id` and no enclosing label
+```
+
+**恢复后 14 项全绿。**
+
+### 提交
+
+| 仓库 | 提交 | 状态 |
+|---|---|---|
+| synra-rust-app | `481fe19` `fix: name the plugin filter and read inputs whole` | ✅ 已推送 |
+
+**门禁**：607 前端测试、lint 0、check 14 项（控件覆盖 8 → 16 个）。
 
 ## 18. 不作为首批前提的增强
 
