@@ -99,7 +99,7 @@ D:/Projects/
 | 8  | **官网 = 用户文档 = schema 托管**，同一个仓库（`docs`），VitePress + Netlify | [27](./27-website.md) |
 | 9  | **域名 `synra-app.dev`**；包标识符 **`dev.synra-app.app`**        | [22 Q-11](./22-risks.md) |
 | 10 | **App UI 只有一份样式真相源**：`@synra/theme`（在 `synra-js/packages/theme`）——包根是零依赖的 token，外部 UI 走子路径（`./unocss` / `./vitepress` / `./css`），三个消费者都从它取 | [28](./28-app-ui.md) |
-| 11 | **设备连接需要持久身份与认证加密**；局域网不作为信任边界 | [04 §7.2、§8.2](./04-wire-protocol.md)、ADR-017 |
+| 11 | **设备连接需要持久身份与认证加密**；局域网不作为信任边界 | [04 §7.2](./04-wire-protocol.md)、ADR-017 |
 | 12 | **共享运行时持有完整业务流程**；daemon 与应用只做宿主适配 | [03 §4](./03-architecture-baseline.md)、[07 §9.1](./07-core-kernel.md)、ADR-018 |
 | 13 | **安装记录、安装更新任务、运行实例分别建模** | [14 §1](./14-plugin-lifecycle.md)、ADR-019 |
 | 14 | **资源清理、安装提交、数据迁移与恢复分别定义保证** | [14 §3.1](./14-plugin-lifecycle.md)、ADR-020 |

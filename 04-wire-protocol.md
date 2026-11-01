@@ -37,7 +37,7 @@
 ├──────────────────────────────────────────────────────────────┤
 │ 信封层   Envelope（固定字段；固定 8 个 + 2 个可选）              │
 ├──────────────────────────────────────────────────────────────┤
-│ 会话层   TransferSession / PairingSession / IntentSession      │
+│ 会话层   TransferSession / IntentSession              │
 ├──────────────────────────────────────────────────────────────┤
 │ 帧层     Frame：u32 BE 长度 + u8 kind + body                   │
 ├──────────────────────────────────────────────────────────────┤
@@ -454,9 +454,6 @@ pub mod kernel_internal {
     pub const ERROR:     &str = "device.error";        // 协议级错误（非业务错误）
 
     // ── 会话控制（由内核的会话状态机消费）──
-    pub const PAIR_REQUEST:  &str = "device.pairing.request";
-    pub const PAIR_RESPONSE: &str = "device.pairing.response";
-    pub const UNPAIR:        &str = "device.pairing.unpair";
     pub const INTENT_INVOKE: &str = "_synra.intent.invoke";
     pub const INTENT_RESULT: &str = "_synra.intent.result";
     pub const INTENT_CANCEL: &str = "_synra.intent.cancel";
@@ -484,8 +481,6 @@ pub mod builtin {
     pub const DEVICE_OFFLINE: &str = "_synra.device.offline";
     /// 某台设备的显示名变了
     pub const DEVICE_RENAMED: &str = "_synra.device.renamed";
-    /// 配对关系变化（被对方解除、或新配对成功）
-    pub const PAIRING_CHANGED: &str = "_synra.pairing.changed";
 
     // ── 分享与意图（★ share.received 是"分享类插件"的入口）──
     /// ★ 本机收到一个分享项，且**没有任何插件声明处理它时**才发（见下方说明）
@@ -534,16 +529,15 @@ pub mod builtin {
 | `_synra.device.changed`        | `DeviceSnapshot[]`                          | 全量快照（不是增量）。插件不必自己维护差量 |
 | `_synra.device.offline`        | `{ deviceId, lastSeenAtMs }`                | —    |
 | `_synra.device.renamed`        | `{ deviceId, displayName }`                 | —    |
-| `_synra.pairing.changed`       | `{ deviceId, paired: bool, reason?: string }` | —  |
 | `_synra.share.received`        | `ShareItem`                                 | **只在无插件声明处理该分享时**才发（见下） |
 
 > ★ **上面那张图的第一步现在存在了**（已提交）：内核收到同伴的分享后会调 `Matcher`，候选进意图流程。
 > 但 **第四步（无候选时发 `_synra.share.received` 给插件）仍然没做**：
 > 那需要向插件投递事件，而 `EventDispatcher` 到今天仍然没有生产调用方。
-| `_synra.intent.completed`      | `IntentOutcome`                             | [§8.3](#83-意图) |
+| `_synra.intent.completed`      | `IntentOutcome`                             | [§8.3](#82-意图) |
 | `_synra.intent.failed`         | `IntentOutcome`（`ok: false`）               | 同上 |
 | `_synra.transfer.completed`    | `{ transferId, kind, byteLength, digest, localPath?, meta }` | 摘要**已校验**过才发 |
-| `_synra.transfer.failed`       | `{ transferId, reason: TransferAbortReason }` | [§8.4](#84-文件传输) |
+| `_synra.transfer.failed`       | `{ transferId, reason: TransferAbortReason }` | [§8.4](#83-文件传输) |
 | `_synra.transfer.progress`     | `TransferProgress`                          | 高频；默认不投递 |
 | `_synra.clipboard.received`    | `{ text?, mime, fromDeviceId }`             | 敏感：默认需用户开启 |
 | `_synra.plugin.*`（四条）       | `{ pluginId, version?, oldVersion?, capabilities? }` | 发给所有插件，用于状态同步 |
@@ -725,11 +719,6 @@ pub enum Inbound {
     MemberOffline { device: DeviceId },
     DisplayNameChanged { device: DeviceId, name: String },
 
-    /// 配对
-    PairRequest  { from: PeerProfile, request: RequestId },
-    PairResponse { accepted: bool, reason: Option<String>, request: RequestId },
-    Unpair       { reason: Option<String> },
-
     /// 意图
     IntentInvoke(IntentInvocation),
     IntentResult(IntentOutcome),
@@ -760,7 +749,6 @@ pub enum BuiltinEvent {
     DeviceChanged { devices: Vec<DeviceSnapshot> },
     DeviceOffline { device: DeviceId, last_seen_at_ms: i64 },
     DeviceRenamed { device: DeviceId, display_name: String },
-    PairingChanged { device: DeviceId, paired: bool, reason: Option<String> },
     ShareReceived { item: ShareItem },
     IntentCompleted(IntentOutcome),
     IntentFailed(IntentOutcome),
@@ -882,126 +870,17 @@ pub mod limits {
 
 ### 7.2 建链握手
 
-**目标契约（2026-10-25，[ADR-017](./20-adr.md)）**：TCP 建连后先建立经过认证的加密通道，
-再在该通道内交换 `Hello` / `HelloAck`。重连必须校验配对时绑定的对端身份公钥；
-`device_id`、地址、显示名、challenge 回显和配对 token 均不能单独证明对端身份。
-若使用 token 表达配对代次，它只能在受保护通道中传输，不能代替身份认证。
+> ✅ **本节已按 ADR-025 重写**（2026-11-01）。TCP 建连后**直接**发 `Hello`，没有 TLS、没有证书、没有 token。
 
-首次配对只能进入权限受限的配对流程，必须通过成熟方案提供的带外核验方式确认双方身份，
-核验结果绑定本次安全会话及双方身份密钥。完成双方确认与持久化前，不接受意图执行、文件传输或插件同步。
-禁止静默信任新密钥、按设备名自动接受证书，或在认证失败后退回明文。
-认证加密库、身份凭据格式和配对核验方案须先完成桌面与 Android 技术验证，再补齐具体字段与测试向量；
-不得自行用 nonce、摘要或 challenge 拼接一个认证协议。
+`dial` 与 `accept` 做的是同一件事：发 `Hello`、收 `HelloAck`、比对 nonce、校验对方自称的 profile。
 
-下面的图和 payload 是**安全通道内的应用层协商示意**，不描述密码学握手。
-共享网络层已实现已批准身份间的 mTLS 通道、设备 id 与证书校验、完整证书固定校验及握手上限
-（[实现与验证](./history/2026-10-26-device-authentication.md)）。两个宿主的业务拨号和共享 listener 已接入认证入口，
-本机凭据初始化失败时拒绝联网，旧 token 不会被转成凭据授权；CLI 首次配对已接入受限任务服务，
-应用首次配对与两个宿主的显式换钥修复均已接入共享流程；记录级登记和身份元数据丢失恢复已接入，沿革不产生授权（[恢复验证](./history/2026-10-26-registration-recovery.md)）；Android 后端及平台恢复仍待完成，
-因此尚不满足完整契约，实施与验收见 [19 §0.2](./19-roadmap.md)。
+- **不验证对端身份。** `device_id` 是对方自报的，地址与显示名同样。手里的东西只有「它说自己是谁」。
+- **不交换任何秘密。** `Hello` 里没有 token、没有 challenge、没有摘要；重连与首连没有区别。
+- **失败只因为不兼容或拒绝。** 版本不一致、缺少必需能力、对方明确拒绝——除此之外握手都会成功。
 
-共享层现另有受限配对通道的实现验证：双方通过可信带外路径交换含完整证书的邀请，
-再以固定证书的 mTLS 证明私钥持有；发现广播或在当前未信任连接中收到邀请不等于带外批准。
-本次用户同意通过 [RFC 9266](https://www.rfc-editor.org/rfc/rfc9266.html) 的 TLS exporter 绑定到双方证书所在的安全会话，
-不将自制短码、UUID 摘要或 exporter 回显单独当成身份认证。
-配对使用独立 `synra/pairing/1` ALPN，拒绝业务 ALPN；同一个配对机制实例依次交换有界的用户同意记录和持久化回执，
-两阶段均检查版本、阶段、双方身份与原始 TLS 会话绑定，不暴露通用业务 IO，完成或失败后关闭，业务流另行建链。
-`MutualConsent` 只证明本次双方同意，不能据此授权；共享服务先持久化同意，再交换双方存储成功的回执，
-最后原子复核任务与身份后产生独立代次的授权，后续每个业务请求都要重新核对其捕获的授权代次。
-取消或撤销必须使原任务无法提交，同证书重新配对也不能恢复旧连接的授权。
-回执不能保证两台设备原子提交；一侧最终提交失败时，本机继续拒绝业务，不从未完成日志自动补发授权。
-具体流程、测试范围及剩余限制见[初次核验](./history/2026-10-26-pairing-consent.md)与[持久绑定验证](./history/2026-10-26-peer-trust.md)。
-旧六位显示码不能证明身份、私钥持有或本次会话，应用和 CLI 生产入口已整体替换；显式换钥会撤销旧绑定，两端必须重新核验。
+握手失败时链路立刻关闭并计数（`handshake` 原因），不重试：重试一条注定失败的握手没有意义。
 
-共享的 `synra_core::peer::authenticated::AuthenticatedPeer` 现将认证通道、Hello 协商和业务链路组成一个入口：
-本机 profile 必须匹配本机证书，Hello 与 HelloAck 声明的 id 必须匹配实际 TLS 身份及当前授权代次，
-接收方复核后才能发 HelloAck，发起方拒绝非 `Current` 的配对状态；token 不参与身份认证。
-TLS 与 Hello 共用不超过 `HELLO_TIMEOUT` 的总预算，业务每帧也有总 IO 预算，TLS 内部的部分记录读取不能重置预算。
-Hello 读取预取到的后续帧保留在同一个 decoder 中，交付每个帧前复核授权，包含缓存中的信封和文件块；
-IO 返回后也要复核，避免等待期间撤销后交付数据，数据库检查失败使本链路持续拒绝，恢复必须建立新连接。
-实现与边界见[认证业务入口验证](./history/2026-10-26-authenticated-peer.md)和[宿主接入验证](./history/2026-10-26-host-authentication.md)。
-宿主克隆 `DialConfig` 后在 Host 锁外建立 TLS、校验当前授权并协商 Hello，完成后才短暂持锁记录 session；
-出站必须指定目标设备 id 和对应凭据，地址只作为路由，不能单凭一个裸地址选择要信任的身份。
-缺少本机原生后端或持久凭据时继续提供本地功能并拒绝业务建链，不静默换钥、回退内存密钥或明文。
-
-```
-发起方                                    接收方
-  │                                          │
-  │ TCP connect                              │
-  ├─────────────────────────────────────────▶│
-  │ 认证加密握手；首次配对限制业务权限         │
-  │◀────────────────────────────────────────▶│
-  │ Frame{ kind: Hello, body: Hello{         │
-  │   app: "synra",                          │
-  │   protocol: 1,                           │
-  │   device_id, display_name,               │
-  │   platform, app_version,                 │
-  │   features: [...],                       │
-  │   intent: Fresh | Paired,                │
-  │   challenge: [u8; 32]                    │
-  │ }}                                       │
-  ├─────────────────────────────────────────▶│
-  │                                          │ 校验 app / protocol / target
-  │                                          │ 决定 intent: Fresh | Paired
-  │                                          │ （本地是否已有配对记录）
-  │                                          │ 计算 challenge_response
-  │ Frame{ kind: HelloAck, body: HelloAck{   │
-  │   device_id, display_name, platform,     │
-  │   features: [...],                       │
-  │   intent: Fresh | Paired,                │
-  │   peer_is_paired_locally: bool,          │
-  │   challenge_response: [u8; 32]           │
-  │ }}                                       │
-  │◀─────────────────────────────────────────┤
-  │ 校验 challenge_response                   │
-  │ → 应用层协商完成；业务权限另查配对状态     │
-```
-
-```rust
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct Hello {
-    pub app: String,                    // 固定 "synra"
-    pub protocol: u16,                  // 见 §9
-    pub device_id: DeviceId,
-    pub display_name: String,
-    pub platform: PlatformKind,
-    pub app_version: String,
-    pub features: Vec<Feature>,
-    pub intent: LinkIntent,
-    pub challenge: [u8; 32],
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum LinkIntent { Fresh, Paired }
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct HelloAck {
-    pub device_id: DeviceId,
-    pub display_name: String,
-    pub platform: PlatformKind,
-    pub features: Vec<Feature>,
-    pub intent: LinkIntent,
-    /// 对端（接收方）本地是否把发起方记为已配对。
-    /// ★ 每个实现都必须发这个字段——它是"陈旧配对自愈"的依据。
-    pub peer_is_paired_locally: bool,
-    pub challenge_response: [u8; 32],
-}
-```
-
-### 7.3 配对授权不一致
-
-本机已撤销或不存在对端授权时，业务连接必须在受保护入口拒绝，不能为了发送 `Fresh` 提示而放行未批准身份。
-重连只接受已绑定的确切证书及当前授权代次；对端声明、旧 token 和 `HelloAck` 字段不能恢复授权。
-
-发起方无法认证对端时报告认证失败，保留本机已有绑定，等待用户明确撤销或重新配对；
-不能从未认证的断链、替换证书或超时推断“对方已解除配对”，更不能因此自动删除可信绑定。
-本机主动解除配对会原子删除授权与列表记录、取消该身份的未完成任务，并使旧业务连接的后续请求被拒绝。
-同证书重新配对也产生新代次，旧连接不能复活；首次或重新配对必须走 [§8.2](#82-配对) 的受限流程。
-
-### 7.4 心跳与 ACK
+### 7.3 心跳与 ACK
 
 ```
 心跳：
@@ -1052,7 +931,7 @@ pub enum AckPolicy {
 > **这是一条重要的纠正**：可靠投递不能因为"这条链路是对方主动连的"就退化。
 > 出站与入站必须用同一个 `AckPolicy` 判定函数，否则会出现"某方向的消息静默丢失"。
 
-### 7.5 幂等
+### 7.4 幂等
 
 ```
 发送端：重试时**复用同一个 request_id**（不生成新的）
@@ -1063,7 +942,7 @@ pub enum AckPolicy {
 
 这是"点两次按钮只开一个浏览器标签"的保证。
 
-### 7.6 断链分类
+### 7.5 断链分类
 
 ```rust
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1107,7 +986,7 @@ impl DisconnectClass {
 > **不要用错误消息里的字符串做判定。** `econnreset` / `socket hang up` 这类关键词会随平台与
 > 运行库版本变化，而且会把"用户可见的错误"错误地静默掉。用 `ErrorKind` 与 `raw_os_error`。
 
-### 7.7 重连
+### 7.6 重连
 
 ```rust
 pub struct ReconnectPolicy {
@@ -1141,7 +1020,6 @@ pub struct ReconnectTriggers {
 
 | 会话              | 标识        | 状态机                                                                 | 持久化          |
 | ----------------- | ----------- | ---------------------------------------------------------------------- | --------------- |
-| `PairingSession`  | `RequestId` | `Sent → Answered → Completed \| Rejected \| Expired`                     | 结果入配对表     |
 | `IntentSession`   | `IntentId`  | `Matching → Decided → Dispatching → Executing → Done \| Failed \| Expired` | 可选（离线排队） |
 | `TransferSession` | `TransferId`| `Requested → Streaming → Assembling → Verified → Persisted \| Failed \| Aborted` | 可选（断点续传） |
 
@@ -1149,7 +1027,6 @@ pub struct ReconnectTriggers {
 
 ```rust
 pub struct SessionTimeouts {
-    pub pairing: Duration,          // 默认 30s
     pub intent: Duration,           // 默认 30s
     pub transfer_idle: Duration,    // 默认 60s（无新块则中止）
     pub transfer_total: Duration,   // 默认 30min
@@ -1158,38 +1035,7 @@ pub struct SessionTimeouts {
 }
 ```
 
-### 8.2 配对
-
-首次配对通过独立 `synra/pairing/1` mTLS 通道完成，不依赖已有业务连接。
-双方先通过可信带外路径交换完整公开证书，导入邀请的动作就是明确批准该身份，解析文本本身不构成批准。
-CLI 与 daemon 的入口现为 `pair invite`、`pair listen DEVICE --invitation ...`、
-`pair connect DEVICE --reply ...`、`pair status` 和 `pair cancel REQUEST_ID`；应用界面尚待接入此流程。
-
-发起方先导出 `synra-pair:1:...`；接收方明确导入后生成有时限的 `synra-pair-reply:1:PORT:...`，
-再经可信带外路径交还发起方导入。应答中的端口及发现地址只用于路由，TLS 仍须证明持有邀请中确切证书的私钥。
-两次导入均须核对所选设备 id 与证书身份，禁止把另一设备的邀请应用到当前选中的设备。
-双方同意、TLS exporter 绑定与持久回执均由同一受限通道机制处理，不另外设计认证算法。
-
-**规则**：
-
-| # | 规则                                                                       |
-| - | -------------------------------------------------------------------------- |
-| 1 | 所选设备 id、可信带外邀请和实际 TLS 证书身份必须一致，拒绝自配对及替换已有绑定 |
-| 2 | 每个共享网络身份只保留一个活动任务，取消中的任务退出前不得复用运行时槽位 |
-| 3 | 握手前先持久预留任务代次、双方公开证书与到期时间，此时 binding 为 NULL，不产生业务授权 |
-| 4 | TLS 成功后仅能绑定原预留任务，取消、撤销、过期或更换本机登记后，晚到连接均不得重新领取任务 |
-| 5 | 双方持久回执完成后，原子提交本机授权代次及列表记录，失败回滚两者，旧 token 不参与授权 |
-| 6 | 时限覆盖等待连接、TLS、同意和持久回执；数据库锁等待后及提交前也复核单调时钟预算 |
-| 7 | 完成或失败后关闭专用连接，业务另行认证；重启不得从预留或未完成日志推断授权或恢复旧 socket |
-
-> 身份密钥变化、丢失或被撤销后，旧绑定不得继续授权；需要明确重新配对。
-> 取消任务阻止尚未提交的授权；已经提交时须如实拒绝取消，解除已生效配对是单独的撤销动作。
-> 发现广播只是候选地址提示，不是认证凭据。私钥保存和轮换见 [17 §5](./17-storage-and-config.md)。
-
-任务快照区分 Listening、Connecting、Confirming、Cancelling 及终态，快照本身不能授权。
-应答、任务代次、取消与边界测试见[生产首次配对入口](./history/2026-10-26-first-pairing.md)。
-
-### 8.3 意图
+### 8.2 意图
 
 ```rust
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1230,7 +1076,7 @@ pub struct IntentOutcome {
 8. 交给插件 execute()
 ```
 
-### 8.4 文件传输
+### 8.3 文件传输
 
 ```rust
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1500,7 +1346,7 @@ pub enum TrustLevel {
 - [x] `inbound.rs`：`Inbound` 语义枚举 + 从 `Envelope` 的解析（含 `Unknown` 兜底）
 - [x] `handshake.rs`：`Hello` / `HelloAck` / `LinkIntent` + 陈旧配对自愈规则
 - [x] `session.rs`：三类会话的状态机类型 + `SessionTimeouts` + 配对/意图/传输三类会话的 payload 类型
-      （`PairRequest` / `PairResponse` / `IntentInvocation` / `IntentOutcome` / `IntentDisplay` /
+      （`IntentInvocation` / `IntentOutcome` / `IntentDisplay` /
       `TransferRequest` / `TransferComplete` / `TransferAbort`）
 - [x] `discovery.rs`：查询/响应/离线公告的编解码 + `ScanBudget`
 - [x] `limits.rs`：§7.1 的全部常量

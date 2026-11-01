@@ -367,8 +367,8 @@ async fn pairing_then_message() {
 }
 
 #[tokio::test]
-async fn stale_pairing_self_heals() {
-    // A 删掉配对、B 仍以为配对着 → 下次连接必须自愈（[04 §7.3]）
+async fn forgetting_a_device_does_not_block_it() {
+    // A 忘记 B → B 再次连上时按首次连接记录，重新出现在列表里（[04 §7.2]）
     let pair = KernelPair::paired().await;
     pair.a.forget(pair.b_id).await?;
     pair.reconnect().await?;

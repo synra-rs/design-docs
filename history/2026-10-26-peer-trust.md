@@ -1,6 +1,6 @@
 # 对端凭据持久绑定与授权代次
 
-日期：2026-10-26。对应 [04 §7.2、§8.2](../04-wire-protocol.md)、[17 §5](../17-storage-and-config.md)、
+日期：2026-10-26。对应 [04 §7.2](../04-wire-protocol.md)、[17 §5](../17-storage-and-config.md)、
 [ADR-017](../20-adr.md)；当前实施状态只以 [19 D1](../19-roadmap.md) 为准。
 
 ## 实现范围
