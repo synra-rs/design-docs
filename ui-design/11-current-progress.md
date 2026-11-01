@@ -6720,6 +6720,16 @@ const headline = computed(() => errorSentence(props.code))
 **未验证的一条**：这条链路没有在两台真机上跑过。最可能出问题的是监听器用 `peek` 从 ClientHello 里认 ALPN——
 TLS 分片理论上可能让首包读不到完整的 ALPN 名，那时表现为「请求发出去了，对方毫无反应」。
 
+**★ 还有一条已知缺口，写在这里免得下次重新发现**：两边接受后写入的只是 `paired_devices`（列表用），
+**没有写 `trusted_peer_records`（信任用）**。`peer_trust::approved_peers` 读的是后者，所以现在的状态是
+「界面上已配对，真去连会被当作未批准的设备拒掉」。
+
+这不是漏了一行：`activate_peer_trust` 要求 `PeerTrustAttempt` 里带上**双向的持久回执**，也就是
+`reserve → bind → claim → 双方回执 → activate` 这套两阶段流程 —— `PairingService` 的 worker 做的正是这件事。
+首配通道已经把双方证书握在手里（`PendingPairing.certificate` 与 `transport::answer` 的返回值），
+要把它们送到那套机制里，等于让首配走一遍 `PairingService` 的任务机，而不是另起一套。
+**下一步就该做这件事；在它完成之前，配对只完成了「两边都记下来」，没有完成「之后能连上」。**
+
 ## 18. 不作为首批前提的增强
 
 **这一节原来把四件事并列写成一句「都按实际收益决定」，但四件的状态各不相同**（16.61 核实）：
