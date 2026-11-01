@@ -6717,6 +6717,9 @@ const headline = computed(() => errorSentence(props.code))
 **门禁**：**611** 前端测试、lint 0、check 0、shapes 15 项；`cargo check --workspace --all-targets` 通过。
 `pnpm build` 产物已确认含 `pairing-outgoing-code`、不含旧邀请文案。
 
+**全量 `cargo test --workspace` 没有跑完**：两次尝试都超过十分钟仍未结束，第二次还撞上 `LNK1104`——上一次被中止的测试进程还占着
+`synra_daemon-*.exe`，杀掉后才继续。**结论按定向测试算：`cargo test -p synra-core --lib pairing` 34 项全过。**
+
 **未验证的一条**：这条链路没有在两台真机上跑过。最可能出问题的是监听器用 `peek` 从 ClientHello 里认 ALPN——
 TLS 分片理论上可能让首包读不到完整的 ALPN 名，那时表现为「请求发出去了，对方毫无反应」。
 
