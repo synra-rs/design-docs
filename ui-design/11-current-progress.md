@@ -285,7 +285,7 @@ F 的验收里有一句“测量后决定虚拟化/分页”。补上这个结�
 
 **B. 核对通过、没有改动的**
 
-`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.160`
+`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.161`
 ——覆盖 `03 §4/§5/§6`、`04 §4.3/§5/§6`、`06` **全章**、`07 §1/§2/§3/§4/§5.1/§5.2/§5.3/§6/§8/§9/§10`、`08` 各节、`09 §7/§8`、命令契约与假内核一致性、`NoticeHost`、`healthLabel`。
 
 **`07` 至此整章核完**，只剩 16.53 那一条未做到。
@@ -6344,6 +6344,56 @@ stale       → 版本变了，旧计划作废
 | synra-rust-app | `da9b8b5` `test: hold plugin sync to its own lifecycle` | ✅ 已推送 |
 
 **门禁**：**612** 前端测试（+4）、lint 0、check 15 项。
+
+### 16.161 导航和路由"不可能不一致"，但这句话没人验
+
+`router.ts` 的第一句注释是这样写的：
+
+> Declared as data rather than written into the template so that the nav and the router cannot disagree — a hand-written nav is where the "Devices" link that goes nowhere comes from.
+
+**这个承诺成立的前提是"有东西在检查"。`PAGES` 同时喂给侧栏和路由表，但没有任何测试确认两者在加第五个页面之后还同步。**
+
+**`router.ts` 共 88 行，零测试引用。**
+
+### 写之前先看它到底靠什么成立
+
+```
+label 用 getter      → 切语言时能读到新文案
+icon 来自 messages   → UnoCSS extractor 能看见，图标不会丢
+routes 由 PAGES 生成 → 路由不会多出一条侧栏没有的
+```
+
+**三样都是"正确的写法"，但正确的写法和"被锁住"是两回事。**
+
+### 写了 5 条
+
+| 用例 | 守的是什么 |
+| --- | --- |
+| 每个页面都有路由，每条路由都有页面 | `PAGES` 与路由表同步 |
+| 首页排第一 | 启动落在哪 |
+| 四条路径不重复 | 避免一条路由永远不可达、侧栏却仍在 |
+| **切语言后 `label` 跟着变** | getter 不能被写成静态值 |
+| 每个页面都有 `i-carbon-` 图标 | R41：图标在构建期内联，空了就是方块 |
+
+**第 4 条是重点。** `label: messages.nav.home.label` 和 `get label() { return messages.nav.home.label }` **在第一次导入时取值完全一样**，区别只在语言变了之后。**肉眼和普通断言都看不出来。**
+
+### 变异验证
+
+把第一条的 getter 改成静态值：
+
+```
+× reads labels through messages, so a language change reaches the nav
+```
+
+**只有这条失败，其余 4 条照常通过。**
+
+### 提交
+
+| 仓库 | 提交 | 状态 |
+|---|---|---|
+| synra-rust-app | `b6803c6` `test: keep the nav and the routes in step` | ✅ 已推送 |
+
+**门禁**：**617** 前端测试（+5）、lint 0、check 0、shapes 15 项。
 
 ## 18. 不作为首批前提的增强
 
