@@ -53,7 +53,6 @@
 | ----------- | ----------------- | ----------------------------- |
 | `identity_` | `Identity`        | 本机身份                      |
 | `devices_`  | `Discovery`+`Trust`+`Transport` | 设备视图（派生）    |
-| `pairing_`  | `Trust`           | 配对                          |
 | `intent_`   | `Intent`          | 意图路由                      |
 | `transfer_` | `TransferSessions`| 文件传输                      |
 | `plugins_`  | `Plugins`         | 插件                          |
@@ -62,25 +61,21 @@
 
 ### 2.2 完整 Command 表
 
-本机身份维护返回协议层的共享类型，不复制宿主私有 JSON 形状：
-`CredentialSnapshot` 区分持久登记、独立的 `CredentialRecovery` 恢复元数据、当前进程加载的身份、待清理数量及重启要求；登记 ready 不表示原生密钥后端当前健康。
-登记丢失时 enrollment 为 null，recovery 只提供最后登记的公开指纹与后端，设置页明确提示并要求确认后换钥；它不表示凭据可用或权限恢复。
-`CredentialRepairReport` 表示新钥已提交，cleanup 是独立的 `CredentialCleanupReport`，清理失败不能抹掉换钥成功。
-设置页确认框捕获当时展示的指纹，刷新不能悄悄更换待确认目标，后端拒绝失效指纹。
-成功或失败后都重新读取身份与设备列表，因为失败前也可能已撤销旧授权；读取失败明确显示且可独立重试，
-不能因重试刷新而再次换钥。操作结果保留在 store 中跨导航展示，应用重启后以新进程的实际身份重新读取。
-状态不是私钥健康探测，不从界面快照产生授权；具体修复契约见 [17 §5](./17-storage-and-config.md)。
+> ⚠️ **本表已按 ADR-025 更新**（2026-11-01）：`pairing_*` 整组、`identity_credentials/repair/cleanup`、
+> `devices_connect/disconnect` 都已从契约删除。**以 `synra-ipc/src/command.rs` 为准**，本文只解释形状。
+
+身份只剩两条命令：读快照、改显示名。**没有凭据、修复、换钥、指纹**——设备不再持有任何证书或私钥，
+因此也没有「身份需要处理」这种状态可返回。
+
+设备四条：快照、开始扫描、取消扫描、忘记。**没有 connect/disconnect**：链路只在有东西要送的时候打开，
+一个只为让屏幕显示「已连接」的连接没有载荷。
+
+**没有配对命令组。** 配对现在的全部含义是：拨号 → 握手交换身份 → 两侧各写一行 `paired_devices`。
+它不是一个可以发起、查询、取消的任务，因此没有 `pairing_*` 可调，也没有 `pairingUpdated` 事件。
+
 应用 Tauri 分发器在调用任何本应用命令之前，以真实 WebView label 选择 Host 或 Plugin 接口并查询共享命令注册表；
 仅 main 可进入 Host 命令，其他 WebView 仅能进入已声明的插件桥接命令，之后仍须校验 token、权限及资源归属。
 未知本应用命令默认拒绝；判断不使用调用参数中声称的窗口标签，不能仅依赖 main 窗口的插件权限配置或前端隐藏按钮。
-
-配对命令共用 core 的 `PairingService`，任务返回 `synra-protocol::pairing::PairingSnapshot`。
-显式导入表示用户批准经可信带外路径获得的目标证书，所选 device id 必须匹配证书；
-应用从发现写入的设备表取得路由地址，路由和名称都不能产生授权。
-`pairing_status` 返回运行时快照或 null（`Maybe`），快照中的 reply、errorCode、detail 为必有键的可空值。
-前端只保存选择和表单输入，任务由共享 store 读取；`pairingUpdated` 触发权威重读，
-读取串行合并并丢弃被新事件或命令失效的旧响应，避免旧快照覆盖新任务。
-六位码提示、token 应答命令及旧配对事件已删除，无兼容入口。
 
 ```rust
 // src-tauri/src/commands/mod.rs
@@ -88,25 +83,13 @@
 // ─────────── identity ───────────
 #[tauri::command] async fn identity_get(state: State<'_, AppState>) -> Result<IdentitySnapshot, IpcError>;
 #[tauri::command] async fn identity_set_display_name(state: State<'_, AppState>, name: String) -> Result<(), IpcError>;
-#[tauri::command] fn identity_credentials(state: State<'_, AppState>) -> Result<CredentialSnapshot, IpcError>;
-#[tauri::command] async fn identity_repair(state: State<'_, AppState>, expected_fingerprint: String) -> Result<CredentialRepairReport, IpcError>;
-#[tauri::command] async fn identity_cleanup(state: State<'_, AppState>) -> Result<CredentialCleanupReport, IpcError>;
 
 // ─────────── devices ───────────
 /// 全量快照：设备卡片列表 + 本机身份 + 扫描状态
 #[tauri::command] async fn devices_snapshot(state: State<'_, AppState>) -> Result<DevicesSnapshot, IpcError>;
 #[tauri::command] async fn devices_scan_start(state: State<'_, AppState>, opts: ScanOptions) -> Result<ScanId, IpcError>;
 #[tauri::command] async fn devices_scan_cancel(state: State<'_, AppState>, scan_id: ScanId) -> Result<(), IpcError>;
-#[tauri::command] async fn devices_connect(state: State<'_, AppState>, device_id: DeviceId) -> Result<(), IpcError>;
-#[tauri::command] async fn devices_disconnect(state: State<'_, AppState>, device_id: DeviceId) -> Result<(), IpcError>;
 #[tauri::command] async fn devices_forget(state: State<'_, AppState>, device_id: DeviceId) -> Result<(), IpcError>;
-
-// ─────────── pairing ───────────
-#[tauri::command] fn pairing_invite(state: State<'_, AppState>) -> Result<String, IpcError>;
-#[tauri::command] async fn pairing_listen(state: State<'_, AppState>, device_id: String, invitation: String) -> Result<PairingSnapshot, IpcError>;
-#[tauri::command] async fn pairing_connect(state: State<'_, AppState>, device_id: String, reply: String) -> Result<PairingSnapshot, IpcError>;
-#[tauri::command] fn pairing_status(state: State<'_, AppState>) -> Result<Option<PairingSnapshot>, IpcError>;
-#[tauri::command] async fn pairing_cancel(state: State<'_, AppState>, request_id: RequestId) -> Result<(), IpcError>;
 
 // ─────────── intent ───────────
 /// 唯一的下发入口（分享、剪切板、插件动作都走这里）
@@ -303,7 +286,6 @@ export function installKernelEventBridge(kernel: KernelClient, store: RootStore)
   const unlisten = events.kernelEvent.listen(({ payload }) => {
     switch (payload.type) {
       case 'device_card_updated':   store.devices.upsert(payload.payload); break
-      case 'pairingUpdated':        void store.pairing.refresh(kernel); break
       case 'intent_candidates_ready': store.intent.showCandidates(payload.payload); break
       case 'plugin_install_progress': store.plugins.setProgress(payload.payload); break
       case 'plugin_faulted':        store.plugins.markFaulted(payload.payload); break
@@ -351,7 +333,7 @@ pub struct KernelEventEnvelope {
 | `stores/pairing.ts`               | ⚠️ 部分保留（弹窗可见性/UI）+ 内核为权威      |
 | `stores/paired-reconnect.ts`      | ❌ 删除 → 内核 `ReconnectSupervisor`         |
 | `composables/use-plugin-catalog`  | ⚠️ 保留（UI 分页/搜索）+ 内核 `plugins_list`  |
-| `composables/use-connect-page`    | ❌ 删除 → 内核 `devices_*` / `pairing_*`    |
+| `composables/use-connect-page`    | ❌ 删除 → 内核 `devices_*`    |
 | `lib/paired-devices-storage`      | ❌ 删除 → 内核 store                        |
 | `lib/plugin-registry-preferences` | ❌ 删除 → 内核 config                       |
 | `lib/pairing-outbound-pending`    | ❌ 删除 → 内核 `PairingSession`             |
