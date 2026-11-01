@@ -6703,6 +6703,16 @@ const headline = computed(() => errorSentence(props.code))
 | synra-rust-app | `2fddf35` | 拨号命令（立刻返回六位数码，拨号在后台线程） |
 | synra-rust-app | `c64141e` | 面板显示「等待对方确认」与大号数码 |
 | synra-rust-app | `3c1d52b` | 等待期间每三秒重读设备列表，直到已配对或窗口结束 |
+| synra-rust-core | `df16308` | 删掉 `Host::locate`（发现表不由应用填充） |
+| synra-rust-app | `b1257af` | 地址改从 `devices_seen.source` 取；删掉仍调用已删命令的旧测试 |
+| synra-rust-core | `9cf8baf` | 清掉首配握手留下的四个警告 |
+| synra-rust-app | `db8e3ec` | 记录里写对端的名字与平台，不再写本机自己的 |
+
+**`b1257af` 修的是一个会让功能完全不可用的错误**：地址原先从 `Host` 的内存发现表取，而那张表应用从不填充 —— 应用自己走的是 `state.discovery` 与 `devices_seen`。
+于是设备明明列在页面上、点「配对」却得到「不在附近」。改为读数据库那一行的 `source`：与屏幕所见同一个来源。
+
+**`db8e3ec` 修的是一个会写错数据的错误**：配对成功后写入的 `display_name` 用的是本机 profile，等于把对方记成本机自己的名字。
+现改为读那条 `devices_seen` 行的名称与平台。
 
 **门禁**：**611** 前端测试、lint 0、check 0、shapes 15 项；`cargo check --workspace --all-targets` 通过。
 `pnpm build` 产物已确认含 `pairing-outgoing-code`、不含旧邀请文案。
