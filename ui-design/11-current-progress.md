@@ -6734,14 +6734,24 @@ const headline = computed(() => errorSentence(props.code))
 **全量最终结果**：**72 个测试套件、3682 个用例、0 失败**（`cargo test --workspace --no-fail-fast`）。
 唯一要注意的是：跑之前得先确认没有残留的 `synra_daemon-*.exe` 进程，否则 `link.exe` 会以 `LNK1104` 拒绝写文件 —— 那不是测试失败。
 
-#### 还有一个已知的小缺口，没有修
+#### 一个我之前记错了的地方，先改正
 
-`DevicesPage.pair()` 里写的是 `void pairing.request(deviceId)`。盘子里找不到地址、或本机没有身份时，这个 Promise 会**拒绝**，
-而 `void` 让拒绝变成未处理的拒绝：**界面既不显示码，也不说明为什么**，用户看到的是「点了没反应」。
+我本来写的是「配对失败时界面既不显示码也不说明原因」。**这是错的。** 面板里本来就有
 
-它该走页面已有的 `ErrorNotice`（`scanError` 就是这么做的），但那条路要接 store 的失败态、面板模板和两颗语言的文案，
-是一次跨四个文件的小改动。**本轮结束时树是全绿的、3682 个用例全过，我不在最后几轮为一句提示去动它。**
-下一次动这个页面时顺手做：失败时把 `kernel.call` 的错误放进 store，面板里用 `ErrorNotice` 呈现，而不是只弹一个空面板。
+```
+<ErrorNotice v-if="pairing.commandError" :code=… :params=… :actions=… />
+```
+
+而 `DevicesPage` 的开关条件是 `opened || pairing.active || pairing.error !== undefined` —— **`kernel.call` 返回 `ok: false` 时，
+面板会自己打开并显示 `ErrorNotice`**，store 的 `request` 里也早就把 `result.error` 放进了 `commandError`。失败是有回声的。
+
+**真正的缺口窄得多**：`DevicesPage.pair()` 写的是 `void pairing.request(deviceId)`。如果 `kernel.call` 本身**抛异常**而不是
+返回 `ok: false`（IPC 层故障），那个异常会穿过 `void` 变成未处理的拒绝，`commandError` 也不会被设置 —— 只有这一种情况会「点了没反应」。
+
+我试过在 store 的 `request` 里把它 catch 成 `commandError`，**类型检查没过**（`IpcError` 的构造缺字段，而它的定义不在 `src/ipc` 里），
+**于是回退了，没有留下半成品**。两次门禁复跑都绿：`shapes agree (15)`、lint 0 错误、工作区 0 个未提交文件。
+
+下次要补，先找到 `IpcError` 的完整类型，再构造；或者更简单 —— 让 `kernel.call` 保证不抛，只在 `ok: false` 里表达失败。
 
 **未验证的一条**：这条链路没有在两台真机上跑过。最可能出问题的是监听器用 `peek` 从 ClientHello 里认 ALPN——
 TLS 分片理论上可能让首包读不到完整的 ALPN 名，那时表现为「请求发出去了，对方毫无反应」。
