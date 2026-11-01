@@ -6747,9 +6747,11 @@ enum Link {
 两端的 `transport::answer` / `ask` 在对方接受后各跑一次 `adopt → begin → finish`，写进 `trusted_peer_records`。
 新增 `WireError::Trust` 专门表示「双方都同意了，但记录这同意的动作被拒」—— 折进 `Io` 会让人去查网络，或更糟，把只差记录的配对报成成功。
 
-**仍然缺的一条测试**：没有「配对后 `approved_peers` 里真的有对方」的集成测试。现有 `NetworkFixture` 是给邀请流程设计的，
-而 `PairingDesk::answer` 要求一个写盘闭包，两端的连接还要真的对上 —— 这条测试得新建夹具，不是补几行断言。
-**在它写出来之前，信任写入只有编译与 33 个旧测试支撑。**
+**仍然缺的一条测试**（`392e1c9` 已补）：`a_first_pairing_leaves_both_sides_trusted` —— 两个独立的 `NetworkFixture`
+各开一个监听端与拨号端，跑完 `ask` / `answer` 之后分别查 `approved_peers`，两边都必须正好有一条。
+
+**写这条测试时才发现的一个细节**：拨号方与应答方的 `now_ms` 必须来自同一处，否则六位数码和 consent 记录里的时间对不上。
+测试里用的是发起方 fixture 的 `now_ms`。
 
 ## 18. 不作为首批前提的增强
 
