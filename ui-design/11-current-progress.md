@@ -285,7 +285,7 @@ F 的验收里有一句“测量后决定虚拟化/分页”。补上这个结�
 
 **B. 核对通过、没有改动的**
 
-`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.162`
+`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.163`
 ——覆盖 `03 §4/§5/§6`、`04 §4.3/§5/§6`、`06` **全章**、`07 §1/§2/§3/§4/§5.1/§5.2/§5.3/§6/§8/§9/§10`、`08` 各节、`09 §7/§8`、命令契约与假内核一致性、`NoticeHost`、`healthLabel`。
 
 **`07` 至此整章核完**，只剩 16.53 那一条未做到。
@@ -6459,6 +6459,69 @@ lint 抓到 `\s*\(?\s*` 里两个 `\s*` 会互相吞字符 —— **改成一个
 | synra-rust-app | `ec9f07b` `test: quarantine every fixture, not one name` | ✅ 已推送 |
 
 **门禁**：617 前端测试、lint 0、check 0、shapes 15 项。
+
+### 16.163 权限复选框组，没人告诉读屏用户在选什么
+
+**这轮顺着 `16.162` 的问法往下查：控件命名守卫只认四个组件，仓库里还有别的组控件。**
+
+统计了一遍全树的 antd 组件使用，**`ACheckboxGroup` 有 1 处，不在守卫的四个名单里。**
+
+### 那一处确实没有名字
+
+```
+<span class="text-xs text-ink-dim">{{ messages.plugins.requested }}</span>
+
+<ACheckboxGroup
+  :value="selection[plugin.pluginId] ?? plugin.granted"
+  :disabled="operations.busy.has(plugin.pluginId)"
+  class="stack"
+  ...
+>
+```
+
+**上面那个 `<span>` 就是「所需权限」，它离 group 只有一行，但没有 `id`。**
+
+**`ACheckboxGroup` 渲染成 `role="group"`。没有名字的 group，读屏只念「group」。**
+
+**所以用户听到的是：** 一个个复选框和它们各自的能力名 —— `net:read-title`、`platform:open-url` —— **但从来不知道这一组在问什么。**
+
+**而答案就在屏幕上，一行之上，连着 `messages.plugins.requested`，只是没连到任何东西上。**
+
+### 修法
+
+`<span>` 加 `:id="requestedLabelId(plugin.pluginId)"`，group 加 `:aria-labelledby="requestedLabelId(plugin.pluginId)"`。
+
+**`id` 必须从插件 id 派生，不能是固定串。** 页面上每个插件行都有自己的权限组，**两个组共用一个 `id`，第二个就会去念第一个插件的标题 —— 比没名字更糟，因为它看起来是对的。**
+
+**插件 id 是 `@synra-plugin/github` 这种带作用域的，不能直接进 `id` 属性**，所以函数里 `replace(/[^\w-]/g, '-')` 把它压平。
+
+### 先复现
+
+三条结构测试在改动前**全部失败**：
+
+```
+× names the group from the heading above it        AssertionError: the group is unnamed:
+× points at an id the label above actually carries  AssertionError: expected null not to be null
+× derives the id from the plugin                    （同类）
+```
+
+### 变异验证
+
+删掉 group 上的 `:aria-labelledby`：**前两条失败，后两条照常通过** —— 每条测各自的事。
+
+### 一处测试写法的教训
+
+**我最初想挂载整个 `PluginsPage` 来验证真实渲染，但它要 store、router、kernel 三样东西才肯渲染。** 最后改成读源码，**只问一件事：那个表达式是不是恰好出现在这两处。**
+
+**这不是妥协** —— `id` 和 `aria-labelledby` 之间要一致，**本质上就是「一个表达式出现两次」，而这正是编辑时最容易只改一处的地方。**
+
+### 提交
+
+| 仓库 | 提交 | 状态 |
+|---|---|---|
+| synra-rust-app | `c843143` `fix: name the permission group after its heading` | ✅ 已推送 |
+
+**门禁**：**621** 前端测试（+4）、lint 0、check 0、shapes 15 项。
 
 ## 18. 不作为首批前提的增强
 
