@@ -285,7 +285,7 @@ F 的验收里有一句“测量后决定虚拟化/分页”。补上这个结�
 
 **B. 核对通过、没有改动的**
 
-`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.164`
+`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.165`
 ——覆盖 `03 §4/§5/§6`、`04 §4.3/§5/§6`、`06` **全章**、`07 §1/§2/§3/§4/§5.1/§5.2/§5.3/§6/§8/§9/§10`、`08` 各节、`09 §7/§8`、命令契约与假内核一致性、`NoticeHost`、`healthLabel`。
 
 **`07` 至此整章核完**，只剩 16.53 那一条未做到。
@@ -6566,6 +6566,48 @@ function stateColour(state: string): 'success' | 'error' | 'warning' | 'default'
 | synra-rust-app | `a33481d` `docs: give each helper back its own note` | ✅ 已推送 |
 
 **门禁**：621 前端测试、lint 0、check 0、shapes 15 项。
+
+### 16.165 全库扫了一遍注释错位，又找到一处
+
+**`16.164` 修完，我意识到那个问题不该只看一个文件 —— 如果我用 `replace` 在 `PluginsPage` 上犯过，别处可能也犯过。**
+
+**扫的办法：找「`*/` 紧跟 `/**`」的地方** —— 正常代码里两个文档注释不会这样挨着，**除非一个是多余，或者有一个挂错了对象。**
+
+### 七处命中，六处正常
+
+| 文件 | 结论 |
+| --- | --- |
+| `channel.ts` | 上一个常量结束备注 + 下一个 —— 正常 |
+| `command-inventory.ts` | 同上 |
+| `check-shapes.ts` | 上一个守卫结束 `*/` + 下一个守卫的注释 —— 正常 |
+| `format.ts` / `errors.ts` | 函数分隔 —— 正常 |
+| `home-page.mount.test.ts` | `*/` 是上一个函数结尾，后面是 `drawWire` 自己的注释 —— 正常 |
+
+### 第七处是真的
+
+```
+/** What a transfer asks before it is abandoned; the friction is a preference, not a fixed rule. */
+/** Whether Synra starts with the user's session. The platform owns the registration; the switch only asks. */
+startup: {
+```
+
+**第一句写的是「传输终止前会问什么」，第二句写的是「是否随会话启动」，下面是 `startup`。**
+
+**第一句描述的是 `transfers.cancelAsk` —— 它在 L107，隔了八行。**
+
+**所以有一段注释飘在了错误的位置上，两段都还完整，只是第一段不属于它现在待的地方。**
+
+### 修法
+
+`startup` 前面只留它自己那句，`transfers` 前面放回传输那句。**一处移动，净改动两行。**
+
+### 提交
+
+| 仓库 | 提交 | 状态 |
+|---|---|---|
+| synra-rust-app | `0f5afb1` `docs: move the cancel note to the transfers it describes` | ✅ 已推送 |
+
+**门禁**：621 前端测试、lint 0、check 0。
 
 ## 18. 不作为首批前提的增强
 
