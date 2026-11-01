@@ -285,7 +285,7 @@ F 的验收里有一句“测量后决定虚拟化/分页”。补上这个结�
 
 **B. 核对通过、没有改动的**
 
-`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.153`
+`16.2`、`16.3`、`16.10`、`16.12`–`16.20`、`16.22`–`16.27`、`16.29`、`16.30`、`16.32`、`16.33`、`16.35`、`16.37`、`16.39`–`16.154`
 ——覆盖 `03 §4/§5/§6`、`04 §4.3/§5/§6`、`06` **全章**、`07 §1/§2/§3/§4/§5.1/§5.2/§5.3/§6/§8/§9/§10`、`08` 各节、`09 §7/§8`、命令契约与假内核一致性、`NoticeHost`、`healthLabel`。
 
 **`07` 至此整章核完**，只剩 16.53 那一条未做到。
@@ -5945,6 +5945,55 @@ src 下每个 .vue，只要渲染 <AButton>，
 | 仓库 | 提交 | 状态 |
 |---|---|---|
 | synra-rust-app | `66ba7fc` `test: read touch queries in either order` | ✅ 已推送 |
+
+**门禁**：607 前端测试、lint 0、check 14 项。
+
+### 16.154 圆角守卫只认得「裸 rounded」，认不出 `rounded-lg`
+
+**这是第三处「守卫的覆盖范围比它声称的窄」。**
+
+`checkCornerLadder` 的正则：
+
+```regex
+/\brounded(?![-:\w])/g
+```
+
+**它只匹配裸 `rounded`（4px）。** 但 UnoCSS 自带的 `rounded-sm` / `md` / `lg` / `xl` **同样不在梯度上** —— 它们走的是 UnoCSS 默认值，不是 `--synra-radius-*`。
+
+**梯度只有三档：`control`(8)、`surface`(12)、`pill`。** `rounded-lg` 恰好也是 8px，**所以肉眼看不出来，但它绕过了 token 体系** —— 改 `--synra-radius-control` 时，它不会跟着变。
+
+### 扫出来一处
+
+`App.vue:198`，离线提示横幅：
+
+```
+mb-4 border border-line rounded-lg bg-raised px-4 py-3 text-sm
+```
+
+**改成 `rounded-surface`。** 它是横幅块，与面板同级，12px 正确。
+
+### 守卫与提示语
+
+正则扩成两种都认，**并在失败信息里写出实际用了哪个类**（`uses \`rounded-lg\``），而不是笼统说"用了裸 rounded"。
+
+**提示语也从 `no bare rounded` 改成 `every corner comes from the ladder`** —— 旧措辞在只查一种时是准确的，现在不再是。
+
+### 变异验证
+
+改回 `rounded-lg`：
+
+```
+· corner-ladder: 1 corner(s) off the ladder
+✗ corner-ladder: src\App.vue:198 uses `rounded-lg`, which is not on the ladder
+```
+
+**文件名、行号、类名全对。** 恢复后 14 项全绿。
+
+### 提交
+
+| 仓库 | 提交 | 状态 |
+|---|---|---|
+| synra-rust-app | `233750b` `fix: put the offline banner corner on the ladder` | ✅ 已推送 |
 
 **门禁**：607 前端测试、lint 0、check 14 项。
 
