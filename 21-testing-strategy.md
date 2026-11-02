@@ -420,7 +420,7 @@ async fn session_times_out_when_peer_is_silent() {
 
     pair.settle().await;
     // ★ 关键：发起端必须回到确定状态，不能永久"等待中"
-    assert_eq!(pair.a.pairing_state(pair.b_id), PairingState::Idle);
+    assert_eq!(pair.a.pairing().phase(), synra_core::pairing::Phase::Idle);
 }
 ```
 
@@ -432,7 +432,7 @@ async fn session_times_out_when_peer_is_silent() {
 | 虚拟时钟 `advance(d)`             | 测超时/心跳/退避，不真的 sleep                    |
 | 故障注入                          | `kill` / `partition` / `drop_chunk` / `corrupt_chunk` / `make_silent` / `delay` |
 | 事件断言                          | `expect_event_a(…)` / `expect_event_b(…)`       |
-| 状态查询                          | `link_state` / `trust_level` / `pairing_state`   |
+| 状态查询                          | `link_state` / `pairing().phase()`（`synra_core::pairing`） |
 | 完整内核 API                      | 不是简化版（否则测不出真问题）                     |
 
 ---
