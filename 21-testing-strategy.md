@@ -824,6 +824,7 @@ fn event_routing_does_not_allocate() {
 | core | 两分钟到期 | `expire` 之后 `Phase::Idle`，对面再来一次可以重新开始 |
 | core | 三态完成 | 接受/拒绝/自己撤回在 `wait_for_decision` 上分别得到 `Accepted`/`Refused`/`Cancelled` |
 | core | 接受后写一行 | `pairing_record::record_paired` 写出的 `device_id`/名称/平台与请求一致，能力位为空 |
+| core 集成 | 信封来回 | `pairing_exchange`：答复来自被问设备、回到发问设备；码经 JSON 仍是六位；撤回无载荷 |
 | app | 发起方看到码 | `devices_pair` 立即返回 `Waiting` 且带六位文本，不等拨号 |
 | app | 接收方看到码 | `devices_pairing_snapshot` 在 `Asked` 时给出 `ask.code`，与对方请求相同 |
 | app | 答复写库 | `devices_pairing_respond` 接受后设备出现在已配对列表；拒绝则不出现 |
