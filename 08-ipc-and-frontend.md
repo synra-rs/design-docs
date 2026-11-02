@@ -70,7 +70,7 @@
 设备四条：快照、开始扫描、取消扫描、忘记。**没有 connect/disconnect**：链路只在有东西要送的时候打开，
 一个只为让屏幕显示「已连接」的连接没有载荷。
 
-**没有配对命令组。** 配对现在的全部含义是：拨号 → 握手交换身份 → 两侧各写一行 `paired_devices`。
+设备组另有四条与配对有关的命令：`devices_pair` 生成本机的六位码并开始拨号，`devices_pairing_snapshot` 读回当前该画什么，`devices_pairing_respond` 接受或拒绝对方的请求，`devices_pairing_cancel` 撤回本机的请求。码由两个人用眼睛比对，不是身份验证；写入 `paired_devices` 只发生在接受之后。
 它不是一个可以发起、查询、取消的任务，因此没有 `pairing_*` 可调，也没有 `pairingUpdated` 事件。
 
 应用 Tauri 分发器在调用任何本应用命令之前，以真实 WebView label 选择 Host 或 Plugin 接口并查询共享命令注册表；
