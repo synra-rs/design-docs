@@ -1,0 +1,62 @@
+[
+  {
+    "level": "debug",
+    "message": "[vite] connecting...",
+    "timestamp": "2026-11-03T12:34:12.222Z",
+    "url": "http://127.0.0.1:5181/@vite/client"
+  },
+  {
+    "level": "debug",
+    "message": "[vite] connected.",
+    "timestamp": "2026-11-03T12:34:12.275Z",
+    "url": "http://127.0.0.1:5181/@vite/client"
+  },
+  {
+    "level": "debug",
+    "message": "[vite] hot updated: \u0000/__uno.css",
+    "timestamp": "2026-11-03T12:34:13.625Z",
+    "url": "http://127.0.0.1:5181/@vite/client"
+  },
+  {
+    "level": "debug",
+    "message": "[vite] hot updated: \u0000/__uno.css",
+    "timestamp": "2026-11-03T12:34:13.888Z",
+    "url": "http://127.0.0.1:5181/@vite/client"
+  },
+  {
+    "level": "debug",
+    "message": "[vite] hot updated: \u0000/__uno.css",
+    "timestamp": "2026-11-03T12:34:13.894Z",
+    "url": "http://127.0.0.1:5181/@vite/client"
+  },
+  {
+    "level": "debug",
+    "message": "[vite] hot updated: \u0000/__uno.css",
+    "timestamp": "2026-11-03T12:34:13.977Z",
+    "url": "http://127.0.0.1:5181/@vite/client"
+  },
+  {
+    "level": "debug",
+    "message": "[vite] hot updated: \u0000/__uno.css",
+    "timestamp": "2026-11-03T12:34:14.310Z",
+    "url": "http://127.0.0.1:5181/@vite/client"
+  },
+  {
+    "level": "debug",
+    "message": "[vite] hot updated: \u0000/__uno.css",
+    "timestamp": "2026-11-03T12:34:14.311Z",
+    "url": "http://127.0.0.1:5181/@vite/client"
+  },
+  {
+    "level": "debug",
+    "message": "[vite] hot updated: \u0000/__uno.css",
+    "timestamp": "2026-11-03T12:34:14.593Z",
+    "url": "http://127.0.0.1:5181/@vite/client"
+  },
+  {
+    "level": "debug",
+    "message": "[vite] hot updated: \u0000/__uno.css",
+    "timestamp": "2026-11-03T12:34:14.602Z",
+    "url": "http://127.0.0.1:5181/@vite/client"
+  }
+]
