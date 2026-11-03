@@ -622,6 +622,8 @@ iframe 若经父窗口转发，可继续使用 `connect-src 'none'`；原生独�
 
 ## 9. 实现清单
 
+> **2026-11-03：修复同步闪退与后续弹层不可用。** `synra-app@942b683` 将同步移出会被协调器隐藏的详情抽屉，统一body Portal并关闭抽屉push；日志与全局查找可临时显示并恢复原工作流。568项前端、373项壳测试、lint、类型/生产构建和15项shapes通过；1280及390宽的实际布局检查确认窗口不受隐藏祖先影响、页面无横向位移。详见 [实施记录](./history/2026-11-03-overlay-lifecycle.md)。
+
 > **2026-11-03：零权限插件可以明确批准运行。** Touchpad的清单确为零权限，旧界面没有提交入口，旧内核也把空决定视为未批准。`synra-app@76b5865`、`synra-core@3eb3845` 增加运行确认并修正空能力清单的决定语义，不自动批准安装、不创建能力授权；已停用状态保持不变。565项前端、373项壳、753项核心单元测试及构建/shapes通过。额外Clippy与开发期提示的实际边界见 [记录](./history/2026-11-03-zero-permission-approval.md)。
 
 > **2026-11-03：修复插件权限页因缺省列表崩溃。** `synra-app@14aaf70`、`synra-js@51c3ca1` 对齐 serde 可以省略的字段，处理空 denied/requested；同时修正 addedCapabilities、candidates 的可选声明，增加字段可省略性守卫并校正旧配对检查。预览快照按真实规则省略空字段，Node 测试不再触碰实验性全局 localStorage。560项前端、371项壳测试、默认功能 cargo check、类型/消费方检查、lint、构建、双方 shapes 和浏览器权限开关回归通过；浏览器采集0 warning、0 error。详见 [修复记录](./history/2026-11-03-plugin-permission-crash.md)。
