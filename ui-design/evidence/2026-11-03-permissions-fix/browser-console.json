@@ -1,0 +1,80 @@
+[
+  {
+    "level": "debug",
+    "message": "[vite] connecting...",
+    "timestamp": "2026-11-03T11:53:21.057Z",
+    "url": "http://127.0.0.1:5181/@vite/client"
+  },
+  {
+    "level": "debug",
+    "message": "[vite] connected.",
+    "timestamp": "2026-11-03T11:53:21.139Z",
+    "url": "http://127.0.0.1:5181/@vite/client"
+  },
+  {
+    "level": "debug",
+    "message": "[vite] hot updated: \u0000/__uno.css",
+    "timestamp": "2026-11-03T11:53:21.872Z",
+    "url": "http://127.0.0.1:5181/@vite/client"
+  },
+  {
+    "level": "debug",
+    "message": "[vite] hot updated: \u0000/__uno.css",
+    "timestamp": "2026-11-03T11:53:21.894Z",
+    "url": "http://127.0.0.1:5181/@vite/client"
+  },
+  {
+    "level": "debug",
+    "message": "[vite] hot updated: \u0000/__uno.css",
+    "timestamp": "2026-11-03T11:53:22.101Z",
+    "url": "http://127.0.0.1:5181/@vite/client"
+  },
+  {
+    "level": "debug",
+    "message": "[vite] hot updated: \u0000/__uno.css",
+    "timestamp": "2026-11-03T11:53:22.104Z",
+    "url": "http://127.0.0.1:5181/@vite/client"
+  },
+  {
+    "level": "debug",
+    "message": "[vite] hot updated: \u0000/__uno.css",
+    "timestamp": "2026-11-03T11:53:22.162Z",
+    "url": "http://127.0.0.1:5181/@vite/client"
+  },
+  {
+    "level": "debug",
+    "message": "[vite] hot updated: \u0000/__uno.css",
+    "timestamp": "2026-11-03T11:53:22.163Z",
+    "url": "http://127.0.0.1:5181/@vite/client"
+  },
+  {
+    "level": "debug",
+    "message": "[vite] hot updated: \u0000/__uno.css",
+    "timestamp": "2026-11-03T11:55:13.503Z",
+    "url": "http://127.0.0.1:5181/@vite/client"
+  },
+  {
+    "level": "debug",
+    "message": "[vite] hot updated: \u0000/__uno.css",
+    "timestamp": "2026-11-03T11:55:13.636Z",
+    "url": "http://127.0.0.1:5181/@vite/client"
+  },
+  {
+    "level": "debug",
+    "message": "[vite] hot updated: \u0000/__uno.css",
+    "timestamp": "2026-11-03T11:55:13.721Z",
+    "url": "http://127.0.0.1:5181/@vite/client"
+  },
+  {
+    "level": "debug",
+    "message": "[vite] connecting...",
+    "timestamp": "2026-11-03T11:55:38.858Z",
+    "url": "http://127.0.0.1:5181/@vite/client"
+  },
+  {
+    "level": "debug",
+    "message": "[vite] connected.",
+    "timestamp": "2026-11-03T11:55:38.863Z",
+    "url": "http://127.0.0.1:5181/@vite/client"
+  }
+]
