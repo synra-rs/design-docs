@@ -4,6 +4,8 @@
 > 参考：[Folo](https://github.com/RSSNext/Folo)，重点是交互与信息组织；保留 Vue 3、Ant Design Vue、UnoCSS、`@synra/theme`。
 > 现状基线：`synra-app@759af79`；Folo 源码基线：`68edee907003a90877f2ffa6bd9ed9bedababfd4`。
 
+> **2026-11-03 重构已实现：** [13 界面重构方案](./13-ui-refactor-plan.md) 已落到 `synra-app@1228d74`、`synra-js@0eeb959`。当前交付和验证范围见 [实施记录](../history/2026-11-03-ui-refactor.md)，实际画面见 [本轮截图](./evidence/2026-11-03-refactor/README.md)。真机双端配对、触摸输入及系统文件选择仍须在可用设备上验收，不能用浏览器样例或构建成功代替。
+
 ## 1. 目标：专业软件的整体完成度
 
 **2026-10-29 用户澄清：希望 Synra 有专业软件的感觉，解决当前像 Demo 的观感；列表与否不重要，Folo 的做法需要时才参考。**
@@ -45,6 +47,7 @@ Folo 提供交互思路；列表、卡片、分栏、就地展开、Drawer 都�
 | [10 · 实施与验收](./10-delivery-and-acceptance.md) | 按什么批次做，怎样避免功能丢失与性能退化 |
 | [11 · 当前开发进展](./11-current-progress.md) | 哪些已实现，接下来做什么，与设计/历史分开记录 |
 | [12 · 全局线缆监视](./12-debug-console.md) | 调试数据流的入口、终端形态、上报节流与验收 |
+| [13 · 界面重构方案](./13-ui-refactor-plan.md) | 2026-11-03 复审结论、Folo 对照、目标布局、实施批次与验收条件 |
 | [截图索引](./evidence/README.md) | 最初研究保存的 12 张原始截图、步骤与限制 |
 
 实现一页前先读 00，再读 03、04 与对应页面候选方案，最后以 10 验收。01、02 是设计依据，不是要重新执行的开发步骤。

@@ -351,7 +351,7 @@ Vue 侧要的糖另开子入口（`@synra/theme/vue`），且只在宿主与官�
 
 | 我们的 token | antd 的对应 | 处理 |
 | ------------ | ----------- | ---- |
-| 圆角**三档**（`control` / `surface` / `pill`） | antd 基本只有一档 `borderRadius` | 映射到 `borderRadius` + `components.*.borderRadius` 的分项，**不许**把三档砍成一档 |
+| 圆角四档（`compact` / `control` / `surface` / `pill`） | antd 有基本与派生圆角 token | 映射 `borderRadiusSM=4`、`borderRadius=8`、`borderRadiusLG=12`；小型复选框保留方形轮廓，不强行变成圆点 |
 | 中性色**只带一个色相**（全部偏紫，§1.4） | antd 的中性色是蓝灰 | 逐个覆盖（`colorBgContainer` / `colorBorder` / `colorText*`），否则一处分隔线就能把"一块材料"拆成两种材质 |
 | `--synra-line`（1.22:1，纯装饰）与 `--synra-line-strong`（4.62:1，承担语义） | antd 的 `colorBorder` 一个键 | 分别映射到 `colorSplit` 与 `colorBorder` —— 这正是 R24 算出两个 token 的原因 |
 
@@ -414,8 +414,7 @@ tokens (TS) ──┬──► theme.colors / theme.spacing / …   → 生成 u
 - **token 有预算**：每个新 token 都要在 §1.4 那份设计计划里被指到用途，且**必须被某处使用**。
   这条不是新发明——官网 `tokens.css:8` 已经写着"Rule for this file: every token must be used by something
   in `theme/`. A token nobody reads is a token nobody maintains."，本文把这条规则升格为全产品的规则。
-- **圆角分层**（控件 / 面 / 胶囊），禁止任意值 `rounded-[12px]`。现在的 8px / 10px / 999px 三个值肉眼不可分辨，
-  正是"没有层级"的证据。
+- **圆角分层**（小型选择控件4px / 常规控件8px / 面12px / 胶囊），禁止任意值 `rounded-[12px]`。值只在共享 token 中定义，由组件适配器映射。
 
 ### R10 · 逻辑属性（MUST）
 
