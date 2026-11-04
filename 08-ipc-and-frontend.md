@@ -71,6 +71,10 @@
 一个只为让屏幕显示「已连接」的连接没有载荷。
 
 设备组另有四条与配对有关的命令：`devices_pair` 生成本机的六位码并开始拨号，`devices_pairing_snapshot` 读回当前该画什么，`devices_pairing_respond` 接受或拒绝对方的请求，`devices_pairing_cancel` 撤回本机的请求。码由两个人用眼睛比对，不是身份验证；写入 `paired_devices` 只发生在接受之后。
+
+输入控制另有三条仅供宿主 UI 的命令：`devices_input_snapshot` 读取当前请求，`devices_input_respond(sessionId, allow)`
+决定展示中的那次请求，`devices_input_stop(sessionId)` 停止控制。`inputUpdated` 通过同一 sequenced 事件流更新全局确认框和停止入口。
+插件页面不能调用这三条命令或批准自己；插件的 headless 导入与接收端权限见 [29 §3.3](./29-official-plugins.md#33-输入会话和传输)。
 它不是一个可以发起、查询、取消的任务，因此没有 `pairing_*` 可调，也没有 `pairingUpdated` 事件。
 
 应用 Tauri 分发器在调用任何本应用命令之前，以真实 WebView label 选择 Host 或 Plugin 接口并查询共享命令注册表；
@@ -621,6 +625,8 @@ iframe 若经父窗口转发，可继续使用 `connect-src 'none'`；原生独�
 ---
 
 ## 9. 实现清单
+
+> **2026-11-04：Touchpad 输入与 Android 返回已接入。** 独立插件的手机页面经 stateful Wasm 和共享 PeerLink 输入服务请求电脑控制；电脑逐次确认，Windows 原生后端执行，带序号、授权代次、独立租约与松键清理。Android 为两个插件提供 WebView 外的原生返回栏。381 项壳、574 项前端及完整包的 Wasm/TCP 链路验收通过；物理鼠标和卓易通实机验证的边界、构建提示及签名状态见 [实施记录](./history/2026-11-04-touchpad-input.md)。
 
 > **2026-11-03：修复LAN发现回程与配对设备端口过期。** `synra-core@f773cbf` 将UDP回应发回查询源端口，重复查询也回应，按真实网卡子网广播，并保留入站连接前的监听地址；`synra-app@2d249cc` 统一同步、传输和远程调用的地址选择，优先当前发现，按近期发现/有效会话显示在线并通知离线变化。758项核心、378项壳、568项前端测试，默认功能编译、lint、构建和15项shapes通过；Clippy已有3项问题及实机边界见 [实施记录](./history/2026-11-03-lan-discovery.md)。
 

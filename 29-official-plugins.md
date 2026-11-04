@@ -22,7 +22,9 @@ Starter 已接入 Vue 本机诊断页，实际 Windows WebView 的按钮→IPC�
 Starter 的明确目标选择及设备列表权限边界已接入（[记录](./history/2026-10-28-starter-targets.md)）；
 它保留离线状态，不自动改用第一台；远端事件接收已接入共享服务（[接收证据](./history/2026-10-28-remote-plugin-events.md)），
 发送端和业务结果关联仍待实现，入队回执不表示插件动作已成功。
-触摸板仍需接入 Vue UI、Wasm action 和宿主实际输入服务，不能据此宣称手机已能控制电脑。
+2026-11-04 已接入触摸板 Vue UI、stateful Wasm action、现有 PeerLink 输入会话、电脑逐次确认与 Windows 原生输入后端。
+完整 `.synra` 包的安装→页面 RPC→Wasm→TCP→接收服务测试已通过，最后一层使用记录 adapter；
+Android/卓易通实际返回和物理鼠标效果仍待实体设备复测，详见 [输入与返回记录](./history/2026-11-04-touchpad-input.md)。
 创建远端、发版、打 tag 与部署由用户处理。
 
 ## 2. Starter
@@ -89,7 +91,8 @@ touchend、pointercancel、页面离开、应用失焦或进入后台、断连�
 每次控制绑定发起设备、目标电脑、完整插件 id、会话 id、授权代次和递增序号，来源以认证上下文为准。
 目标电脑显式允许当前控制会话；未配对、未授权、已撤销、过期和重放输入在系统操作前拒绝。
 使用现有认证链路，不新增绕过身份或 capability 的旁路。
-系统能力需要移动、滚动和按钮操作的宿主接口与权限，后续由 WIT 及共享平台服务统一定义，不能在两个宿主各写一套。
+移动、滚动和按钮由 WIT 的 `input-session` 与共享平台服务统一定义；`device:input` 门控发起端导入，
+`@receiver-capability("platform:control-pointer")` 声明接收侧独立权限，仍须电脑逐次同意，不能在两个宿主各写一套。
 
 移动与滚动初始发送上限为 60 Hz，接收队列有界；相对位移合并时累加 delta，避免仅保留最后一个 delta 而丢失移动距离。
 按钮 down/up、点击、取消和会话结束保持有序、去重且不可被移动合并丢弃；合并不能越过按钮状态边界。
