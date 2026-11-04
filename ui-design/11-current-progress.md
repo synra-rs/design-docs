@@ -1,7 +1,15 @@
 # 11 · 当前开发进展
 
-> 更新：2026-11-03。当前应用基线：`synra-app@2d249cc`、`synra-core@f773cbf`，协议：`synra-js@51c3ca1`；共享主题保持 `0eeb959` 的实现。
+> 更新：2026-11-04。当前应用基线：`synra-app@0bb3c6e`、`synra-core@ffec0a2`、`synra-js@e558c30`。跨仓库能力与验收边界见 [当前实现状态](../CURRENT-STATE.md)。
 > 这里记录已实现和下一步；设计选择见00–10，详细验证与历史见日期记录。
+
+## 2026-11-04 插件承载、输入会话与文档校准
+
+Android 通过独立 PluginActivity 承载插件，原生返回栏和系统返回位于网页之外。
+通用输入会话接入电脑逐次同意与停止，插件页面保留业务交互；真实包测试经过安装、确认、RPC、Wasm 和 TCP，末端使用记录适配器。
+实体 Android/卓易通与 Windows 原生效果仍需分开验收，不能由构建或回环测试代替。
+各仓库 README 收敛为用途与使用入口，开发步骤进入 CONTRIBUTING；官网 20 组中英文页面按当前实现更新，并延续已有主题。
+详见 [实现记录](../history/2026-11-04-touchpad-input.md)与[文档记录](../history/2026-11-04-documentation-refresh.md)。
 
 ## 2026-11-03 LAN发现与在线状态
 

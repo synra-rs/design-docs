@@ -1,5 +1,7 @@
 # 06 · Workspace 与 Crate 规划
 
+> 现状入口（2026-11-04）：[当前实现状态](./CURRENT-STATE.md)。核心实际 workspace 为 26 个成员（17 个库、2 个应用、7 个工具）；包含 fetch、registry、SDK、IPC/control。当前应用是独立 Tauri 仓库，标识符为 com.synra.app。
+
 > 本文定义 **`synra-core` 仓库**（[README §1](./README.md)）的物理结构：有哪些 crate、谁依赖谁、哪些 feature gate 控制编译期形态。
 > 目标：**内核可单独编译、单独测试、单独部署**；宿主（`synra-app`）是它的一个消费者，且**不在本仓库里**。
 >
@@ -304,7 +306,7 @@ src/
 ### 4.1 ⚠️ `synra-desktop` / `synra-mobile` **不在本仓库**
 
 它们属于 **`synra-app`**（[README §1](./README.md)、[ADR-016](./20-adr.md)）。
-本仓库只提供内核，并通过 [README §1.3](./README.md) 的两个接触点（Rust API + 生成的 TS 类型）被它消费。
+核心通过 Rust 公开契约被应用消费；TypeScript 对照位于独立 synra-js，由编译与形状检查保持一致。
 
 > **为什么 CLI / daemon 在 core，而 desktop / mobile 不在**：
 >
@@ -315,7 +317,7 @@ src/
 >
 > **判据**：宿主是否**只依赖内核的公开 API**且**没有平台特定的重型依赖**？CLI/daemon 是；Tauri 应用不是。
 
-`synra-app` 的目录结构见 [README §1](./README.md) 与 synra-app 仓库的 `design-docs/08-ipc-and-frontend.md`。
+`synra-app` 的入口见其 README 与 CONTRIBUTING.md，IPC 设计保留在本仓库的 [08](./08-ipc-and-frontend.md)。
 
 ### 4.2 `apps/synra-cli`（本仓库）
 

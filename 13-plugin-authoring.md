@@ -1,5 +1,7 @@
 # 13 · 插件写法
 
+> 现状入口（2026-11-04）：[当前实现状态](./CURRENT-STATE.md)。Rust Guest 使用 wasm32-unknown-unknown 模块，经 CLI 编码为组件；支持 headless/hybrid，拒绝纯 UI。SDK 与作者 CLI 固定同一源码提交，构建真实 dist 后 verify。
+
 > **本文的定位**：把"插件到底怎么写"这件事**具体到可讨论的程度**——作者写什么文件、manifest 长什么样、构建产物是什么、运行期谁调谁。
 > 它是 [11 插件系统总设计](./09-plugin-system.md) 的**具体化**，也是 [16 插件 SDK](./15-plugin-sdk.md) 的**前置**。
 >

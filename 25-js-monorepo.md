@@ -1,5 +1,7 @@
 # 25 · JS 包 monorepo（`synra-js`）
 
+> 现状入口（2026-11-04）：[当前实现状态](./CURRENT-STATE.md)。实际有五个包：synra、client、protocol、testkit、theme。构建采用 tsc；protocol 为受检查的 Rust 对照，不是全部由 ts-rs 自动生成。testkit 和 theme 有运行时。
+
 > 本文定义**面向插件的一部分 JavaScript/TypeScript 包**的仓库形态：
 > 谁在哪个包、怎么发布、`synra` 为什么"一般不用安装"、以及生成类型与形状一致性如何保证。
 >

@@ -5,6 +5,13 @@
 
 | 记录 | 范围 |
 | --- | --- |
+| [文档与 README 校准](./2026-11-04-documentation-refresh.md) | 七个仓库、当前事实入口、双语官网内容及阅读检查 |
+| [输入会话与移动端返回](./2026-11-04-touchpad-input.md) | 插件页面、双端授权、Windows 接收适配与验证边界 |
+| [设备发现与可达性](./2026-11-03-lan-discovery.md) | UDP 回程、动态监听端点与在线状态 |
+| [权限页崩溃修复](./2026-11-03-plugin-permission-crash.md) | 可省略字段与真实数据形态 |
+| [零权限插件确认](./2026-11-03-zero-permission-approval.md) | 明确允许运行与空能力决定 |
+| [弹层生命周期](./2026-11-03-overlay-lifecycle.md) | 同级工作流、Portal 与展示恢复 |
+| [界面流程重构](./2026-11-03-ui-refactor.md) | 插件管理、权限、安装、查找和统一控件 |
 | [组件契约收敛](./2026-10-27-component-contract.md) | CLI 与原生入口共用实际组件检查，删除实现布尔值并移除纯 UI 模板 |
 | [完整事件身份](./2026-10-26-event-identity.md) | 完整包 owner、具体事件授权、模式和长度边界，以及跨发布者与包名前缀冒充拒绝 |
 | [能力旧观察](./capability-observations.md) | 原 10 §8 的源码调查与实现清单，仅作历史快照 |

@@ -31,7 +31,7 @@
 - 阶段门禁：**43文件、392项前端测试通过**，全量ESLint、生产构建、8项shapes通过；47命令、67调用点、58Native wrapper未变化。
 - `CARGO_BUILD_JOBS=1 cargo build --locked -j1 --manifest-path src-tauri/Cargo.toml` 成功，27.38秒；更新开发EXE，未改Rust源码、未重复未变的Rust单测。
 
-日志：工作区 `.scratch2/ui-phase-b-{all-tests,lint,build,shapes,native}.log`。
+日志：工作区 `.scratch2/ui-phase-b-{all-tests,lint,build,shapes,native}.log`，属本地临时产物，已在文档清理时删除。
 已有生产块大小警告仍在，主JS840.97kB/gzip262.35kB；Cargo仍报告bin/lib PDB同名警告，没有修改门禁阈值。
 构建后即清理两个无用staticlib路径，保留EXE/PDB/增量依赖；实际回收约2.12GiB，不重复计算硬链接，D盘可用约4.92GiB。
 

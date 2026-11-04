@@ -1,12 +1,13 @@
 # 08 · IPC 契约与前端集成
 
-> 📍 **归属：`synra-app` 仓库**（[README §2 分流表](./README.md)）。本文是**唯一一篇整篇进 app 仓库的文档**。
+> 现状入口（2026-11-04）：[当前实现状态](./CURRENT-STATE.md)。配对、权限、弹层及发现修复已接入；应用增加移动端 PluginActivity 和输入会话提示。命令数量与调用清单由应用 CONTRIBUTING.md 和 shapes 对照。
+
+> 📍 **实现归属：`synra-app`，设计文档保留在本仓库。** 仓库分工见 [README](./README.md)。
 >
 > 本文定义 Tauri 侧（第 2 环）与前端（第 3 环）之间的契约，以及前端如何从"业务宿主"退化为"渲染层"。
 > 对应 [06 三环模型](./05-system-architecture.md) 的第 2↔3 环边界。
 >
-> ⚠️ **迁移到 app 仓库时**：文中所有 `./NN-*.md` 的相对链接要改成跨仓库形式——
-> core 的文档在 `../../synra-core/design-docs/`（[README §2.1](./README.md) 的路径基准表）。
+> 本文与核心专题使用本仓库相对链接；应用侧开发步骤见其 CONTRIBUTING.md，不再按旧分流表搬迁文档。
 
 ---
 
@@ -625,6 +626,10 @@ iframe 若经父窗口转发，可继续使用 `connect-src 'none'`；原生独�
 ---
 
 ## 9. 实现清单
+
+> 2026-11-04 文档与使用入口已按当前代码校准。README 收敛为产品和项目职责，开发步骤进入 CONTRIBUTING；
+> 官网 20 组中英文内容更新，保留现有主题与路由。当前行为见 [CURRENT-STATE](./CURRENT-STATE.md)，
+> 文档验证范围见 [本轮记录](./history/2026-11-04-documentation-refresh.md)。
 
 > **2026-11-04：Touchpad 输入与 Android 返回已接入。** 独立插件的手机页面经 stateful Wasm 和共享 PeerLink 输入服务请求电脑控制；电脑逐次确认，Windows 原生后端执行，带序号、授权代次、独立租约与松键清理。Android 为两个插件提供 WebView 外的原生返回栏。381 项壳、574 项前端及完整包的 Wasm/TCP 链路验收通过；物理鼠标和卓易通实机验证的边界、构建提示及签名状态见 [实施记录](./history/2026-11-04-touchpad-input.md)。
 

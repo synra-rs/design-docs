@@ -28,7 +28,7 @@
 6. shapes仍为8项，47个前端调用命令、67个调用点，对齐58个Native wrapper；没有增加IPC面。
 7. `CARGO_BUILD_JOBS=1 cargo build --locked -j1 --manifest-path src-tauri/Cargo.toml` 成功，用42.44秒更新开发EXE。没有Rust源码改动，未重复未变的Rust全量测试。
 
-日志在工作区 `.scratch2/ui-phase-a-{all-tests,lint,build,shapes,native}.log`，属于本地验证产物，不作为版本库依赖。
+日志在工作区 `.scratch2/ui-phase-a-{all-tests,lint,build,shapes,native}.log`，属于本地验证产物，不作为版本库依赖；该临时目录已在文档清理时删除。
 已有警告仍存在：生产JS主块约837.56kB（gzip261.17kB），Node测试环境localStorage实验性提示，以及Cargo bin/lib PDB同名提示；未通过放宽门禁或屏蔽警告处理。
 
 ## 3. 实际浏览器检查

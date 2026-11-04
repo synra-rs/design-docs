@@ -1,5 +1,7 @@
 # 28 · App UI 规范（宿主与插件界面）
 
+> 现状入口（2026-11-04）：[当前实现状态](./CURRENT-STATE.md)。主程序管理设备/插件/授权和通用任务，不内置插件业务页面。详情与同步同级，body Portal、关闭 push、临时展示恢复及 Android 原生返回均已接入。
+
 > 📍 **归属：`synra-app` + `synra-js`（`packages/theme`）两半**——宿主界面与插件界面共享同一套 token 与规则，
 > 但"能被强制"的程度不同（§12、§13.3）。这份文档因此不是一篇整篇进单个仓库的文档。
 >
@@ -480,7 +482,7 @@ tokens (TS) ──┬──► theme.colors / theme.spacing / …   → 生成 u
 
 ### R16 · 移动端四件事（MUST）
 
-宿主有 Android 产物（根目录有 `synra-0.1.0-arm64-v8a-release.apk`），所以下面四条不是"以后再说"：
+宿主有 Android ARM64 产物（本地交付副本见 `artifacts/20261104-touchpad/`），所以下面四条不是"以后再说"：
 
 | # | 规则 | 不管会怎样 |
 | - | ---- | ---------- |
