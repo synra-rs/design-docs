@@ -18,8 +18,8 @@ Synra 由应用、Rust 内核、JS 库和独立插件协作，让一台设备上
 | [Touchpad](https://github.com/synra-rs/synra-plugin-touchpad) | 独立的手机触摸板插件 |
 | 本仓库 | 规范、决策、路线与历史证据 |
 
-各仓库独立管理，并排检出用于联调。目录名 `synra-rust-core`、`synra-rust-app`
-与远端仓库名不同，不代表代码仍在单体仓库中。
+各仓库独立管理，使用与远端仓库一致的目录名并排检出用于联调：
+`synra-core`、`synra-app`、`synra-js`。本地路径依赖相对各自仓库解析，不依赖电脑上的绝对路径。
 
 ## 阅读入口
 
