@@ -52,7 +52,7 @@
 | `cargo check --locked -p synra-net --target aarch64-linux-android --target-dir spike/device-authentication/target-android` | 通过 |
 | `cargo test --locked -p synra-net --target aarch64-linux-android --target-dir spike/device-authentication/target-android --no-run` | Android 测试程序链接通过 |
 
-Android 命令沿用[认证实验](../../synra-rust-core/spike/device-authentication/README.md)记录的 NDK r28b、API 24 环境变量。
+Android 命令沿用[认证实验](https://github.com/synra-rs/synra-core/blob/a75d399/spike/device-authentication/README.md)记录的 NDK r28b、API 24 环境变量。
 未在 Android 设备或模拟器运行本模块，不据此声称移动端运行行为已通过。
 本次未改前端或 Wasm 执行逻辑，不额外重跑未受影响的前端检查；修改的 Rust 文件单独检查格式。
 

@@ -51,7 +51,7 @@ Windows 原生测试使用独立随机命名空间并清理测试密钥，验证
 cargo test --locked -p synra-plugin-api -p synra-plugin-cli -p synra-plugin-host -p synra-plugin-sdk -p synra-plugin-ui -p synra-protocol -p synra-registry -p synra-store -p synra-testkit -p synra-testkit-alloc -p wit-codegen --quiet
 ```
 
-Android 编译沿用[认证实验](../../synra-rust-core/spike/device-authentication/README.md)记录的 NDK r28b、API 24 环境变量。
+Android 编译沿用[认证实验](https://github.com/synra-rs/synra-core/blob/a75d399/spike/device-authentication/README.md)记录的 NDK r28b、API 24 环境变量。
 本次没有前端改动，不额外重跑前端检查。
 
 ## 全量测试发现的既有断言问题

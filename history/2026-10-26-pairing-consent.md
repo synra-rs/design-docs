@@ -56,7 +56,7 @@
 | app 默认 Tauri 构建及无默认 feature 的 Rust 测试 | 通过，317 个测试；锁文件同步网络层依赖 |
 | Android：`cargo test --locked -p synra-net --target aarch64-linux-android --target-dir spike/device-authentication/target-android --no-run` | 测试程序链接通过，未运行 |
 
-Android 使用[技术实验](../../synra-rust-core/spike/device-authentication/README.md)记录的 NDK r28b、API 24 配置。
+Android 使用[技术实验](https://github.com/synra-rs/synra-core/blob/a75d399/spike/device-authentication/README.md)记录的 NDK r28b、API 24 配置。
 本次没有前端或 Wasm 执行路径修改，不额外重跑对应专门检查；修改的 Rust 文件单独检查格式。
 最终修改的 10 个 Rust 文件单独通过 `rustfmt --check`，各仓库 `git diff --check` 通过。
 工作区门禁后只增强了测试夹具，让真实 TLS 入口消费编码并解析后的带外邀请；重新通过该模块的 Clippy、19 个测试及 Android 测试程序链接，未重复无关工作区测试。
