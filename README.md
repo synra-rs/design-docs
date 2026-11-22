@@ -32,6 +32,7 @@ Synra 由应用、Rust 内核、JS 库和独立插件协作，让一台设备上
 | 界面与 JS | [23 客户端库](./23-client-library.md)、[25 JS 仓库](./25-js-monorepo.md)、[28 App UI](./28-app-ui.md)、[UI 设计](./ui-design/README.md) |
 | 质量与运维 | [11 设计原则](./11-design-principles.md)、[17 存储与配置](./17-storage-and-config.md)、[18 可观测性](./18-observability.md)、[21 测试](./21-testing-strategy.md)、[26 开发契约](./26-core-stability-and-perf.md) |
 | 决策与计划 | [19 路线图](./19-roadmap.md)、[20 ADR](./20-adr.md)、[22 风险](./22-risks.md)、[24 迁移映射](./24-migration-map.md)、[27 官网](./27-website.md) |
+| 专项改造 | [2026-11-22 Core、JS 与 App 契约及策略收敛计划](./2026-11-22-contract-and-policy-refactor/README.md) |
 
 ## 如何理解状态
 
