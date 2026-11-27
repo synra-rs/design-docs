@@ -627,6 +627,8 @@ iframe 若经父窗口转发，可继续使用 `connect-src 'none'`；原生独�
 
 ## 9. 实现清单
 
+> **2026-11-27 · 插件出网按实际主机和方法授权。** App `9828400` 接入 Core `aeef961` 的共享客户端缓存，页面与 Wasm 使用同一插件的并发预算。Core 和 JS `c3a98c9` 用显式主机授权匹配方法，族通配授权无法放宽具体方法授权。真实原生 RPC、注入 façade 和 testkit 核对同一份 18 项夹具。409 项 Rust、727 项前端、默认 Tauri 编译、生产构建和 21 项契约检查通过。前端全量使用一次性 15 秒 CLI 超时，先前超时的三个文件用默认超时单独复跑通过。[实施记录](./2026-11-22-contract-and-policy-refactor/IMPLEMENTATION.md)
+
 > **2026-11-27 · 插件更新使用统一 SemVer。** App `03df068` 使用 Core `aaf1efb` 比较本地包、注册表候选及当前安装版本。只改构建元数据时保持同一升级优先级。版本无效时，更新检查返回带原因的 `InvalidArgument`，直接打开包会显示告警。412 项 Rust、709 项前端、默认 Tauri 编译、生产构建和 21 项契约检查通过。首轮契约检查在 Cargo 排队时超时，编译结束后单独复跑通过。[实施记录](./2026-11-22-contract-and-policy-refactor/IMPLEMENTATION.md)
 
 > **2026-11-27 · 自定义事件经插件会话投递。** Core `9c19b45` 提供已校验事件观察者和页面信封，JS `e41c83d` 对齐订阅授权与 testkit，App `2df9c83` 按主题和会话权限投递。发生缺序时宿主重读状态快照，并通过 `onGap` 通知错过自定义事件的订阅。真实 Wasm 发射、权限隔离和溢出恢复回归通过，App 全量 708 项前端、411 项 Rust、默认 Tauri 编译和 21 项 shapes 通过。[实施记录](./2026-11-22-contract-and-policy-refactor/IMPLEMENTATION.md)

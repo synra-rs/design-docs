@@ -217,6 +217,8 @@ await expect(synra.platform.openUrl('https://example.test')).rejects.toMatchObje
 
 `stub` 和 `stubFailure` 在支持和授权检查后替换结果，设置 stub 不计为调用。`capabilities` 使用 Core 语法，单独的 `*` 会被拒绝。设备选择需提供 `pickedDevice`，HTTP 响应需提供 fixture，可用 `createMockResponse` 创建。跨实现自动验证及真实宿主验收范围见[实施记录](./2026-11-22-contract-and-policy-refactor/IMPLEMENTATION.md)。
 
+`network.fetch` 根据标准 URL 解析后的主机及请求方法检查授权。用 `network:fetch:api.example.com` 授权该主机，或用 `network:fetch:api.example.com:GET` 限制为 GET。`network:fetch:*` 是函数族标记，具体出站请求需要明确主机。testkit 在模拟响应前执行相同的主机、方法及 HTTPS 检查，DNS、IP 和传输由真实宿主负责。
+
 > `testkit` 是 devDependency，**永远不会进入插件产物**（作者只用它跑测试）。
 > 它也是"零运行时"原则的例外：**它不是注入对象的实现，而是它的替身**，两者不冲突。
 

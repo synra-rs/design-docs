@@ -1,8 +1,8 @@
 # 04 · Testkit 行为与能力语义收敛
 
-状态：基础执行管线、授权、支持、错误、设备和自定义事件及外发传输已有共同场景。网络范围的联合验收待补齐。优先级：P1。实际结果见[实施记录](./IMPLEMENTATION.md)。
+状态：已实施并通过共同场景验收。覆盖授权、支持、错误、设备和自定义事件、外发传输及网络范围。优先级：P1。实际结果见[实施记录](./IMPLEMENTATION.md)。
 
-## 1. 当前证据
+## 1. 改造前的证据
 
 核心文件为 [packages/testkit/src/index.ts](https://github.com/synra-rs/synra-js/blob/622a2ef/packages/testkit/src/index.ts)。类型上 implements SynraClient 只能证明签名完整，不能保证行为相同。
 
