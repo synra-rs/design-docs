@@ -493,6 +493,10 @@ export interface SelfNamespace {
 **选 A**：运行时只有宿主一个提供者，让它实现最简单（它本来就有 `event.subscribe`，包一层即可）。
 **这条决定了本包能始终保持零运行时。**
 
+`device.onChange(handler, options?)` 与 `event.subscribe('device.changed', handler, options?)` 使用同一个设备主题，需要 `device:list`。前者给回调设备数组，后者给 `{ devices }`。设备范围与 `device.list()` 一致，包括已配对、未屏蔽的离线设备。首次展示可以在建立订阅后调用 `device.list()`，并在页面卸载时调用订阅返回的函数。
+
+两个方法都接受可选的 `SubscriptionOptions.onError`，用来接收异步挂接、投递和快照恢复中的结构化错误。回调抛出的异常也走这个入口，每个订阅独立处理。返回的退订函数可以立即调用，也可重复调用。
+
 ### 4.5 渐进增强：`ClientFeature` 与 `env.hostSupports`
 
 `device.pick` 这类"预留但可能未实现"的能力，需要一个**能力自述**机制，

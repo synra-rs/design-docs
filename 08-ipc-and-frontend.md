@@ -627,6 +627,8 @@ iframe 若经父窗口转发，可继续使用 `connect-src 'none'`；原生独�
 
 ## 9. 实现清单
 
+> **2026-11-27 · 插件设备事件已定向接入。** App `d9cd62d` 利用现有页面 RPC 投递会话级 `device.changed`，从真实调用窗口验证授权。客户端复用单一读取循环，缺序重读设备快照，退订和窗口销毁均清理；JS `4a15235` 同步可选错误回调和 testkit。App 701 项前端和 395 项 Rust 测试、21 项 shapes、默认编译通过，嵌入资源模式的两项原生 ACL 与 CSP 验证通过。Android 验证覆盖权限清单解析，设备运行待测。传输进度、终态和自定义事件继续实施。[实施记录](./2026-11-22-contract-and-policy-refactor/IMPLEMENTATION.md)
+
 > **2026-11-27：授权和错误诊断联合验证。** App `b7c014d` 补齐截断 URL、请求头与 FTP 凭据脱敏。App `93e13dc` 统一同步授权查询和本地预检查，使用 Core 实际生成的 28 个决策比对 testkit。684 个前端测试、392 个 Rust 测试、默认 Tauri 编译和 20 项 shapes 通过。Core 已定义插件事件 DTO，App 的定向投递继续实施。[实施记录](./2026-11-22-contract-and-policy-refactor/IMPLEMENTATION.md)
 
 > **2026-11-27：阶段复核。** 注册表批次已完成 App 原生 392 个测试及默认 Tauri 编译，今日复跑均退出 0；这两项不再待验证。07 的诊断脱敏另补了截断 URL、Authorization 与 FTP 凭据回归，正在完成本批前端检查；04 的统一执行管线改造尚未提交，不计为已交付。详见[实施记录](./2026-11-22-contract-and-policy-refactor/IMPLEMENTATION.md)。
