@@ -1,8 +1,8 @@
 # 08 · Wasm 限额与 Trap 分类
 
-状态：计划。优先级：P2。范围：synra-plugin-host 的 Wasmtime 后端与对外 CallOutcome。
+状态：已实施，原生自动验收通过。范围：synra-plugin-host 的 Wasmtime 后端与对外 CallOutcome。
 
-## 1. 当前证据
+## 1. 重构前证据
 
 [instance.rs:215](https://github.com/synra-rs/synra-core/blob/a75d399/crates/synra-plugin-host/src/engine/wasmtime_backend/instance.rs#L215) 先检查 memory_refused，再格式化整个 Wasmtime 错误链，依据是否包含 epoch/interrupt/fuel 选择 Timeout 或 FuelExhausted。否则返回普通 Trap。
 
@@ -44,7 +44,8 @@ CallOutcome 继续表达 timeout、fuel、memory 与普通 trap 的不同含义�
 | 真实 epoch 中断 | Timeout，时长来自有效时间限制 |
 | 默认内存 ceiling 生效 | MemoryExceeded 报默认真实上限，不报 0 |
 | 主动设置更小内存限制 | 报本次更小 ceiling |
-| 先超额调用，再正常调用，同实例 | 拒绝标志、fuel、deadline 不污染第二次 |
+| 先处理可恢复的内存增长拒绝，再正常调用同实例 | 拒绝记录、fuel、deadline 与内存 ceiling 都按新调用初始化 |
+| 宿主强制终止之后再次调用插件 | 实例池丢弃已 trap 的实例，下一次从可用实例执行 |
 | 无限额调用接在有限额调用后 | 不继承旧限制；测试有外部截止机制 |
 | 内存拒绝后产生其他独立 trap | 按明确的因果规则归类，附带诊断 |
 | App 与 daemon | 对同一 CallOutcome 返回一致错误类别 |
@@ -54,3 +55,12 @@ CallOutcome 继续表达 timeout、fuel、memory 与普通 trap 的不同含义�
 后端版本升级可能改变可下转型的类型，分类模块应集中这种依赖并用真实组件测试锁住行为。不要在某类错误下转型失败后重新引入关键词 fallback。
 
 测试执行带明确超时，避免错误的 epoch/fuel 设置让套件永久挂起。通过受影响 package 的真实后端测试、App RPC 映射回归后才算完成；ScriptedBackend 的模拟结果不能证明 Wasmtime 分类有效。
+
+## 6. 落地方式
+
+- `wasmtime_backend/failure.rs` 从错误链读取 `Trap::OutOfFuel`、`Trap::Interrupt`、宿主内存拒绝和 WIT 宿主调用错误。时间或 fuel 缺少对应预算时保留普通 trap。错误文本用于诊断。
+- 每次进入 WIT 调用前建立有效预算。未指定 fuel 和时间时使用 Wasmtime 的解除限额值，未指定内存时恢复 16 MiB 默认上限。内存上限检查每个线性内存增长后的大小，已分配的内存不会收缩。
+- 超出宿主配额直接从 Wasmtime 限制器返回 `MemoryCeilingExceeded`。如果线性内存声明或分配器最大值更严格或相等，guest 仍可以通过 `-1` 处理增长拒绝。可恢复拒绝只作为后续独立 trap 的附加诊断，并在下次调用清除。
+- 实例化阶段沿用 `BackendError::Instantiate`。App 页面 `self.invoke`、本地执行和 daemon 远程执行共用 `CallOutcome::into_result`，保留协议错误码与预算诊断。
+
+详见[实施记录](./IMPLEMENTATION.md)。

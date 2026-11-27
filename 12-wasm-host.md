@@ -171,52 +171,16 @@ SDK 使用 wasm32-unknown-unknown core module 与内置组件编码，避免 was
 
 ## 4. 中断与超时（两层防护）
 
-```rust
-// crates/synra-plugin-host/src/instance.rs
+Wasmtime 后端每次调用先安装有效预算，再执行 WIT 导出入口。分类直接读取 Wasmtime trap 和宿主拒绝的类型。
 
-pub struct CallBudget {
-    /// 指令预算（确定性）
-    pub fuel: u64,
-    /// 墙钟超时（非确定性，兜底）
-    pub timeout: Duration,
-    /// 内存增长上限
-    pub max_memory_growth: u64,
-}
+| 失败来源 | 调用结果 | App 页面与远程调用诊断 |
+| --- | --- | --- |
+| `Trap::OutOfFuel` 且本次配置了 fuel | `FuelExhausted` | `plugin_trapped`，`kind: fuelExhausted`，含 fuel |
+| `Trap::Interrupt` 且本次配置了超时 | `Timeout` | `plugin_timeout`，`kind: timeout`，含 `afterMs` |
+| 宿主限制器拒绝超过内存上限的请求 | `MemoryExceeded` | `plugin_trapped`，`kind: memoryExceeded`，含上限字节数 |
+| 其余 trap、非 result 型 Host 导入失败 | `Trap` | `plugin_trapped`，`kind: trap`，含原始错误信息 |
 
-impl PluginInstance {
-    pub async fn call<T: Export>(
-        &mut self,
-        args: T::Args,
-        budget: CallBudget,
-    ) -> Result<T::Result, HostError> {
-        // ── 层 1：fuel ──
-        // 设置本次调用的指令预算。耗尽时 wasmtime trap with OutOfFuel。
-        self.store.set_fuel(budget.fuel)?;
-
-        // ── 层 2：epoch（墙钟）──
-        // 计算 deadline 对应的 epoch 值；epoch ticker 任务每隔 epoch_period 递增。
-        let deadline_epoch = self.compute_deadline_epoch(budget.timeout);
-        self.store.set_epoch_deadline(deadline_epoch);
-
-        // ── 层 3：内存增长限制 ──
-        self.limiter.reset_growth_counter(budget.max_memory_growth);
-
-        // 执行（★ 注意：不能直接 block_in_place 在一个 worker 上，
-        //   否则并发插件会互相饿死；见 §4.2）
-        let result = tokio::task::block_in_place(|| {
-            self.binding.call_execute(&mut self.store, args)
-        });
-
-        match result {
-            Ok(v) => Ok(v),
-            Err(e) if e.is_out_of_fuel() => Err(HostError::FuelExhausted { budget: budget.fuel }),
-            Err(e) if e.is_epoch_deadline() => Err(HostError::Timeout { after: budget.timeout }),
-            Err(e) if e.is_memory_growth_exceeded() => Err(HostError::MemoryExceeded),
-            Err(e) => Err(HostError::WasmTrap(e)),
-        }
-    }
-}
-```
+宿主限制器将超出宿主内存上限的请求直接转为 trap，失败原因随错误链传递。线性内存或分配器自身有更严或相等上限时，`memory.grow` 仍可返回 `-1` 给 guest 处理。分配失败同样可由 guest 处理。后续独立 trap 只附加本次增长拒绝的诊断。初始化失败继续通过实例化错误报告。实现和验收见 [08](./2026-11-22-contract-and-policy-refactor/08-wasm-failure-classification.md)。
 
 ### 4.1 fuel、epoch 与 Host IO 的边界
 
@@ -232,9 +196,9 @@ IO 必须由宿主提供自己的 deadline 与取消机制，异步适配还须�
 把 Wasm 放到另一个线程不会自动终止那个线程中正在阻塞的 IO。
 当前纯计算 epoch 用例不作为 Host IO 有界终止的证明。
 
-每次业务调用都重新设置 fuel 与 deadline，未指定时不能继承构造函数或上一调用的有限额度。
-无指令上限使用足够大的 fuel，无时限使用不会在当前 epoch 加法中溢出的相对值；
-没有指定内存额度时仍保留初始化内存限制。
+每次业务调用都重设 fuel、deadline、内存上限和增长拒绝记录。
+无指令上限使用 `u64::MAX` fuel，无时限使用不会在当前 epoch 加法中溢出的相对值。
+未指定内存额度时，每个线性内存的增长请求使用 16 MiB 默认上限。限制器检查增长后的大小，已分配的内存不会随预算重置收缩。
 发生 trap 等异常后由实例池丢弃实例，不能将无法再次进入的组件当作健康实例复用。
 
 ### 4.2 不要在异步 worker 上直接执行 Wasm
@@ -430,7 +394,7 @@ impl PluginPool {
 | 无限循环                       | `OutOfFuel` / epoch  | 仅本次调用                       | 返回错误，记入健康度                      |
 | 栈溢出                         | trap                 | 仅本次调用                       | 返回错误 + 记录（可能是插件 bug）          |
 | 越界内存访问                    | trap                 | 仅本次调用                       | 返回错误（**Wasm 保证不影响宿主**）         |
-| 内存超限                       | `MemoryLimit` trap   | 仅本次调用                       | 销毁实例，返回错误                        |
+| 内存超限                       | `MemoryCeilingExceeded` | 仅本次调用                    | 销毁实例，返回实际内存上限                |
 | 调用不存在的导出                | 链接错误              | 装载期就发现                     | 拒绝装载                                 |
 | 恶意 host function 参数         | 校验失败              | 仅本次调用                       | 返回 `InvalidArgument`                   |
 | 插件 panic（Rust guest）        | trap（`unreachable`） | 仅本次调用                       | 返回错误；若频繁则 Faulted                 |

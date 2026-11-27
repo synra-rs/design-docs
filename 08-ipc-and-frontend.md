@@ -627,6 +627,8 @@ iframe 若经父窗口转发，可继续使用 `connect-src 'none'`；原生独�
 
 ## 9. 实现清单
 
+> **2026-11-27 · 页面 RPC 保留类型化 Wasm 失败。** App `19845ea` 使用实际组件核对 Core `4a25b84` 的宿主内存拒绝，`self.invoke` 返回 `plugin_trapped` 及带实际配额的 `memoryExceeded`。Core 远程执行通过同一映射返回相同诊断。411 项 Rust、727 项前端、默认 Tauri 编译、生产构建及 21 项契约检查通过。[实施记录](./2026-11-22-contract-and-policy-refactor/IMPLEMENTATION.md)
+
 > **2026-11-27 · 插件按键使用统一组合。** App `e698533` 在 Wasm 边界把字符串解析为 Core `f1ab82c` 的 `KeyChord`。无效组合返回 `badArgument`，平台支持查询使用当前桌面后端和宿主策略。Windows ARM64 实机捕获了 `Ctrl+C`、`Ctrl+V` 和 `Ctrl+Shift+S` 的完整按下与释放顺序。410 项 Rust、727 项前端、默认 Tauri 编译、生产构建和 21 项契约检查通过。macOS 和 Linux 完成目标类型检查。[实施记录](./2026-11-22-contract-and-policy-refactor/IMPLEMENTATION.md)
 
 > **2026-11-27 · 插件出网按实际主机和方法授权。** App `9828400` 接入 Core `aeef961` 的共享客户端缓存，页面与 Wasm 使用同一插件的并发预算。Core 和 JS `c3a98c9` 用显式主机授权匹配方法，族通配授权无法放宽具体方法授权。真实原生 RPC、注入 façade 和 testkit 核对同一份 18 项夹具。409 项 Rust、727 项前端、默认 Tauri 编译、生产构建和 21 项契约检查通过。前端全量使用一次性 15 秒 CLI 超时，先前超时的三个文件用默认超时单独复跑通过。[实施记录](./2026-11-22-contract-and-policy-refactor/IMPLEMENTATION.md)
