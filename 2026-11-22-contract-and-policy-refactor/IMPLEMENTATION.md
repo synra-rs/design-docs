@@ -18,7 +18,7 @@
 | 08 Wasm 分类 | 已实施并自动验收 | 真实组件核对 fuel、epoch、内存上限、独立 trap 和复用。App RPC 与 daemon 远程执行保留一致诊断 |
 | 09 注册表 | 已实施并自动验收 | 共享源值、严格配置读写、有限原因、预览与发现页已接入；最终宿主联合验收见 11 |
 | 10 宿主环境 | 已实施，待移动端实机验收 | 平台事实、视口和 Android 返回分别处理。Windows WebView 实测布局与关闭，移动端行为已有自动化和 ACL 回归 |
-| 11 联合验收 | 部分实施 | 已联合验证错误、授权、注册表、设备投影及传输进度和终态。真实 TCP 两端及跨页面传输状态已通过，实体平台场景待补齐 |
+| 11 联合验收 | 本机联合检查通过，待设备实测 | Windows 真实插件页面已验证诊断和撤权。真实 TCP 两端及跨页面传输状态已通过，移动端、实体收发及其他原生效果待登记 |
 
 ## 第一批：错误边界和真实序列化
 
@@ -317,6 +317,30 @@ Windows ARM64 使用嵌入本轮生产前端的 Tauri 测试构建和独立数�
 App 的 Rust 无默认功能 412 项和默认 Tauri 编译通过。带 `tauri/custom-protocol` 的原生资源和 ACL 用例 2 项通过。主窗口及返回逻辑的重点回归 17 项通过，前端全量 81 个文件、736 项通过。生产构建和 21 项 shapes 通过，lint 有 297 条既有 UnoCSS 排序警告。
 
 默认开发协议的原生资源测试缺少嵌入的 HTML。构建生产前端后启用 `tauri/custom-protocol` 复跑，原生两项通过。前端首轮全量有一个独立的终端关闭焦点测试失败。该文件以默认测试超时单跑 10 项通过，随后在原生构建结束后用单 worker 的 forks 复跑全量通过。
+
+## 第十六批 · 联合验收基线复核
+
+Windows ARM64 核对 Core `4a25b84`、App `bd83c92` 和 JS `c3a98c9`。三个源码仓库与各自的上游主分支一致。
+
+| 检查 | 本轮结果 |
+| --- | --- |
+| Core `cargo run --locked --quiet -p guards` | 12 项通过，包括兄弟 App 编译、Rust 1.88.0 MSRV 和 198 个设计及公开文档的链接。文档计数中 4 项可核对且一致，3 项无对应检查入口 |
+| Core `cargo run --locked --quiet -p matrix` | 4 项通过、7 项跳过、0 项失败。Android 协议与传输、桌面无引擎插件宿主、独立 CLI 编译通过 |
+| Core `cargo test --locked -p synra-ipc -p synra-registry -p synra-plugin-api` | 341 项通过 |
+| JS `pnpm test`、`pnpm run check`、`pnpm run lint` | 共 242 项测试通过，其中 testkit 为 78 项。消费者类型、15 项契约检查和文档示例通过 |
+| 独立 Starter | `15ed578` 的 0.2.6 包使用锁定的 SDK 和 CLI 修订版 `e0c5481` 构建。清单、完整 WIT 组件、10 个实际导入和 3 个 UI 归档文件共 4 项检查通过 |
+| App 真实包回归 | `cargo test --locked --no-default-features --features official-plugin-tests --manifest-path src-tauri/Cargo.toml --lib` 全量 413 项通过，覆盖真实包安装、激活、正常调用、撤权和页面会话更新 |
+| App 完整检查 | 默认 Tauri 编译通过。前端 81 个文件、736 项通过，生产构建及 21 项契约检查通过。lint 为 0 错误、297 条既有 UnoCSS 排序警告 |
+
+本机为 Rust 1.99.1 安装了 `aarch64-linux-android` 标准库。Android 持久化、核心和启用 Wasmtime 的插件宿主三个配置缺少 NDK C 工具链。其余四个跳过项是矩阵预留的无插件核心、wasmi、AOT 和无 TCP 配置。
+
+真实包回归首轮在激活处复现授权夹具漂移。Starter 0.2.6 已导入 `platform-open-path`，App 的验收授权清单尚未包含它。App `1b7cb2f` 补入这项明确的测试授权，撤权用例从同一清单移除 `device:list`，复跑覆盖其余授权及拒绝行为。该签名提交也校准了两个 Starter 验收入口的适用范围。
+
+Windows 真 WebView 使用同一 Starter 0.2.6 包及独立 App 数据目录。通过生产管理 IPC 安装、授予已知能力、启用和打开页面。页面实际渲染 Wasm 诊断，宿主形态为 `desktop`。Wasm 的参数拒绝沿注入 façade 返回 `invalid_argument`，`details.context.pluginCode` 保留 `badArgument`。通过生产 IPC 撤销 `device:list` 并重新打开插件，旧 WebView 退出，新页面返回 `capability_denied` 并显示「设备列表未获授权」提示。
+
+首轮验收只给主 WebView 配置调试参数，同一 WebView2 环境创建插件页时返回 `ERROR_INVALID_STATE`。复跑在独立检出中为两个窗口传入一致的本地调试参数，保留生产 IPC、插件权限和页面会话路径。本机常规可执行文件恢复后通过哈希比对。见 [WebView2 环境选项](https://learn.microsoft.com/en-us/microsoft-edge/webview2/reference/win32/webview2-idl?view=webview2-1.0.4258.31)。
+
+前端全量使用单 worker 的 forks 池和一次性的 15 秒测试超时。最终文档链接检查为 198 个文件零问题，错误守卫检查 1104 个文件零违规。
 
 ## 仍需交付
 

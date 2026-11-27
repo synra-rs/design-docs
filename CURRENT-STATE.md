@@ -1,12 +1,21 @@
 # 当前实现状态
 
-核对日期：2026-11-04。本文描述源码和本轮交付已建立的能力，不把目标架构或自动化测试当成所有平台的实体设备验收。
+功能基线核对日期：2026-11-04。下节记录此后的契约改造与验收范围。
 
-2026-11-27 增量。App 同步授权预检查和 testkit 共享 Core 产生的授权测试向量，错误分类和诊断已有共同自动验证。插件事件契约已在 Core 和 JS 定义，App 定向投递尚在实施。[实施记录](./2026-11-22-contract-and-policy-refactor/IMPLEMENTATION.md)
+## 2026-11-27 契约改造
 
-2026-11-23 增量：App 错误归一化、注册表配置与工作流原因已实施并完成本批自动验证，见[实施记录](./2026-11-22-contract-and-policy-refactor/IMPLEMENTATION.md)。以下其他专题仍以原核对日期为准；事件、传输、testkit、版本、按键、Wasm 和宿主环境改造继续按[计划](./2026-11-22-contract-and-policy-refactor/README.md)推进。
+当前联合验收基线为 Core `4a25b84`、App `1b7cb2f` 和 JS `c3a98c9`。
 
-## 实现基线
+| 路径 | 已建立的行为与证据 |
+| --- | --- |
+| 插件页面事件 | App 按会话、订阅和当前授权投递设备、传输和已声明自定义事件。序列缺口会恢复状态快照，并为受影响的订阅报告自定义事件缺口 |
+| 插件上传与外发 | 宿主分块确认上传，接管临时文件和预算，由 worker 提交终态。实际 TCP 回环两端核对文件字节、定向进度和重新打开插件页面后的终态 |
+| 宿主契约 | App 与 testkit 对照 Core 校验的错误、授权和事件用例。注册表配置由 Core 统一判定。版本走同一套 SemVer 语义。Wasmtime 根据失败类型返回调用实际生效的预算。Windows 真 WebView 已验证 Starter 诊断、Wasm 拒绝和撤权后页面更新 |
+| 平台 | Windows 实测结构化按键顺序以及三档 WebView 布局和窄窗关闭。Android 系统返回已有自动化和权限配置验收，Android、鸿蒙卓易通与实体设备间收发的结果待登记 |
+
+逐项覆盖范围见[实施记录](./2026-11-22-contract-and-policy-refactor/IMPLEMENTATION.md)和[设备验收清单](./2026-11-22-contract-and-policy-refactor/11-validation-and-rollout.md#8-移动端和设备间实测记录)。
+
+## 2026-11-04 实现基线
 
 | 项目 | 行为基线 |
 | --- | --- |
@@ -78,11 +87,7 @@ SDK 和 CLI 固定同一已审查提交，独立插件提交 Cargo.lock。
 生成的模板仍写 SDK 版本依赖，开发使用时需替换为所选源码提交。
 当前 Rust workspace 与应用未发布，不把示例版本或 schema v1 路径当成外部兼容冻结承诺。
 
-本地事件通过声明与 `on_event` 交付，emit 回执表示入队。
-当前应用的通用 headless device-send/broadcast、安全存储、headless transfer 等适配仍明确拒绝；
-不能借输入通道已实现而宣称所有跨设备 SDK 方法都已完成。
-页面的 `device.send`、`broadcast` 和宿主 picker 同样不代表当前已实现。
-宿主能力、平台能力与本插件授权需要分别检查。
+本地事件通过声明与 `on_event` 交付，emit 回执表示入队。App 的 Wasm 宿主允许经授权向指定设备排队发送插件事件，调用成功表示已排队。页面的 `device.send`、`broadcast` 和宿主 picker 仍返回不支持。Wasm 广播、安全存储和 Wasm 文件传输仍由宿主显式拒绝。宿主能力、平台能力与本插件授权需要分别检查。
 
 ## 独立插件
 
@@ -98,8 +103,8 @@ SDK 和 CLI 固定同一已审查提交，独立插件提交 Cargo.lock。
 
 ## 平台与交付
 
-Windows 桌面程序和 Android ARM64 APK 已构建。
-Android/卓易通的系统返回、连续触控，以及真实 Windows 鼠标效果仍需独立实体设备验收。
+2026-11-04 基线曾构建 Windows 桌面程序和 Android ARM64 APK。
+本轮实测了 Windows 结构化按键与主窗口布局。Android、卓易通的系统返回和连续触控，以及真实 Windows 鼠标效果仍待实体设备验收。
 源码中存在 macOS、Linux 或 iOS 的类型和适配，不表示已有对应应用分发或完整验收。
 
 当前没有由本轮工作建立的 winget、Homebrew、AUR、安装脚本或 TestFlight 渠道。
