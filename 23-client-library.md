@@ -499,6 +499,8 @@ export interface SelfNamespace {
 
 `transfer.send()` 在后台任务接管后返回 ID。须持有 `file:transfer:send` 才能用 `transfer.status(id)` 查询本插件发起的任务。查询返回 `pending`、`transferring`、`completed`、`failed` 或 `cancelled`，以及确认字节数和 `revision`。终态携带 `endedAtMs`，失败另有 `failure.kind`。如果任务不存在、保留已过期或归属其他插件，宿主返回 `invalid_argument`，其 `params.reason` 为 `transfer_not_found`。
 
+`transfer.send()` 在接管前由宿主为页面暂存文件。单文件上限是 64 MiB，额度占满时返回 `rate_limited`，其 `params.reason` 为 `upload_capacity`。页面关闭或会话失效会清理正在暂存的文件。worker 已接管的任务仍可通过同一插件重新打开页面后查询其状态。
+
 ### 4.5 渐进增强：`ClientFeature` 与 `env.hostSupports`
 
 `device.pick` 这类"预留但可能未实现"的能力，需要一个**能力自述**机制，
