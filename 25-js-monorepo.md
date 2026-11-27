@@ -211,6 +211,8 @@ await expect(synra.platform.openUrl('https://example.test')).rejects.toMatchObje
 
 `MockSynraClient` 实现 `SynraClient`。默认 profile 模拟 testkit 可实现的方法，`APP_PROFILE` 表示当前 App 的方法支持情况。平台支持和授权分别配置。上述模拟发送示例验证插件的调用，当前 App 对 `device.send` 返回 `unsupported`。
 
+传输测试可以用 `setTransferStatus` 设置初始记录，再用 `reportProgress` 推进。`transfer.onProgress` 先交付当前状态，后续只接收较新的 revision。`transfer.progress` 主题使用同一记录作为 payload，保留状态及失败原因。`transfer.status` 对未知 ID 返回 `invalid_argument` 和 `transfer_not_found`。
+
 `stub` 和 `stubFailure` 在支持和授权检查后替换结果，设置 stub 不计为调用。`capabilities` 使用 Core 语法，单独的 `*` 会被拒绝。设备选择需提供 `pickedDevice`，HTTP 响应需提供 fixture，可用 `createMockResponse` 创建。跨实现自动验证及真实宿主验收范围见[实施记录](./2026-11-22-contract-and-policy-refactor/IMPLEMENTATION.md)。
 
 > `testkit` 是 devDependency，**永远不会进入插件产物**（作者只用它跑测试）。

@@ -441,7 +441,7 @@ export interface NetworkNamespace {
 export interface TransferNamespace {
   send(req: { to: DeviceId; file: Blob; fileName: string; contextId?: string }): Promise<TransferId>
   status(id: TransferId): Promise<TransferStatus>
-  onProgress(id: TransferId, handler: (p: TransferProgress) => void): Unsubscribe
+  onProgress(id: TransferId, handler: (p: TransferProgress) => void, options?: SubscriptionOptions): Unsubscribe
 }
 
 export interface PlatformNamespace {
@@ -495,9 +495,11 @@ export interface SelfNamespace {
 
 `device.onChange(handler, options?)` 与 `event.subscribe('device.changed', handler, options?)` 使用同一个设备主题，需要 `device:list`。前者给回调设备数组，后者给 `{ devices }`。设备范围与 `device.list()` 一致，包括已配对、未屏蔽的离线设备。首次展示可以在建立订阅后调用 `device.list()`，并在页面卸载时调用订阅返回的函数。
 
-两个方法都接受可选的 `SubscriptionOptions.onError`，用来接收异步挂接、投递和快照恢复中的结构化错误。回调抛出的异常也走这个入口，每个订阅独立处理。返回的退订函数可以立即调用，也可重复调用。
+`event.subscribe`、`device.onChange` 和 `transfer.onProgress` 接受可选的 `SubscriptionOptions.onError`，用来接收异步挂接、投递和快照恢复中的结构化错误。回调抛出的异常也走这个入口，每个订阅独立处理。返回的退订函数可以立即调用，也可重复调用。
 
 `transfer.send()` 在后台任务接管后返回 ID。须持有 `file:transfer:send` 才能用 `transfer.status(id)` 查询本插件发起的任务。查询返回 `pending`、`transferring`、`completed`、`failed` 或 `cancelled`，以及确认字节数和 `revision`。终态携带 `endedAtMs`，失败另有 `failure.kind`。如果任务不存在、保留已过期或归属其他插件，宿主返回 `invalid_argument`，其 `params.reason` 为 `transfer_not_found`。
+
+`transfer.onProgress(id, handler, options?)` 使用相同的授权与归属检查。它在登记订阅后读取当前状态，按 `revision` 合并实时事件、初始查询及恢复快照。晚订阅仍可收到保留的终态。回调额外提供 `ratio`，按确认字节数占总字节数的比例计算，零字节时为 0。需要观察本插件发起的多个任务时，可以订阅 `transfer.progress`，其 payload 与 `transfer.status` 相同。有效的页面会话内，丢失事件后客户端读取宿主快照。页面重新打开后可以重新订阅。
 
 `transfer.send()` 在接管前由宿主为页面暂存文件。单文件上限是 64 MiB，额度占满时返回 `rate_limited`，其 `params.reason` 为 `upload_capacity`。页面关闭或会话失效会清理正在暂存的文件。worker 已接管的任务仍可通过同一插件重新打开页面后查询其状态。
 
