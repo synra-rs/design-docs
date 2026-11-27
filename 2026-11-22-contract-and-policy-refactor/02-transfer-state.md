@@ -1,6 +1,6 @@
 # 02 · 传输状态与终态查询
 
-状态：外发传输的宿主终态、定向进度和统一 worker 入口已接入。实际网络收发验收仍待执行。优先级：P1。范围：Core 传输状态规则、App worker/查询接口、JS transfer 契约。
+状态：外发传输的宿主终态、定向进度和统一 worker 入口已接入。Windows ARM64 上的真实 TCP 回环收发及重开页面后的状态恢复已通过。实体设备网络验收归 [11](./11-validation-and-rollout.md)。优先级：P1。范围：Core 传输状态规则、App worker/查询接口、JS transfer 契约。
 
 ## 1. 当前证据
 
