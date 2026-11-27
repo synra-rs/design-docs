@@ -1,8 +1,8 @@
 # 06 · 结构化按键与平台后端
 
-状态：计划。优先级：P2。范围：core 平台契约、桌面适配、SDK/调用方；不新增宿主业务快捷键。
+状态：结构化按键及宿主调用链已接入，Windows ARM64 实机按键接收通过。平台验证见[实施记录](./IMPLEMENTATION.md)。优先级：P2。
 
-## 1. 当前证据
+## 1. 改造前的证据
 
 [actions.rs:68](https://github.com/synra-rs/synra-core/blob/a75d399/crates/synra-platform/src/desktop/platform/actions.rs#L68) 将同一 chord 字符串直接交给 Linux xdotool、macOS AppleScript 和 Windows 后端。这些后端本身使用不同语法，字符串不构成跨平台语义。
 
@@ -58,3 +58,9 @@ Ctrl、Alt、Shift、Meta 的具体物理含义在文档中说明；不要隐式
 键盘布局、IME 与当前焦点影响物理效果，测试应区分逻辑键、字符输入和扫描码含义。首批不扩大为任意输入自动化系统，也不改变用户逐次确认或授权边界。
 
 完成条件是统一输入模型、通用后端选择、失败释放和至少 Windows 实机验收均有证据。原有常见复制粘贴组合仍需回归，不能只证明新增组合有效。
+
+## 7. 实施规则
+
+`KeyChord` 解析后按 `Ctrl`、`Alt`、`Shift`、`Meta` 顺序按下修饰键，最后按下主键。释放从主键开始，逆序释放所有已按下的键。外部执行器超时且输入状态不确定时，同时尝试释放可能已按下的键。同一个桌面宿主的并发组合由键盘互斥锁保护。
+
+Windows 使用原生虚拟键码，macOS 用固定 ANSI 位置表示字母和数字键，并读取辅助功能权限来判断可用性。X11 用探测命令检查显示连接和 `xdotool`，再把按键值转换为固定键名。宿主选区复制通过同一执行路径，macOS 明确选择 `Meta+C`，其他桌面选择 `Ctrl+C`。[Windows 键码定义](https://learn.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes) [xdotool 按键入口](https://github.com/jordansissel/xdotool/blob/main/cmd_key.c)

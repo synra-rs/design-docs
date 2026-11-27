@@ -209,7 +209,7 @@ DeviceCard = f(
 [PC] 内核收到
    → 校验：已配对 / 插件已装 / 动作已声明 / platform:simulate-keys 已授权
    → 调插件的 execute() → 插件调 platform::simulate_keys()
-   → 平台实现执行（Windows: SendKeys / macOS: osascript / Linux: xdotool）
+   → 宿主解析 KeyChord → Windows 和 macOS 发送原生键事件，Linux 向 X11 发送映射后的键事件
    → 回执
 ```
 

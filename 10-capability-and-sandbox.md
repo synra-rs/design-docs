@@ -592,7 +592,7 @@ pub fn validate_event_name(plugin_slug: &PluginSlug, event: &str) -> Result<()> 
 | --------------------------- | -------------------------------------- | ------------------------------------------- |
 | `platform:open-url`         | 钓鱼（打开恶意站点）                     | 显示确认弹窗（可配置为"仅 https"）           |
 | `platform:open-path`        | 执行任意文件（如果打开的是可执行文件）      | ★ 拒绝可执行扩展名；或强制"仅用默认应用打开"且不在 PATH 中 |
-| `platform:simulate-keys`    | **最强的能力**：可模拟任意按键            | ★ 独立的、默认关闭的授权；UI 上红色警示        |
+| `platform:simulate-keys`    | 可向当前焦点应用发送单次键盘组合          | ★ 独立的、默认关闭的授权；UI 上红色警示        |
 | `platform:read-clipboard`   | 读取密码等敏感内容                       | 权限 + 用户可见指示器（"某插件正在读剪贴板"）  |
 | `platform:write-clipboard`  | 污染剪贴板                               | 权限                                        |
 | `platform:notify`           | 骚扰                                    | 速率限制                                    |
@@ -603,6 +603,8 @@ pub fn validate_event_name(plugin_slug: &PluginSlug, event: &str) -> Result<()> 
 > - 每次调用在 UI 上有可见指示（托盘图标 / 通知）；
 > - 只能在用户前台交互期间调用（不能后台静默连按）；
 > - 有速率上限。
+
+Wasm 宿主将 `Ctrl+Shift+S` 之类的字符串解析为 `KeyChord`，再交给平台策略及限流。平台按顺序按下修饰键和主键，逆序尝试释放。输入失败和释放失败均有诊断。平台支持查询同时检查桌面环境和本地策略。插件的具体授权仍由能力门禁判断。
 
 ---
 

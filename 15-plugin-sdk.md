@@ -609,6 +609,10 @@ pub mod env {
 ```
 
 
+按键动作使用 `synra_plugin_sdk::host::platform_simulate_keys("Ctrl+Shift+S")`，返回 WIT `Outcome`。声明并取得 `platform:simulate-keys` 授权后才可以调用。每次请求一个主键，前面可以有互不重复的 `Ctrl`、`Alt`、`Shift`、`Meta`。支持 A–Z、0–9、F1–F12、方向键及 `Enter`、`Tab`、`Space`、`Backspace`、`Delete`、`Escape`、`Home`、`End`、`PageUp`、`PageDown`、`NumpadAdd`。
+
+输入忽略大小写及各段前后的 ASCII 空格。macOS 上 `Ctrl` 对应 Control，`Alt` 对应 Option，`Meta` 对应 Command。Windows 的 `Meta` 对应 Windows 键，X11 对应 Super。将旧的 `^c`、`{LWIN}e` 和 `cmd+c` 分别改为 `Ctrl+C`、`Meta+E` 和 `Meta+C`。数字键盘的加号写作 `NumpadAdd`。
+
 ### 4.4 错误处理
 
 ```rust
