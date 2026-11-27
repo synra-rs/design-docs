@@ -497,6 +497,8 @@ export interface SelfNamespace {
 
 两个方法都接受可选的 `SubscriptionOptions.onError`，用来接收异步挂接、投递和快照恢复中的结构化错误。回调抛出的异常也走这个入口，每个订阅独立处理。返回的退订函数可以立即调用，也可重复调用。
 
+`transfer.send()` 在后台任务接管后返回 ID。须持有 `file:transfer:send` 才能用 `transfer.status(id)` 查询本插件发起的任务。查询返回 `pending`、`transferring`、`completed`、`failed` 或 `cancelled`，以及确认字节数和 `revision`。终态携带 `endedAtMs`，失败另有 `failure.kind`。如果任务不存在、保留已过期或归属其他插件，宿主返回 `invalid_argument`，其 `params.reason` 为 `transfer_not_found`。
+
 ### 4.5 渐进增强：`ClientFeature` 与 `env.hostSupports`
 
 `device.pick` 这类"预留但可能未实现"的能力，需要一个**能力自述**机制，
