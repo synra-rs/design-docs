@@ -627,6 +627,8 @@ iframe 若经父窗口转发，可继续使用 `connect-src 'none'`；原生独�
 
 ## 9. 实现清单
 
+> **2026-11-27 · 注册表读取统一在后台执行。** App `06c6f32` 将预览与更新检查接入搜索使用的阻塞线程池。Windows ARM64 原生复测确认设置可在请求挂起时继续读写，换源后迟到的更新检查无法覆盖新记录。安装及更新的元数据和下载复用同一份源配置。413 项 Rust、31 项注册表前端和 21 项契约检查通过。[实施记录](./2026-11-22-contract-and-policy-refactor/IMPLEMENTATION.md)
+
 > **2026-11-27 · 注册表搜索在后台执行阻塞 HTTP。** App `a6ccc2b` 将两个搜索命令收敛到同一后台入口。Windows 原生 WebView 在一个回环源挂起时完成设置读写，并从新源完成另一次搜索。发现页的源变更回归确认已失效的旧结果不会进入列表。412 项 Rust、737 项前端、默认 Tauri 编译及 21 项契约检查通过。[实施记录](./2026-11-22-contract-and-policy-refactor/IMPLEMENTATION.md)
 
 > **2026-11-27 · 主窗口平台和视口分别处理。** App `bd83c92` 复用 Rust 平台事实。Windows 实际 WebView 在三段视口宽度正确切换导航，窄窗关闭后进程继续运行。Android 主窗口系统返回和退出权限有自动化验证。412 项 Rust、736 项前端、原生资源和 ACL、生产构建及 21 项契约检查通过。移动端实机结果待登记。[实施记录](./2026-11-22-contract-and-policy-refactor/IMPLEMENTATION.md)
