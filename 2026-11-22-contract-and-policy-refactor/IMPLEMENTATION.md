@@ -13,7 +13,7 @@
 | 03 上传会话 | 已接入 | 核对窗口会话、串行提交 offset，上传文件和预算一并移交给 worker。取消、过期、启动残留及权限失效有自动覆盖 |
 | 04 testkit | 已实施并自动验收 | 授权、方法支持、平台分支、拒绝、错误、设备事件、自定义主题、传输状态和网络范围均有共同场景 |
 | 05 版本策略 | 统一语义已接入 | 清单、SDK 最低版本、安装、同步、注册表及 App/daemon 更新共用 SemVer 解析和优先级规则 |
-| 06 平台按键 | 已实施并通过 Windows 实机验收 | 解析、授权、支持查询及失败清理有自动覆盖。其余桌面环境的实际效果归 11 |
+| 06 平台按键 | 已实施，通过 Windows 实机及 Alpine X11 验收 | 解析、授权、支持查询及失败清理有自动覆盖。Linux 事件在 ARM64 虚拟机中验证，macOS 原生效果待登记 |
 | 07 错误边界 | App 与 testkit 自动验收及 Windows 原生 WebView 验收通过 | 真实 serde 错误经实际 façade 与 testkit 验证，Starter 的参数诊断与撤权提示见第十六批 |
 | 08 Wasm 分类 | 已实施并自动验收 | 真实组件核对 fuel、epoch、内存上限、独立 trap 和复用。App RPC 与 daemon 远程执行保留一致诊断 |
 | 09 注册表 | 已实施，通过自动验收及 Windows 原生 WebView 验收 | 严格配置读写、有限原因、静态源预览与 npm 重试见第十七批 |
@@ -383,6 +383,20 @@ Windows ARM64 原生复现 `plugins_preview` 和 `plugins_check_update` 在等�
 
 默认 Tauri 编译、变更文件格式检查、31 项注册表前端和 21 项契约检查通过。首次 Rust 验收未设置 `SYNRA_STARTER_PACKAGE`，官方包用例报告缺少路径。指定已构建的 Starter `dist` 后，启用 `official-plugin-tests` 的 Rust 全量 413 项通过。原生探针首次调试请求超时，延长探针的 IPC 等待后完整复跑通过。测试构建与常用 Windows App 使用不同的可执行文件和数据目录，常用可执行文件的哈希校验通过。
 
+## 第二十一批 · Linux X11 按键事件
+
+从 Core `4a25b84` 的检出快照和锁文件构建 `aarch64-unknown-linux-musl` 探针。Windows ARM64 上使用 Rust `1.99.1`、Zig `0.17.1` 的 C 编译器以及 Alpine 的静态运行库完成链接。在 QEMU `11.1.0` 的 Alpine `3.24.4` ARM64 虚拟机运行，使用 Linux `6.18.60`、Xvfb `21.1.26`、xdotool `4.20260303.1` 和 xev `1.2.7`。
+
+探针调用生产 `CommandPlatform`。默认策略拒绝按键且支持查询不报告该动作。显式开启策略、未设置 `DISPLAY` 时返回 `Unsupported`。在 Xvfb `:101` 中聚焦独立 xev 窗口后，支持查询成功，接收队列的 14 个事件与下表完全一致。
+
+| 组合 | xev 捕获顺序 |
+| --- | --- |
+| `Ctrl+C` | Control_L↓ c↓ c↑ Control_L↑ |
+| `Ctrl+V` | Control_L↓ v↓ v↑ Control_L↑ |
+| `Ctrl+Shift+S` | Control_L↓ Shift_L↓ S↓ S↑ Shift_L↑ Control_L↑ |
+
+虚拟机内的源码编译较慢，最终使用宿主交叉构建的探针，并在来宾侧核对二进制 SHA-256。首轮 X11 就绪查询挂起，复跑使用单独的显示、关闭 GLX 的 Xvfb 和有截止时间的就绪查询。结果覆盖 Linux X11 后端的键事件投递和释放。
+
 ## 仍需交付
 
-10 仍需 Android 系统返回、全屏和 Activity 的实机证据。11 的实体收发、Android 和鸿蒙卓易通测试场景见[移动端验收记录](./11-validation-and-rollout.md#8-移动端和设备间实测记录)。其余平台操作仍需对应环境的实机记录。
+10 仍需 Android 系统返回、全屏和 Activity 的实机证据。11 的实体收发、Android 和鸿蒙卓易通测试场景见[移动端验收记录](./11-validation-and-rollout.md#8-移动端和设备间实测记录)。macOS 原生按键仍需实测。
