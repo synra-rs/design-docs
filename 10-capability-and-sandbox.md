@@ -660,6 +660,8 @@ impl RateLimiter {
 
 ## 6. UI 插件的会话令牌
 
+2026-11-27 更新。App 的同步 `env.can` 和本地预检查共用一份注入授权快照，按 Core 的域、通配符和限定符规则匹配。每次 RPC 仍由 Rust 会话校验当前授权。testkit 使用同一组 Core 生成的授权向量验证查询，方法支持与平台支持分别读取。[实施记录](./2026-11-22-contract-and-policy-refactor/IMPLEMENTATION.md)
+
 UI 插件跑在 WebView 里，它通过 IPC 调内核。**必须防止**：
 
 - 插件伪造 `pluginId`；

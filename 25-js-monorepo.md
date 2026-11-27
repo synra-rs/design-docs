@@ -185,30 +185,33 @@ synra-js/packages/protocol/src/generated/*.ts   （★ 手写，commit 进仓库
 
 CI 守卫：**任何生成文件被手改 → 重新同步后 `git diff` 不为空 → 失败**。
 
-### 2.4 `@synra/testkit`：唯一带实现的那个
+### 2.4 `@synra/testkit`：模拟插件客户端
 
 插件作者在本地要能"没有宿主也跑起来"：
 
 ```ts
-import { createMockClient } from '@synra/testkit'
+import { createMockClient, synraError } from '@synra/testkit'
 
 const synra = createMockClient({
-  capabilities: ['device:list', 'device:send'],
-  devices: [{ deviceId: 'dev_a', displayName: '我的 PC', online: true }],
-  platformCapabilities: ['open_url', 'notify'],       // 模拟 iOS（无 simulate_keys 等）
-  hostFeatures: ['device.onChange'],                  // 模拟"宿主未实现 device.pick"
+  capabilities: ['device:list', 'device:send:dev_a', 'platform:open-url'],
+  devices: [{ deviceId: 'dev_a', displayName: '我的 PC', platform: 'linux', online: true }],
+  platformCapabilities: ['open_url'],
+  hostFeatures: ['device.onChange'],
 })
 
 // 调用被记录，供断言
-await synra.device.send({ to: 'dev_a', event: 'chat.text', payload: { body: 'hi' } })
-expect(synra.calls).toContainEqual({ ns: 'device', method: 'send', args: { /* … */ } })
+const request = { to: 'dev_a', event: 'chat.text', payload: { body: 'hi' } }
+await synra.device.send(request)
+expect(synra.calls).toContainEqual({ ns: 'device', method: 'send', args: [request] })
 
 // 让某次调用失败
-synra.stub('platform', 'openUrl', { kind: 'synra-error', code: 'capability_denied', /* … */ })
+synra.stubFailure('platform', 'openUrl', synraError('timeout', '打开链接超时'))
+await expect(synra.platform.openUrl('https://example.test')).rejects.toMatchObject({ code: 'timeout' })
 ```
 
-`MockSynraClient extends SynraClient`（类型来自 `@synra/client`），所以
-**mock 与真实注入对象是同一类型**——作者写测试时不会"测过了但真机不对"。
+`MockSynraClient` 实现 `SynraClient`。默认 profile 模拟 testkit 可实现的方法，`APP_PROFILE` 表示当前 App 的方法支持情况。平台支持和授权分别配置。上述模拟发送示例验证插件的调用，当前 App 对 `device.send` 返回 `unsupported`。
+
+`stub` 和 `stubFailure` 在支持和授权检查后替换结果，设置 stub 不计为调用。`capabilities` 使用 Core 语法，单独的 `*` 会被拒绝。设备选择需提供 `pickedDevice`，HTTP 响应需提供 fixture，可用 `createMockResponse` 创建。跨实现自动验证及真实宿主验收范围见[实施记录](./2026-11-22-contract-and-policy-refactor/IMPLEMENTATION.md)。
 
 > `testkit` 是 devDependency，**永远不会进入插件产物**（作者只用它跑测试）。
 > 它也是"零运行时"原则的例外：**它不是注入对象的实现，而是它的替身**，两者不冲突。

@@ -627,6 +627,8 @@ iframe 若经父窗口转发，可继续使用 `connect-src 'none'`；原生独�
 
 ## 9. 实现清单
 
+> **2026-11-27：授权和错误诊断联合验证。** App `b7c014d` 补齐截断 URL、请求头与 FTP 凭据脱敏。App `93e13dc` 统一同步授权查询和本地预检查，使用 Core 实际生成的 28 个决策比对 testkit。684 个前端测试、392 个 Rust 测试、默认 Tauri 编译和 20 项 shapes 通过。Core 已定义插件事件 DTO，App 的定向投递继续实施。[实施记录](./2026-11-22-contract-and-policy-refactor/IMPLEMENTATION.md)
+
 > **2026-11-27：阶段复核。** 注册表批次已完成 App 原生 392 个测试及默认 Tauri 编译，今日复跑均退出 0；这两项不再待验证。07 的诊断脱敏另补了截断 URL、Authorization 与 FTP 凭据回归，正在完成本批前端检查；04 的统一执行管线改造尚未提交，不计为已交付。详见[实施记录](./2026-11-22-contract-and-policy-refactor/IMPLEMENTATION.md)。
 
 > **2026-11-23：错误边界与真实 Rust 夹具开始落地。** core `09c9901` 修正 SuggestedAction payload 的 camelCase 序列化。App 工作区统一宿主与插件的错误校验，未知失败归为 internal，诊断限长脱敏，并让 shapes 直接执行 Rust producer 比较夹具。前端 616 个测试、lint、生产构建与 18 项 shapes 已通过；App 原生编译、testkit 一致性和实际 UI 展示尚待验证。完整改造仍在进行，见[实施记录](./2026-11-22-contract-and-policy-refactor/IMPLEMENTATION.md)，不能将本条视为 01–11 全部交付。
