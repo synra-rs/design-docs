@@ -1,6 +1,6 @@
 # 07 · 注入边界错误归一化
 
-状态：App 与 testkit 已通过错误形状和分类的共同自动验收，真实宿主 UI 展示归 11。优先级：P1。实际提交和验证见[实施记录](./IMPLEMENTATION.md)。
+状态：App 与 testkit 已通过错误形状和分类的共同自动验收。Windows 原生 WebView 已验收 Starter 的参数诊断与撤权提示。优先级：P1。实际提交和验证见[实施记录](./IMPLEMENTATION.md)。
 
 ## 1. 当前证据
 
