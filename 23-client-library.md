@@ -497,6 +497,8 @@ export interface SelfNamespace {
 
 `event.subscribe`、`device.onChange` 和 `transfer.onProgress` 接受可选的 `SubscriptionOptions.onError`，用来接收异步挂接、投递和快照恢复中的结构化错误。回调抛出的异常也走这个入口，每个订阅独立处理。返回的退订函数可以立即调用，也可重复调用。
 
+页面通过 `event.subscribe` 接收现有 Core 事件服务投递的 `_plugin.<full-plugin-id>.<topic>`。精确订阅需要 `event:subscribe:<event>` 授权，其中 `<event>` 是完整事件名。通配订阅按点分模式匹配，宿主逐个具体主题复核授权。回调收到插件定义的 JSON 对象。可选的 `onGap({ afterSeq, throughSeq })` 会在恢复时报告本订阅在该序列范围内错过了至少一个自定义事件，之后继续接收新事件。设备和传输主题仍可重读当前快照。
+
 `transfer.send()` 在后台任务接管后返回 ID。须持有 `file:transfer:send` 才能用 `transfer.status(id)` 查询本插件发起的任务。查询返回 `pending`、`transferring`、`completed`、`failed` 或 `cancelled`，以及确认字节数和 `revision`。终态携带 `endedAtMs`，失败另有 `failure.kind`。如果任务不存在、保留已过期或归属其他插件，宿主返回 `invalid_argument`，其 `params.reason` 为 `transfer_not_found`。
 
 `transfer.onProgress(id, handler, options?)` 使用相同的授权与归属检查。它在登记订阅后读取当前状态，按 `revision` 合并实时事件、初始查询及恢复快照。晚订阅仍可收到保留的终态。回调额外提供 `ratio`，按确认字节数占总字节数的比例计算，零字节时为 0。需要观察本插件发起的多个任务时，可以订阅 `transfer.progress`，其 payload 与 `transfer.status` 相同。有效的页面会话内，丢失事件后客户端读取宿主快照。页面重新打开后可以重新订阅。

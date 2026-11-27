@@ -213,6 +213,8 @@ await expect(synra.platform.openUrl('https://example.test')).rejects.toMatchObje
 
 传输测试可以用 `setTransferStatus` 设置初始记录，再用 `reportProgress` 推进。`transfer.onProgress` 先交付当前状态，后续只接收较新的 revision。`transfer.progress` 主题使用同一记录作为 payload，保留状态及失败原因。`transfer.status` 对未知 ID 返回 `invalid_argument` 和 `transfer_not_found`。
 
+用 `deliver` 注入自定义事件时传入完整的 `_plugin.<full-plugin-id>.<topic>` 及 JSON 对象。精确订阅先检查授权，通配订阅在投递时检查具体事件的 `event:subscribe:<event>`，两种订阅都使用 Core 的点分模式语义。真实桥的丢帧恢复另由 App 的契约测试驱动。
+
 `stub` 和 `stubFailure` 在支持和授权检查后替换结果，设置 stub 不计为调用。`capabilities` 使用 Core 语法，单独的 `*` 会被拒绝。设备选择需提供 `pickedDevice`，HTTP 响应需提供 fixture，可用 `createMockResponse` 创建。跨实现自动验证及真实宿主验收范围见[实施记录](./2026-11-22-contract-and-policy-refactor/IMPLEMENTATION.md)。
 
 > `testkit` 是 devDependency，**永远不会进入插件产物**（作者只用它跑测试）。

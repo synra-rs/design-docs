@@ -627,6 +627,8 @@ iframe 若经父窗口转发，可继续使用 `connect-src 'none'`；原生独�
 
 ## 9. 实现清单
 
+> **2026-11-27 · 自定义事件经插件会话投递。** Core `9c19b45` 提供已校验事件观察者和页面信封，JS `e41c83d` 对齐订阅授权与 testkit，App `2df9c83` 按主题和会话权限投递。发生缺序时宿主重读状态快照，并通过 `onGap` 通知错过自定义事件的订阅。真实 Wasm 发射、权限隔离和溢出恢复回归通过，App 全量 708 项前端、411 项 Rust、默认 Tauri 编译和 21 项 shapes 通过。[实施记录](./2026-11-22-contract-and-policy-refactor/IMPLEMENTATION.md)
+
 > **2026-11-27 · TCP 回环验证了上传、终态及页面重开。** App `fef06c0` 使用两个独立宿主状态和真实回环套接字，从插件上传 RPC 驱动后台发送及 Core 接收。接收文件逐字节一致。原页面关闭后旧令牌失效，同一插件的新页面可恢复保留的终态。409 项 Rust 测试及默认 Tauri 编译通过。实体设备验收归计划 11。[实施记录](./2026-11-22-contract-and-policy-refactor/IMPLEMENTATION.md)
 
 > **2026-11-27 · 传输进度经插件会话投递。** App `25331ac` 将宿主确认的状态、revision 和失败原因投影给具备发送授权的发起插件。Core `3242f31` 定义投递及恢复契约，JS `0085251` 同步类型与 testkit。单项进度订阅先登记再查询，缺序或可重试读取失败后从当前有效会话恢复快照。App 706 项前端、408 项 Rust 测试、默认编译和 21 项 shapes 通过。实际网络两端和跨会话恢复仍待验收。[实施记录](./2026-11-22-contract-and-policy-refactor/IMPLEMENTATION.md)
