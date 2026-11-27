@@ -627,6 +627,10 @@ iframe 若经父窗口转发，可继续使用 `connect-src 'none'`；原生独�
 
 ## 9. 实现清单
 
+> **2026-11-27：阶段复核。** 注册表批次已完成 App 原生 392 个测试及默认 Tauri 编译，今日复跑均退出 0；这两项不再待验证。07 的诊断脱敏另补了截断 URL、Authorization 与 FTP 凭据回归，正在完成本批前端检查；04 的统一执行管线改造尚未提交，不计为已交付。详见[实施记录](./2026-11-22-contract-and-policy-refactor/IMPLEMENTATION.md)。
+
+> **2026-11-23：错误边界与真实 Rust 夹具开始落地。** core `09c9901` 修正 SuggestedAction payload 的 camelCase 序列化。App 工作区统一宿主与插件的错误校验，未知失败归为 internal，诊断限长脱敏，并让 shapes 直接执行 Rust producer 比较夹具。前端 616 个测试、lint、生产构建与 18 项 shapes 已通过；App 原生编译、testkit 一致性和实际 UI 展示尚待验证。完整改造仍在进行，见[实施记录](./2026-11-22-contract-and-policy-refactor/IMPLEMENTATION.md)，不能将本条视为 01–11 全部交付。
+
 > 2026-11-04 文档与使用入口已按当前代码校准。README 收敛为产品和项目职责，开发步骤进入 CONTRIBUTING；
 > 官网 20 组中英文内容更新，保留现有主题与路由。当前行为见 [CURRENT-STATE](./CURRENT-STATE.md)，
 > 文档验证范围见 [本轮记录](./history/2026-11-04-documentation-refresh.md)。

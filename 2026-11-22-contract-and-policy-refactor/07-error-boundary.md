@@ -1,6 +1,6 @@
 # 07 · 注入边界错误归一化
 
-状态：计划。优先级：P1。范围：App façade、IPC 错误映射、JS testkit 与公开错误契约。
+状态：App 边界已实施并通过本批自动验收，testkit 同场景一致性及联合宿主验收待后续批次。优先级：P1。范围：App façade、IPC 错误映射、JS testkit 与公开错误契约。实际提交和验证见[实施记录](./IMPLEMENTATION.md)。
 
 ## 1. 当前证据
 
