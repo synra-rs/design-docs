@@ -1,8 +1,8 @@
 # 10 · 宿主环境与响应式布局分离
 
-状态：计划。优先级：P2。范围：App 启动环境、布局和返回/退出处理。
+状态：已实施，Windows 与自动化已验证，移动端待实机验收。范围：App 启动环境、布局和返回/退出处理。
 
-## 1. 当前证据
+## 1. 重构前证据
 
 [App.vue:83](https://github.com/synra-rs/synra-app/blob/f7c6d1d/src/App.vue#L83) 通过移动 UA 或 maxTouchPoints > 0 推断 phoneLike，再结合 Tauri 标志和 64rem 媒体查询得到 isMobile。随后同一个 isMobile 同时决定布局、全屏和双击退出。
 
@@ -59,4 +59,13 @@ ViewportLayout 只描述 compact/wide、导航呈现方式和断点变化。maxT
 
 Android 的全屏、系统返回和 Activity 行为必须在实际构建中验证；jsdom 的 matchMedia 和模拟 Tauri 只能验证编排。移动构建先更新 dist 再打包，避免用旧前端验证新逻辑。
 
-完成条件包括桌面触屏/窄窗口场景及 Android 返回的独立证据。不能把把 phoneLike 提取成一个工具函数视为完成，必须消除平台与布局的混用。
+完成条件包括桌面触屏和窄窗口场景，以及 Android 返回的独立证据。
+
+## 6. 实现
+
+- Rust 会在 App 启动时按当前目标平台刷新本地设备资料，保留设备 ID 和用户设置的名称。主窗口从既有设备快照获取该事实。插件注入、Wasm 宿主类别和引擎选择复用同一个 Rust 来源。
+- `ViewportLayout` 只根据 48rem 和 64rem 断点派生底部导航、图标 rail 和展开侧栏。浏览器使用独立的预览环境。原生桌面控件和 Android 返回按宿主环境启用。
+- Android 主窗口接收 Tauri 系统返回事件，先尝试关闭对话框，再按实际应用历史返回。直接进入 query 或 hash 子状态时回到该页基础地址，未知路径回到首页。根页用单一 1800ms 窗口确认退出。移动插件页面由独立的 Activity 处理返回。
+- 视口监听使用同一处理函数注册和释放。Android 返回和桌面窗口缩放共用异步监听清理。原生监听注册失败会记录诊断，设备和设置各自初始化。
+
+实际验收见[实施记录](./IMPLEMENTATION.md)。
