@@ -374,6 +374,8 @@ pub async fn remove(&self, plugin_id: &PluginId, opts: RemoveOptions) -> Result<
 
 ## 3. 更新（Update）
 
+清单、SDK 最低版本、更新检查、安装及同步共用 Core 的 `PluginVersion`。手动替换和自动更新都要求候选版本优先级更高。自动更新另检查稳定版、主版本策略、签名和现有授权。构建元数据保留在版本身份中，参与精确查找。同优先级的不同构建沿同步策略处理字节冲突。
+
 ```rust
 pub struct UpdatePlan {
     pub from: Semver,

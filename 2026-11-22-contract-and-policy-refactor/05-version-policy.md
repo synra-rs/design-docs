@@ -1,10 +1,10 @@
 # 05 · 统一版本解析、排序与升级策略
 
-状态：计划。优先级：P2。范围：core 插件清单、注册表、同步和更新；App/daemon 调用方同步调整。
+状态：统一 SemVer 已接入清单、注册表、同步、安装及 App/daemon 更新入口。实际回归和提交见[实施记录](./IMPLEMENTATION.md)。优先级：P2。
 
-## 1. 当前存在的规则
+## 1. 改造前的规则
 
-| 实现 | 证据 | 当前问题 |
+| 实现 | 证据 | 问题 |
 | --- | --- | --- |
 | plugin_sync::compare_versions | [decision_policy.rs:159](https://github.com/synra-rs/synra-core/blob/a75d399/crates/synra-core/src/plugin_sync/decision_policy.rs#L159) | 预发布仅保留有/无，数字解析失败变 0，build metadata 参与向量比较 |
 | plugin-host registry::compare_versions | [integrity.rs:14](https://github.com/synra-rs/synra-core/blob/a75d399/crates/synra-plugin-host/src/registry/integrity.rs#L14) | 同形简化实现，用于缺 latest 时挑默认版本 |

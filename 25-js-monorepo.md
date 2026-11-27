@@ -290,6 +290,8 @@ export type { DeviceId, TransferId, DeviceTarget } from '@synra/protocol'
 
 ## 4. 版本与发布
 
+宿主按完整 SemVer 校验插件清单和注册表版本。`1.0.0-01` 和日期式版本需要在发布前改为合法的版本，构建元数据可用于记录日期。只改构建元数据的发行保留独立的精确版本号，升级优先级相同。详情见[插件作者手册](./13-plugin-authoring.md)。
+
 ### 4.1 三个包**同步版本**
 
 `synra` / `@synra/client` / `@synra/protocol` 采用**同一个版本号**（`fixed` 模式），
